@@ -1,0 +1,63 @@
+﻿@using BlazorOTPInput.Pages.OtpInputComponent
+<div class="codecell-otp-wrapper" style="@Option.ComponentStyle(); direction: ltr;justify-content: center">
+    @for (int i = 0; i < Count; i++)
+    {
+        var index = i;
+
+        <OtpBaseInput TabIndex="@index"
+                      MaxTabIndex="@(Count - 1)"
+                      OnKeydownEvent="Keydown"
+                      Option="Option"
+                      @ref="inputs![index]"
+                      @key="index" />
+    }
+</div>
+
+@code {
+
+    [Parameter, EditorRequired] public int Count { get; set; }
+
+    [Parameter] public OtpOption Option { get; set; } = new();
+
+    [Parameter] public EventCallback<string> OnCompleteEvent { get; set; }
+
+    OtpBaseInput[]? inputs;
+
+    protected override void OnInitialized()
+    {
+        if (Option is null)
+            Option = new();
+
+        inputs = new OtpBaseInput[Count];
+
+        for (int i = 0; i < Count; i++)
+        {
+            inputs[i] = new OtpBaseInput();
+        }
+
+    }
+
+    async Task Keydown((int TabIndex, string Value, OtpActionType action) data)
+    {
+        if (data.action != OtpActionType.NoAction)
+        {
+            var currentIndex = data.TabIndex;
+
+            int targetIndex = data.action switch
+            {
+                OtpActionType.GotToNext => data.TabIndex + 1,
+                OtpActionType.GoToPrev => data.TabIndex - 1,
+                _ => data.TabIndex
+            };
+
+            await inputs![targetIndex].FocusAsync();
+        }
+
+        if (IsCompleted())
+            await OnCompleteEvent.InvokeAsync(GetValue());
+    }
+
+    public string GetValue() => string.Join("", inputs!.Select(d => d.GetValue()));
+
+    bool IsCompleted() => GetValue().Length == Count;
+}

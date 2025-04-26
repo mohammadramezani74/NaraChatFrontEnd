@@ -1,0 +1,80 @@
+﻿@using BlazorOTPInput.Pages.OtpInputComponent
+<input @bind-value="value"
+       @onkeydown="HandleOnKeydown"
+       @onkeydown:preventDefault
+       @ref="textInput"
+       @onfocusin="HandleOnFocusIn"
+       @onfocusout="HandleOnFocusOut"
+       maxlength="1"
+       class="codecell-otp-input"
+       style="@style" />
+
+@code {
+
+    [Parameter]
+    public BaseOtpOption Option { get; set; } = new();
+
+    [Parameter, EditorRequired]
+    public int TabIndex { get; set; }
+
+    [Parameter, EditorRequired]
+    public int MaxTabIndex { get; set; }
+
+    [Parameter, EditorRequired]
+    public EventCallback<(int TabIndex, string Value, OtpActionType Action)> OnKeydownEvent { get; set; }
+
+    string style = string.Empty;
+    string value = string.Empty;
+    string key = string.Empty;
+
+    ElementReference textInput;
+
+    protected override void OnInitialized()
+    {
+        if (Option is null)
+            Option = new();
+
+        style = Option.Style();
+    }
+
+
+    async Task HandleOnKeydown(KeyboardEventArgs args)
+    {
+        key = args.Key;
+
+        OtpActionType action = OtpActionType.NoAction;
+
+        bool canBind = int.TryParse(key, out int result);
+
+        if (canBind)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                value = result.ToString();
+
+            action = TabIndex != MaxTabIndex ? OtpActionType.GotToNext : OtpActionType.NoAction;
+        }
+        else if (key.Equals("backspace", StringComparison.OrdinalIgnoreCase))
+        {
+            value = string.Empty;
+            action = TabIndex != 0 ? OtpActionType.GoToPrev : OtpActionType.NoAction;
+        }
+
+        await OnKeydownEvent.InvokeAsync((TabIndex, value, action));
+    }
+
+    void HandleOnFocusIn(FocusEventArgs arg)
+    {
+        style = Option.OnFocusStyle();
+    }
+    void HandleOnFocusOut(FocusEventArgs arg)
+    {
+        style = Option.Style();
+    }
+
+    public async Task FocusAsync()
+    {
+        await textInput.FocusAsync();
+    }
+
+    public string GetValue() => value;
+}

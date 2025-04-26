@@ -1,0 +1,44 @@
+﻿<MudItem xs="1">
+    <MudPopover Open="ShowEmojiPicker" @onmouseleave="()=>ShowEmojiPicker=false" AnchorOrigin="Origin.TopRight" TransformOrigin="Origin.TopRight" Style="width:350px;">
+        <MudPaper>
+            <MudGrid>
+                <MudItem xs="12" Style="display: flex; justify-content: space-between; align-items: center;">
+
+                    <MudIconButton Icon="@Icons.Material.Filled.Close" OnClick="CloseToggle"  Size="Size.Small" />
+                </MudItem>
+                @foreach (var emoji in Emojis)
+                {
+                    <MudItem xs="3">
+                        <MudButton OnClick="() => SelectEmoji(emoji)" Style=" font-size: 24px;width: 40px;  height: 40px;display: flex; justify-content: center; align-items: center;">
+                            @emoji
+                        </MudButton>
+                    </MudItem>
+                }
+            </MudGrid>
+        </MudPaper>
+    </MudPopover>
+</MudItem>
+
+@code {
+    [Parameter]
+    [EditorRequired]
+    public bool ShowEmojiPicker { get; set; }
+    [Parameter]
+    public EventCallback<string> OnEmojiSelected { get; set; }
+    [Parameter]
+    public EventCallback OnClosepopover{ get; set; }
+    private async Task CloseToggle(){
+        await OnClosepopover.InvokeAsync();
+    }
+
+
+    private async Task SelectEmoji(string emoji)
+    {
+      await  OnEmojiSelected.InvokeAsync(emoji);
+    }
+
+    private List<string> Emojis = new()
+    {
+        "😀", "😂", "😍", "😎", "🤩", "🥳", "😊", "😇", "🤣", "😜","🌸","💐","🙏","😁","👍","😡","❤️"
+    };
+}

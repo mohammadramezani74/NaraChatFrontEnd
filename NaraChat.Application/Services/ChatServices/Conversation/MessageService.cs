@@ -1,0 +1,171 @@
+﻿using Microsoft.AspNetCore.Authorization.Infrastructure;
+using NaraChat.Contract.Models.BaseResponse;
+using NaraChat.Contract.Models.Chat.Conversation;
+using System;
+using System.IO;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Net.Mime;
+using System.Reflection.Metadata;
+using System.Text.Json;
+
+namespace NaraChat.Application.Services.ChatServices.Conversation
+{
+    public class MessageService(HttpClient httpClient) : IMessageService
+    {
+        private readonly HttpClient _httpClient = httpClient;
+
+        public async Task<List<ChatMessageDto>?> LoadMessages(Guid ConverSationId,int Messagecount=50, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+
+        
+            var messages = await _httpClient.GetFromJsonAsync<BaseResponseDto<List<ChatMessageDto>?>>($"/api/v1/message/{ConverSationId}/messages?messageCount={Messagecount}");
+            if (!messages.isSucceded)
+            {
+                return null;
+            }
+          return messages.result;
+            }
+            catch (Exception)
+            {
+
+                return null;
+            }
+        }
+
+        public async Task<(bool,Guid MessageId)> SendMessageAsync(Guid ConversationId, string Message, Guid? ParentId = null, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+
+         
+
+            var result = await _httpClient.PostAsJsonAsync($"api/v1/message/messages", new { conversationId= ConversationId, message= Message, ParentId=ParentId },new System.Text.Json.JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+            });
+                if (result.IsSuccessStatusCode)
+                {
+                    var responseApi = JsonSerializer.Deserialize<BaseResponseDto<Guid>>(await result.Content.ReadAsStringAsync());
+                    return (true, responseApi!.result);
+                }
+                return (false, Guid.Empty);
+            }
+            catch (Exception)
+            {
+
+                return (false, Guid.Empty);
+            }
+        }
+
+        public async Task<(bool, string message)> EditMessageAsync(EditedMessageDto editedMessage, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+
+        
+            var result = await _httpClient.PutAsJsonAsync($"api/v1/message/EditMessage", new {MessageId= editedMessage.Id,Message= editedMessage.Message, otherUserId=editedMessage.OtherId }, new System.Text.Json.JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+            });
+            result.EnsureSuccessStatusCode();
+                return (true, "ویرایش پیام با موفقیت انجام شد!");
+            }
+            catch (Exception ex)
+            {
+
+                return (false, "ویرایش پیام به خطا مواجه شد!");
+            }
+        }
+
+        public async Task<(bool, string message)> DeleteMessageAsync(Guid MessageId, Guid OtherId, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+
+         
+            var result = await _httpClient.DeleteAsync($"/api/v1/message/{MessageId}/{OtherId}/DeleteMessage");
+                result.EnsureSuccessStatusCode();
+                return (true, "حذف پیام با موفقیت انجام شد.");
+            }
+            catch (Exception)
+            {
+
+                return (false, "حذف پیام با خطا مواجه شد!");
+            }
+
+        }
+
+        public async Task<(bool, string message, UploadFileResult? result)> UploadChatFileAsync(UploadFileDto uploaddto, CancellationToken cancellationToken = default)
+        {
+            var content = new MultipartFormDataContent();
+            uploaddto.file.Headers.ContentType = new MediaTypeHeaderValue(uploaddto.ContentType);
+    
+            content.Add(uploaddto.file, "file",uploaddto.fileName);
+            content.Add(new StringContent(uploaddto.caption ?? ""), "caption");
+            content.Add(new StringContent(uploaddto.ConversationId.ToString()), "conversationId");
+            try
+            {
+
+
+                var result = await _httpClient.PostAsync("/api/v1/message/UploadFile",content, cancellationToken);
+                if (result.IsSuccessStatusCode)
+                {
+                    var resultapi = await result.Content.ReadAsStringAsync();
+                    var FileResult = JsonSerializer.Deserialize<BaseResponseDto<UploadFileResult>>(resultapi, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+                    return (true, "عملیات با موفقیت انجام شد. ", FileResult!.result);
+                }
+                return (false, "مشکلی در بارگذاری فایل شما به وجود آمده ",null);
+            }
+            catch (Exception e)
+            {
+
+                return (false, "مشکلی در بارگذاری فایل شما به وجود آمده  لطفا مدتی دیگر مجدد تلاش فرمایید!",null);
+            }
+        }
+
+        public async Task<Stream?> GetFileById(Guid Id, CancellationToken cancellationToken=default)
+        {
+            var result = await _httpClient.GetAsync($"api/v1/chatfiles/{Id}/files", cancellationToken);
+            if (!result.IsSuccessStatusCode)
+            {
+                return null;
+            }
+            var stream = await result.Content.ReadAsStreamAsync();
+            return stream;
+        }
+       public async Task<ChatPhotoMessageDto?> GetImageById(Guid Id, CancellationToken cancellationToken = default)
+        {
+            var result = await _httpClient.GetAsync($"api/v1/chatfiles/{Id}/files", cancellationToken);
+            if (!result.IsSuccessStatusCode)
+            {
+                return null;
+            }
+            var response = await result.Content.ReadAsStringAsync();
+            var photoData = JsonSerializer.Deserialize<ChatPhotoMessageDto>(response, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+            return photoData;
+        }
+
+        public async Task<(bool issuccess, string Message)> newReactionOnMessage(string? reaction, Guid MessageId)
+        {
+            var result = await _httpClient.PostAsJsonAsync($"api/v1/message/newReactionOnMessage", new { Reaction = reaction, MessageId }, new System.Text.Json.JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+            });
+            if (result.IsSuccessStatusCode)
+            {
+                return (true, "ok");
+            }
+            return (false, "ارسال ری اکشن با خطا مواجه شد!");
+
+        }
+    }
+}

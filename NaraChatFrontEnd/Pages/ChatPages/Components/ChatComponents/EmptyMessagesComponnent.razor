@@ -1,0 +1,46 @@
+﻿
+<MudGrid Justify="Justify.Center" Style="height: 70vh; padding: 2rem;">
+    <MudItem xs="12" md="8" lg="6">
+        <div class="d-flex flex-column align-center text-center" style="gap: 1.5rem; animation: fadeIn 0.6s ease-out;">
+
+
+            <MudText Style="font-size: 8rem; line-height: 1; animation: float 3s ease-in-out infinite; transform-origin: center;">
+                <span class="emoji-wrapper">@GetRandomEmoji()</span>
+            </MudText>
+
+
+            <MudText Typo="Typo.h4" Color="Color.Default" Style="font-weight: 800;">
+                @(OtherId != null ? $"بیاید چت رو شروع کنیم!" : "به ناراگرام خوش آمدید!🤩")
+            </MudText>
+            <MudText Typo="Typo.body1" Color="Color.Default">
+                @(OtherId != null ? $" اولین پیامت رو به {OtherId.Name} ارسال کن!" : "برای شروع مکالمه ابتدا کاربری را از لیست انتخاب نمایید")
+            </MudText>
+
+            <div class="floating-dots">
+                <div class="dot dot-1"></div>
+                <div class="dot dot-2"></div>
+                <div class="dot dot-3"></div>
+            </div>
+        </div>
+    </MudItem>
+</MudGrid>
+
+@code {
+   
+    [Parameter]
+    public UserDto? OtherId { get; set; } = null;
+    private static readonly Random _random = new Random();
+    private static readonly string[] _emojis =
+    {
+        "🚀", "🌈", "😇", "👻", "⚡",
+        "🕶️", "🦄", "🤖", "🐉", "🌌",
+        "🎭", "🖌️", "🎸", "🧩", "🌠",
+        "🦊", "🐧", "🦥", "🥳", "🦋",
+        "🖥️", "📱", "😍", "💻", "😎"
+    };
+    public static string GetRandomEmoji()
+    {
+        int index = _random.Next(_emojis.Length);
+        return _emojis[index];
+    }
+}

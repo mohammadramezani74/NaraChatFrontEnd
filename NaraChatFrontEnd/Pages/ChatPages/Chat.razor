@@ -1,0 +1,524 @@
+﻿@page "/chat"
+@page "/chat/{id:guid}"
+@using NaraChat.Contract.Models.Chat
+
+@inject ISnackbar snackbar
+@inject IUserChatService userService
+@inject IJSRuntime js
+@inject IConversationService ConversationService
+@inject NavigationManager nm
+@inject AuthenticationStateProvider stateprovider
+@implements IAsyncDisposable
+
+
+ @inject AuthenticationStateProvider AuthenticationStateProvider
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="pa-0" Style="@(ThemeChanging.boxShadow+"; height: 90vh;" )">
+    <MudCard Class="br-0 h-100">
+        <MudCardContent Class="bg-light d-flex pa-0" Style="height: 100%; min-height: 0;">
+            <MudGrid Style="flex:1; margin:0; height: 100%;" Spacing="0">
+
+                @if(gotoDetailByMobile!=true){
+                    <MudItem xs="12" sm="3" Class="h-100 d-flex flex-column" Style="padding:0; height: 100%;">
+                        <UserList Users="Users"
+                        MissedMessageCount="missedMassage"
+                        ReeadMissedMessage="EmptyReadMessage"
+                        Loading="LoadingUsers"
+                        OnUserSelected="OnUserSelected" OnOtherUserSelected="OnOtherUserSelected" />
+                    </MudItem>
+                }
+                @if (!IsMobile || gotoDetailByMobile)
+                {
+                    <MudItem xs="12" sm="@( ThemeChanging.IsShowSetting  ? 6 : 9)" Class="h-100 d-flex px-0">
+                        <ChatDetail @key="ThemeChanging.IsShowSetting" OtherUser="OtherUser"
+                        NewIncomingMessage="_newIncomingMessage"
+                        IncommingMessageRecieved="NullIncomingMessage"
+                        OnCancel="HandleChatDetailsCancel"
+                        OnMessageSeen="SendMessageSeenIdsToHub"
+                        MessagedSeened="MessagesId"
+                        ReduceMessageSeenedCount="ReduceSeenedMessage"
+                        NewIncomingEditedMessage="_newIncomingEditedMessage" 
+                        DeletedMessageId="DeletedMessageId"
+                        OnSendMessageSession="SendConnectionMessage"
+                        IsMobile="IsMobile" 
+                        BackToUsersList="HandleBackToUserListMobile"
+                        SendReaction="ReactionToUser"
+                        reactionType="reaction"
+                        MyAvatar="@myAvatar"
+                        NullReaction="NullReaction"
+                        MessageReactioncallBack="SendReaction"
+                        EmojiReaction="Reaction"
+                        NullEmojiReactioncallBack="NullReact"
+                        MissedUserMessage="missedTargetUserMassages"
+                        ClearMissedMessageUser="ClearMissedTargetUserMessages"/>
+
+
+                    </MudItem>
+                }
+                @if (ThemeChanging.IsShowSetting && IsMobile != true)
+                {
+                    <MudItem  xs="12" sm="3" Class="h-100 d-flex flex-column" Style="padding:0; position:relative; overflow:hidden;">
+                        <MudIconButton Icon="@Icons.Material.Filled.Close"
+                        Color="Color.Default"
+                        Class="ma-2"
+                        Style="position:absolute; right:0; z-index:1000;"
+                        OnClick="ToggleUserInfo" />
+                        <UserInfo MyAvatar="@myAvatar" ChosenUser="_selectedUser" OnPictureChanged="OnChanedPicture" OnClearChosenUser="OnClearUserSelected" />
+                    </MudItem>
+                }
+            </MudGrid>
+        </MudCardContent>
+    </MudCard>
+</MudContainer>
+
+@code {
+    [CascadingParameter(Name = "Theme")]
+    public ThemeChanging ThemeChanging { get; set; }
+    [Parameter]
+    public Guid id { get; set; }
+    private Timer pingTimer;
+    public string? myAvatar { get; set; }
+    protected override void OnParametersSet()
+    {
+        if(id !=Guid.Empty){
+            OtherUser = Users.Where(x=>x.Id==id).FirstOrDefault() ;
+            StateHasChanged();
+        }
+    }
+
+
+    private void ToggleUserInfo()
+    {
+        ThemeChanging.IsShowSetting = !ThemeChanging.IsShowSetting;
+        StateHasChanged();
+    }
+    private void NullReaction(){
+        reaction = null;
+    }
+    private void NullReact()
+    {
+        Reaction = null;
+    }
+
+}
+
+
+
+
+@code {
+    private DotNetObjectReference<Chat> _objRef;
+    private UserDto Logineduser;
+
+    public List<Guid> MessagesId { get; set; } = new ();
+    private UserDto? OtherUser=null;
+    private UserDto? _selectedUser = null;
+    private IList<UserDto> Users { get; set; } = new List<UserDto>();
+    private HubConnection? _hubConnection;
+    private bool LoadingUsers = false;
+    private ChatMessageDto? _newIncomingMessage = null;
+    private ChatMessageDto? LastReceivedMessage = null;
+    private EditedMessageDto? _newIncomingEditedMessage = null;
+    public Guid? DeletedMessageId { get; set; } = null;
+    private Timer _idleTimer;
+    private DateTime _lastActivityTime = DateTime.Now;
+    private const int IdleTimeoutMinutes = 5;
+    private bool IsMobile { get; set; } = false;
+    private bool gotoDetailByMobile { get; set; } = false;
+    public TypingReactionDto? reaction { get; set; } = null;
+    private Timer _pingTimer;
+    private MessageReaction? Reaction = null;
+    private List<ChatMessageDto> missedMassage = new List<ChatMessageDto>();
+    private List<ChatMessageDto> missedTargetUserMassages = new List<ChatMessageDto>();
+
+
+    public async Task HandleBackToUserListMobile(){
+        gotoDetailByMobile = false;
+        StateHasChanged();
+    }
+
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            Console.WriteLine( "OnInitializedAsync Called one Time");
+            LoadingUsers = true;
+            Logineduser = await ((CustomAuthenticationStateProvider)AuthenticationStateProvider).GetUserInfoAsync();
+            if (!await((CustomAuthenticationStateProvider)AuthenticationStateProvider).IsAuthenticated()){
+                Console.WriteLine("کاربر احراز هویت نشده");
+                nm.NavigateTo("/");
+            }
+
+            _hubConnection = await ConfigureHubConnection();
+
+
+            if (_hubConnection.State == HubConnectionState.Disconnected)
+            {
+                await _hubConnection.StartAsync();
+            }
+
+
+            var usersList = await userService.GetUsersAsync();
+            if (usersList is not null)
+                Users = usersList.ToList();
+            if (_hubConnection.State == HubConnectionState.Connected)
+            {
+                await _hubConnection.SendAsync("SetUserOnline", Logineduser);
+            }
+
+            //         pingTimer = new Timer(async _ =>
+            // {
+            //     try
+            //     {
+            //         await _hubConnection.InvokeAsync("Ping");
+            //     }
+            //     catch (Exception ex)
+            //     {
+            //         Console.WriteLine($"Ping error: {ex.Message}");
+            //     }
+            // }, null, TimeSpan.Zero, TimeSpan.FromSeconds(15));
+
+            LoadingUsers = false;
+            var myImage= await ConversationService.GetImageConversation(Logineduser.Id,Guid.NewGuid());
+            myAvatar = myImage.MyAvatar;
+            StateHasChanged();
+            var size = await js.InvokeAsync<WindowSizeDto>("getWindowSize");
+            if(size.Width<=500){
+                IsMobile = true;
+            }
+
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("کاربر احراز هویت نشده");
+            Console.WriteLine($"هاب ارور داره: {ex.Message}");
+
+        }
+    }
+
+
+    private async Task SendConnectionMessage()
+    {
+        if(_hubConnection is not null){
+            if (_hubConnection.State == HubConnectionState.Disconnected)
+            {
+                await _hubConnection.StartAsync();
+                await _hubConnection.SendAsync("SetUserOnline", Logineduser);
+            }
+            await _hubConnection.SendAsync("SetUserOnline", Logineduser);
+        }
+    }
+    private async Task OnReconnected(string? arg)
+    {
+        Console.WriteLine("Reconnecting User Again");
+        Console.WriteLine("ریکانکت دوباره");
+        var messageId = LastReceivedMessage?.Id.ToString() ?? "خالی";
+        Console.WriteLine($"آخرین پیام من : {messageId}");
+
+        if (_hubConnection.State == HubConnectionState.Disconnected)
+        {
+            await _hubConnection.StartAsync();
+        }
+        if (_hubConnection.State == HubConnectionState.Connected)
+        {
+            _hubConnection.SendAsync("SetUserOnline", Logineduser);
+        }
+        if (LastReceivedMessage != null)
+        {
+            await _hubConnection.InvokeAsync<List<ChatMessageDto>>(
+             "GetMissedMessages", LastReceivedMessage
+             );
+        }
+        else
+        {
+            LastReceivedMessage = new ChatMessageDto { UserId = Logineduser.Id };
+            Console.WriteLine($"رفتش توی اینورینت دومی با آیدی {LastReceivedMessage.Id}");
+            await _hubConnection.InvokeAsync<List<ChatMessageDto>>(
+            "GetMissedMessages", LastReceivedMessage
+            );
+        }
+
+    }
+    private async Task<HubConnection> ConfigureHubConnection()
+    {
+        var token = await ((CustomAuthenticationStateProvider)stateprovider).GetTokenAsync();
+
+        var hubConnection = new HubConnectionBuilder()
+       .WithUrl(nm.ToAbsoluteUri(SiteSettings.HubConnectuinUrl), Options => {
+           Options.AccessTokenProvider = () => Task.FromResult(token);
+       })
+       .WithAutomaticReconnect()
+       .Build();
+        hubConnection.KeepAliveInterval = TimeSpan.FromSeconds(20);
+        hubConnection.ServerTimeout = TimeSpan.FromSeconds(150); 
+        hubConnection.HandshakeTimeout = TimeSpan.FromSeconds(30);
+        hubConnection.Reconnecting += error =>
+    {
+        Console.WriteLine($"Connection lost. Attempting to reconnect... Error: {error.Message}");
+        return Task.CompletedTask;
+    };
+
+        hubConnection.Reconnected +=  OnReconnected;
+
+        hubConnection.Closed += error =>
+        {
+            Console.WriteLine($"Connection closed. Error: {error?.Message}");
+            return Task.CompletedTask;
+        };
+
+        hubConnection.On<UserDto>(nameof(IChatHubClient.UserConnected), (newUser) =>
+    {if(!Users.Any(x=>x.Id==newUser.Id))
+            Users.Add(newUser);
+        StateHasChanged();
+    });
+
+        hubConnection.On<ICollection<UserDto>>(nameof(IChatHubClient.OnlineUserList), (onlineUsers) =>
+       {
+           foreach (var user in Users)
+           {
+               if (onlineUsers.Any(x => x.Id == user.Id))
+               {
+                   user.IsOnline = true;
+               }
+           }
+           StateHasChanged();
+       });
+        hubConnection.On<ChatMessageDto>(nameof(IChatHubClient.MessagedReceived), (MessageDto) =>
+       {
+           var fromusers = Users.FirstOrDefault(x => x.Id == MessageDto.UserId);
+           if (!Users.Any(x => x.Id == MessageDto.UserId))
+           {
+               Users.Insert(0, fromusers!);
+               _newIncomingMessage = MessageDto;
+               Users.Where(x => x.Id == MessageDto.UserId).First().messageUnreadedCount -= 1;
+           }
+           else
+           {
+               if (OtherUser?.Id == MessageDto.UserId)
+               {
+                   _newIncomingMessage = MessageDto;
+                   Users.Where(x=>x.Id==MessageDto.UserId).First().messageUnreadedCount -= 1;
+               }
+           }
+
+           StateHasChanged();
+
+       });
+
+
+        hubConnection.On<Guid>(nameof(IChatHubClient.UserIsOnline), (id) =>
+       {
+           var user = Users.FirstOrDefault(x => x.Id == id);
+           if (user is not null)
+           {
+               user.IsOnline = true;
+               StateHasChanged();
+           }
+       });
+        hubConnection.On<MessageReaction>(nameof(IChatHubClient.ReceivedEmojiReact), (reaction) =>
+       {
+           Reaction = reaction;
+           StateHasChanged();
+       });
+
+        hubConnection.On<List<Guid>>(nameof(IChatHubClient.MessagedSeenReceived), (messagesIds) =>
+       {
+
+           MessagesId.AddRange(messagesIds);
+
+
+           StateHasChanged();
+
+       });
+        hubConnection.On<Guid>(nameof(IChatHubClient.UserIsOffline), (userid) =>
+      {
+          foreach (var user in Users)
+          {
+              if (user.Id == userid)
+              {
+                  user.IsOnline = false;
+              }
+          }
+          StateHasChanged();
+      });
+        hubConnection.On<Guid>(nameof(IChatHubClient.IncreaseMessageCount), (userId) =>
+    {
+
+        Users.First(x => x.Id == userId).messageUnreadedCount += 1;
+
+        StateHasChanged();
+
+    });
+        hubConnection.On<List<ChatMessageDto>>(nameof(IChatHubClient.GetMissedMessages), (missedMessagess) =>
+    {
+        if (missedMessagess.Count > 0)
+        {
+            missedMassage = missedMessagess;
+            if (OtherUser != null)
+        {
+            missedTargetUserMassages=   missedMassage.Where(x => x.UserId == OtherUser.Id).ToList();
+        }
+        StateHasChanged();
+    }
+      
+
+    });
+        hubConnection.On<NotificationModelDto>(nameof(IChatHubClient.ReceivedNotifications), async (notify) =>
+    {
+        notify.Url = nm.BaseUri ;
+        await js.InvokeVoidAsync("browserNotify", notify);
+
+    });
+
+        hubConnection.On<LastSeenModelDto>(nameof(IChatHubClient.SetLastSeenUser), async (lastseenmodel) =>
+    {
+
+        var targetUser = Users.Where(u => u.Id == lastseenmodel.UserId).FirstOrDefault();
+        if(targetUser is not null){
+            targetUser.LastSeen = lastseenmodel.Time;
+        }
+        if (OtherUser != null)
+        {
+            if (OtherUser.Id == lastseenmodel.UserId)
+            {
+                OtherUser.LastSeen = lastseenmodel.Time;
+                StateHasChanged();
+            }
+        }
+
+    });
+
+        hubConnection.On<EditedMessageDto>(nameof(IChatHubClient.EditedMessageReceived), async (message) =>
+    {
+
+        _newIncomingEditedMessage = message;
+        StateHasChanged();
+    });
+        hubConnection.On<EditedMessageDto>(nameof(IChatHubClient.EditedMessageReceived), async (message) =>
+     {
+
+         _newIncomingEditedMessage = message;
+         StateHasChanged();
+     });
+        hubConnection.On<Guid>(nameof(IChatHubClient.DeletedMessageReceived), async (messageId) =>
+     {
+
+         DeletedMessageId = messageId;
+         StateHasChanged();
+     });
+        hubConnection.On<TypingReactionDto>(nameof(IChatHubClient.ReceivedReactions), async (messageType) =>
+     {
+
+         reaction = messageType;
+         StateHasChanged();
+     });
+
+
+        return hubConnection;
+    }
+
+    private async Task OnUserSelected(UserDto user)
+    {
+        var userAvatar = Users.Where(c => c.Id == user.Id).Select(x => x.avatar).FirstOrDefault();
+        _selectedUser = user;
+        _selectedUser.avatar = userAvatar;
+        ThemeChanging.IsShowSetting = true;
+        StateHasChanged();
+    }
+    private async Task OnOtherUserSelected(UserDto user)
+    { var userAvatar = Users.Where(c => c.Id == user.Id).Select(x => x.avatar).FirstOrDefault();
+        OtherUser = user;
+        OtherUser.avatar = userAvatar;
+        var targetUser=  Users.Where(u => u.Id == user.Id).FirstOrDefault();
+        if (targetUser!=null){
+            OtherUser.LastSeen = targetUser.LastSeen;
+        }
+        @if(IsMobile){
+            gotoDetailByMobile = true;
+        }
+        StateHasChanged();
+    }
+    public async Task ReactionToUser(Guid Id){
+
+        await _hubConnection!.SendAsync("TypingReaction", new TypingReactionDto(Id,Logineduser.Id,0));
+    }
+    private async Task OnClearUserSelected(UserDto user)
+    {
+        _selectedUser = null;
+        ThemeChanging.IsShowSetting = false;
+    }
+    private async Task OnChanedPicture(UserDto user)
+    {
+
+        var currentUser= Users.Where(x => x.Id == user.Id).FirstOrDefault();
+        if (currentUser != null)
+            currentUser.avatar = user.avatar;
+
+        StateHasChanged();
+    }
+    private async Task HandleChatDetailsCancel(bool shouldRemoveFromChatsList)
+    {
+        // if (shouldRemoveFromChatsList)
+        // {
+        //     Users.Remove(_selectedUser);
+        // }
+        _selectedUser = null;
+    }
+    private async Task SendMessageSeenIdsToHub(MessageSeenDto messagesForSeen)
+    {
+
+        await _hubConnection!.SendAsync("MessageSeen", messagesForSeen);
+    }
+    private async Task ReduceSeenedMessage((Guid userId,int MessageCount) recuceMessage){
+        if (recuceMessage.MessageCount == 1100)
+        {
+            Users.Where(u => u.Id == recuceMessage.userId).First().messageUnreadedCount = 0;
+        }
+        else
+            Users.Where(u => u.Id == recuceMessage.userId).First().messageUnreadedCount -= recuceMessage.MessageCount;
+
+
+    }
+
+    [JSInvokable]
+    public async Task NotifyServerUserLeft()
+    {
+        Console.WriteLine("enter crirtitcal");
+        if (_hubConnection != null)
+        {
+            await _hubConnection!.SendAsync("SetUserOffline", Logineduser);
+        }
+    }
+    public async ValueTask DisposeAsync()
+    {
+        await _hubConnection!.SendAsync("SetUserOffline", Logineduser);
+        Console.WriteLine($"{Logineduser.Name} is offlined");
+        if (_hubConnection is not null)
+            await _hubConnection.DisposeAsync();
+        _objRef?.Dispose();
+    }
+    public async Task SendReaction(MessageReaction reaction)
+    {
+        if (_hubConnection.State == HubConnectionState.Disconnected)
+        {
+            await _hubConnection.StartAsync();
+            await _hubConnection.SendAsync("SetUserOnline", Logineduser);
+        }
+        await _hubConnection!.SendAsync("ReceiveReaction", reaction);
+    }
+    public void EmptyReadMessage()
+    {
+        missedMassage = new List<ChatMessageDto>();
+    }
+    public void ClearMissedTargetUserMessages()
+    {
+        missedTargetUserMassages = new List<ChatMessageDto>();
+    }
+    public void NullIncomingMessage()
+    {
+        LastReceivedMessage = _newIncomingMessage;
+        _newIncomingMessage = null;
+    }
+
+}

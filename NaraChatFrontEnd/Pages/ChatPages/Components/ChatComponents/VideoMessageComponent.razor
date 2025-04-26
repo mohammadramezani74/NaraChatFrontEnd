@@ -1,0 +1,111 @@
+﻿@using NaraChat.Application.Services.TokenProvider
+@using NaraChatFrontEnd.Pages.ChatPages.Components.DialogComponents
+@inject IJSRuntime JS
+@inject ITokenService tokenservice
+
+@if (message.FileContent != null)
+{
+    <div style="display: flex; flex-direction: column; align-items: center; max-width: 300px; margin: auto; padding: 10px; border: 1px solid #ddd; border-radius: 10px; box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1); direction: rtl;">
+
+
+        <!-- ویدیو -->
+        <video poster="lib/assets/Images/blured.jpg"  @onplay="OnVideoPlay" @onended="OnVideoEnded" id="video-@message.FileContent!.FileId" controls style="width: 100%; height: 200px; border-radius: 10px; object-fit: cover;">
+
+            مرورگر شما از ویدیو پشتیبانی نمی‌کند.
+        </video>
+        @if (!isVideoPlaying){
+            <div id="@message.FileContent!.FileId" class="video-overlay" @onclick="()=>loadVideo(message.FileContent!.FileId)">
+                <MudIcon Size="Size.Large" Icon="@Icons.Material.Filled.PlayCircle" Color="ThemeCascading.SeenColor"></MudIcon>
+            </div>
+        }
+        @if (Loading)
+        {
+            <div id="@message.FileContent!.FileId" class="video-overlay ">
+                <MudProgressCircular Color="ThemeCascading.SeenColor" Indeterminate="true" />
+            </div>
+        }
+    </div>
+}
+
+
+<style>
+
+    /* برای ویدیو */
+    video {
+    position: relative; /* موقعیت‌دهی ویدیو */
+    width: 300px;
+    height: 250px;
+    border-radius: 10px;
+    object-fit: cover;
+    }
+
+    /* قرار دادن دکمه وسط ویدیو */
+    .video-overlay {
+    position: absolute;
+    top: 40%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 10; /* دکمه روی ویدیو نمایش داده شود */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    opacity: 0.8; /* مقداری محو بودن دکمه */
+    cursor: pointer; /* نشانه کلیک */
+    }
+
+
+    /* طراحی دکمه */
+    .play-button {
+    background-color: rgba(0, 0, 0, 0.5);
+    color: white;
+    font-size: 16px;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    opacity: 1;
+    transition: opacity 0.3s ease;
+    }
+
+    /* مخفی کردن دکمه وقتی ویدیو در حال پخش است */
+    .video-overlay.hidden {
+    display: none;
+    }
+</style>
+
+@code {
+    [CascadingParameter(Name = "Theme")]
+    public ThemeChanging ThemeCascading { get; set; }
+
+    [Parameter]
+    public ChatMessageDto message { get; set; } = null!;
+    public bool Loading { get; set; } = false;
+}
+
+
+@code {
+    private bool isVideoPlaying = false;
+
+    public async Task loadVideo(Guid FileId)
+    {
+        Loading = true;
+        StateHasChanged();
+        var token = await tokenservice.GetAccessTokenAsync() ;
+        var url = SiteSettings.ApiUrl;
+        var videoUrl = url + $"api/v1/chatfiles/{FileId}/files";
+        await JS.InvokeVoidAsync("playVideoFromApi", $"{FileId}", videoUrl, token);
+        Loading = false;
+    }
+    private void OnVideoPlay()
+    {
+        isVideoPlaying = true;
+        StateHasChanged(); 
+    }
+
+   
+    private void OnVideoEnded()
+    {
+        isVideoPlaying = false;
+        StateHasChanged(); 
+    }
+}

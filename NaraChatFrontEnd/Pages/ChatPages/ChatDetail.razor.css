@@ -1,0 +1,13 @@
+﻿
+.reply-bar {
+    margin-bottom: 8px;
+    border-radius: 8px;
+}
+
+.text-truncate {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+

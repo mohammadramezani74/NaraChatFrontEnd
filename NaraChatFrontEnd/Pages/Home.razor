@@ -1,0 +1,306 @@
+﻿@page "/"
+
+@using BlazorOTPInput.Pages.OtpInputComponent
+@using NaraChat.Application.Services.Auth
+@using NaraChat.Contract.Models.Auth
+@using NaraChatFrontEnd.Models.BaseModels
+@using NaraChatFrontEnd.Pages.ChatPages.Components.OtpInputComponent
+@inject IAuthService _service
+@inject ISnackbar snackbar
+@inject IJSRuntime JS
+@inject NavigationManager navigation
+@inject AuthenticationStateProvider auth
+@attribute [AllowAnonymous]
+
+@if(!IsLoadVrifyCodeComponent){
+    <div class="Login-card row d-flex justify-content-center align-items-center" style="height: 50vh;">
+        <div class="col-4" style="margin-top: 70px;">
+            <div class="test" Style="@(ThemeChanging.boxShadow);">
+                <MudCard>
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudImage Style="margin-right: 140px;;max-width: 180px;" Src="./lib/assets/Images/logo.png"></MudImage>
+                            <MudText  Style="text-align:center; font-weight:400;color:gray">ورود  به حساب کاربری</MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <EditForm Model="PhoneNumber"  OnValidSubmit="SendVerifyCode" >
+                        <MudCardContent>
+                            <MudTextField Style="margin-bottom: 20px;" ShrinkLabel @bind-Value="@PhoneNumber" Label="شماره همراه" Variant="Variant.Text"></MudTextField>
+                        </MudCardContent>
+                        <MudCardActions>
+                            <MudButton ButtonType="ButtonType.Submit" Style="margin-bottom: 20px;" Variant="Variant.Filled" Color="Color.Primary">ورود</MudButton>
+                        </MudCardActions>
+
+                    </EditForm>
+                </MudCard>
+
+            </div>
+        </div>
+    </div>
+
+
+}
+else{
+    <div class="Login-card row d-flex justify-content-center align-items-center" style="height: 50vh;">
+        <div class="col-4" style="margin-top: 70px;">
+            <div class="test" Style="@(ThemeChanging.boxShadow);">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudImage Style="margin-right: 140px;;max-width: 180px;" Src="./lib/assets/Images/logo.png"></MudImage>
+                        <MudText  Style="text-align:center; font-weight:400;color:gray">اعتبارسنجی شماره همراه</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <EditForm Model="PhoneNumber"  OnValidSubmit="OTPComplete" FormName="Login">
+                    <MudCardContent>
+                        <OtpInput Count="5"
+                        Option="option"
+                        @ref="otp"
+                        OnCompleteEvent="OTPCompleted" />
+
+                         <div class="text-center mt-4">
+                        @if (isResendDisabled)
+                        {
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                ارسال مجدد کد پس از @($"{remainingTime / 60:D2}:{remainingTime % 60:D2}")
+                            </MudText>
+                        }
+                        else
+                        {
+                            <MudButton Variant="Variant.Text" 
+                                      Color="Color.Primary" 
+                                      OnClick="ResendCode"
+                                      Disabled="@isResendDisabled">
+                                ارسال مجدد کد
+                            </MudButton>
+                        }
+                    </div>
+                    </MudCardContent>
+                    <MudCardActions>
+                        <MudButton ButtonType="ButtonType.Submit" Style="margin-bottom: 20px;" Variant="Variant.Filled" Color="Color.Primary">ورود</MudButton>
+                    </MudCardActions>
+
+                </EditForm>
+
+
+            </div>
+        </div>
+    </div>
+}
+<script>
+    function googleLogin() {
+    return new Promise((resolve, reject) => {
+    google.accounts.id.initialize({
+    client_id:  "611292152710-4fp0hfte6n9bcf371k0c1tgs7o39qe7l.apps.googleusercontent.com",
+    callback: (response) => {
+    if (response.credential) {
+    resolve(response.credential);
+    } else {
+    reject("Google sign-in failed: No credential received.");
+    }
+    }
+    });
+
+    google.accounts.id.prompt((notification) => {
+    if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+    reject("Google Sign-In popup was not displayed.");
+    }
+    });
+    });
+    }
+
+</script>
+@code{
+    OtpInput otp;
+
+    string value;
+
+    OtpOption option = new OtpOption
+    {
+        Space = 5,
+        BorderColorOnFocus = "purple",
+        Width = 40,
+        Height = 40,
+        ViewMode = OtpViewMode.Default,
+        FontFamily = "Tahoma",
+    };
+
+    async Task OTPCompleted(string finalValue)
+    {
+        
+        var otpfunc=otp.GetValue();
+        VerifyCode = finalValue;
+        await LoginAsync();
+        VerifyCode = string.Empty;
+    }
+       async Task OTPComplete()
+    {
+        VerifyCode = otp.GetValue();
+        await LoginAsync();
+        VerifyCode = string.Empty;
+    }
+
+}
+@code {
+    // تایمر
+    private  System.Timers.Timer timer;
+    private int remainingTime = 120; // 2 دقیقه به ثانیه
+    private bool isResendDisabled = true;
+
+    protected override void OnInitialized()
+    {
+        StartTimer();
+    }
+
+    private void StartTimer()
+    {
+        timer = new  System.Timers.Timer(1000); // هر ثانیه
+        timer.Elapsed += async (sender, e) => await UpdateTimer();
+        timer.AutoReset = true;
+        timer.Enabled = true;
+        isResendDisabled = true;
+    }
+
+    private async Task UpdateTimer()
+    {
+        remainingTime--;
+        
+        if (remainingTime <= 0)
+        {
+            timer.Stop();
+            isResendDisabled = false;
+            remainingTime = 120; // ریست تایمر
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ResendCode()
+    {
+        // کد ارسال مجدد
+        await _service.SendVerifyCode(PhoneNumber);
+        StartTimer();
+    }
+
+    public void Dispose()
+    {
+        timer?.Dispose();
+    }
+
+}
+@code{
+
+    [CascadingParameter(Name = "Theme")]
+    public ThemeChanging ThemeChanging { get; set; }
+    public LoginDTo LoginDTo { get; set; }
+    public string VerifyCode { get; set; } = string.Empty;
+    public bool IsLoadVrifyCodeComponent { get; set; } = false;
+    public string PhoneNumber { get; set; } = string.Empty;
+    public bool DisableKey { get; set; }
+        [Parameter]
+    public string token { get; set; }
+
+
+    bool isShow;
+    InputType PasswordInput = InputType.Password;
+    string PasswordInputIcon = Icons.Material.Filled.VisibilityOff;
+
+    void ButtonTestclick()
+    {
+        @if (isShow)
+        {
+            isShow = false;
+            PasswordInputIcon = Icons.Material.Filled.VisibilityOff;
+            PasswordInput = InputType.Password;
+        }
+        else
+        {
+            isShow = true;
+            PasswordInputIcon = Icons.Material.Filled.Visibility;
+            PasswordInput = InputType.Text;
+
+        }
+
+
+
+    }
+    protected async override Task OnInitializedAsync()
+    {
+        if (await ((CustomAuthenticationStateProvider)auth).IsAuthenticated())
+        {
+            var user = await ((CustomAuthenticationStateProvider)auth).GetUserInfoAsync();
+            snackbar.Clear();
+            snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomRight;
+            snackbar.Add($"{user.Name} عزیز خوش امدی ", Severity.Success, x =>
+            {
+
+            });
+            navigation.NavigateTo("/chat");
+            StateHasChanged();
+        }
+    }
+    public async Task LoginAsync()
+    {
+        if(string.IsNullOrEmpty(PhoneNumber)){
+            snackbar.Clear();
+            snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomRight;
+            snackbar.Add($"شماره همراه وارد شده نباید خالی باشد", Severity.Error, x =>
+            {
+
+            });
+
+            PhoneNumber = string.Empty;
+        }
+        var result = await _service.LoginOrRegisterAsync(PhoneNumber,VerifyCode);
+        if (result)
+        {
+            navigation.NavigateTo("/chat");
+            IsLoadVrifyCodeComponent = false;
+        }
+        else
+        {
+            snackbar.Clear();
+            snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomRight;
+            snackbar.Add($"شماره همراه مورد نظر یافت نشد لطفا با پشتیبانی تماس حاصل فرمایید", Severity.Error, x =>
+            {
+
+            });
+
+            PhoneNumber = string.Empty;
+            IsLoadVrifyCodeComponent = false;
+        }
+    }
+
+    public async Task SendVerifyCode(){
+        if(string.IsNullOrEmpty(PhoneNumber)){
+            snackbar.Clear();
+            snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomRight;
+            snackbar.Add($"شماره همراه وارد شده نباید خالی باشد", Severity.Error, x =>
+            {
+
+            });
+
+            PhoneNumber = string.Empty;
+        }
+        else{
+            var result= await _service.SendVerifyCode(PhoneNumber);
+            if(result.result){
+                snackbar.Clear();
+                snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomRight;
+                snackbar.Add(result.Message, Severity.Success, x =>
+                {
+
+                });
+                IsLoadVrifyCodeComponent = true;
+            }
+           else{
+          snackbar.Clear();
+            snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomRight;
+            snackbar.Add(result.Message, Severity.Error, x =>
+            {
+
+            });
+           }
+        }
+    }
+
+}

@@ -1,0 +1,159 @@
+﻿<MudPaper Class="h-100 w-100 d-flex flex-column">
+
+    <MudList T="string" Class="overflow-y-auto flex-grow-1" Style="max-height:100%;">
+        @if (Loading)
+        {
+            <MudProgressCircular />
+        }else{
+            <MudListItem Class="py-3 px-2"
+            Style="height:68px; margin-top: 10px;">
+
+                <ChildContent>
+
+                    <MudTextField @bind-Value="Search" Immediate="true" @onchange="SearchUsers" Placeholder="جستجو" Variant="Variant.Outlined" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search" AdornmentColor="Color.Secondary" />
+
+                </ChildContent>
+
+            </MudListItem>
+            @foreach (var user in AllUsers)
+            {
+
+
+                <MudListItem @onclick="()=>HandleUserClick(user)" Class="py-3 px-2"
+                Style="height:50px;">
+
+                    <AvatarContent>
+                        <MudBadge Dot="true" Color="@(user.IsOnline? Color.Success:Color.Default)" Class="mx-6 my-4">
+                            <MudAvatar Size="Size.Small">
+                                @if(user.avatar!=null){
+                                    <MudImage Src="@($"data:image/png;base64,{user.avatar}")" Class="rounded-circle"
+                                    Style="width:100%; height:100%; object-fit:inherit;" />
+                                }
+                                else{
+                                    <MudImage Src="lib/assets/Images/avatar.jpg" Class="rounded-circle"
+                                    Style="width:100%; height:100%; object-fit:inherit;" />
+                                }
+                            </MudAvatar>
+                        </MudBadge>
+                    </AvatarContent>
+
+
+
+                    <ChildContent>
+                        <MudStack Row="true">
+                            @if(user.messageUnreadedCount>0){
+                                <MudText Style="font-size:12px;">@user.Name</MudText>
+                                <MudBadge Content="user.messageUnreadedCount" Color="Color.Error" Overlap="true" Origin="Origin.TopRight" Class="mx-6 my-4">      </MudBadge>
+                            }
+                            else{
+                                <MudText Style="font-size:12px;">@user.Name</MudText>
+                            }
+                        </MudStack>
+                    </ChildContent>
+
+                </MudListItem>
+
+
+            }
+        }
+    </MudList>
+
+</MudPaper>
+
+@code {
+
+    [Parameter]
+    public IEnumerable<UserDto> Users { get; set; } = Enumerable.Empty<UserDto>();
+    public IEnumerable<UserDto> AllUsers { get; set; } = Enumerable.Empty<UserDto>();
+    [Parameter]
+    public bool Loading { get; set; }
+    [Parameter]
+    public EventCallback<UserDto> OnUserSelected { get; set; }
+    [Parameter]
+    public EventCallback<UserDto> OnOtherUserSelected { get; set; }
+
+
+      [Parameter]
+    public List<ChatMessageDto> MissedMessageCount { get; set; } = new List<ChatMessageDto>();
+    [Parameter]
+    public EventCallback ReeadMissedMessage { get; set; }
+    public bool HaveFilter { get; set; } = false;
+    private string search;
+    private string Search
+    {
+        get => search;
+        set
+        {
+            search = value;
+            SearchUsers(); // فراخوانی متد جستجو هنگام تغییر مقدار
+        }
+    }
+
+    public async Task HandleUserClick(UserDto user)
+    {
+        await OnUserSelected.InvokeAsync(user);
+        await HandleAnotherUserClick(user);
+    }
+    public async Task HandleAnotherUserClick(UserDto user)
+    {
+        await OnOtherUserSelected.InvokeAsync(user);
+    }
+}
+
+@code {
+    [CascadingParameter(Name = "Theme")]
+    public ThemeChanging themeChanging { get; set; }
+    private bool IsUserInfoVisible = true;
+
+    private void ToggleUserInfo()
+    {
+        IsUserInfoVisible = !IsUserInfoVisible;
+    }
+    private void SearchUsers()
+    {
+
+        if (!string.IsNullOrWhiteSpace(Search))
+        {
+            HaveFilter = true;
+
+            AllUsers = Users.Where(x => x.Name.Contains(Search, StringComparison.OrdinalIgnoreCase)).ToList();
+        }
+        else
+        {
+
+            HaveFilter = false;
+
+            AllUsers = Users.ToList();
+        }
+        StateHasChanged();
+    }
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!HaveFilter)
+            AllUsers = Users.OrderByDescending(u => u.messageUnreadedCount > 0).ToList();
+        if (MissedMessageCount.Count > 0)
+        {
+
+            var groupedMissed = MissedMessageCount
+                .GroupBy(m => m.UserId)
+                .ToDictionary(g => g.Key, g => g.Count());
+
+            foreach (var kvp in groupedMissed)
+            {
+                var userId = kvp.Key;
+                var count = kvp.Value;
+
+                var targetUser = AllUsers.FirstOrDefault(x => x.Id == userId);
+
+                if (targetUser != null)
+                {
+                    targetUser.messageUnreadedCount += count;
+                }
+            }
+            await ReeadMissedMessage.InvokeAsync();
+            StateHasChanged();
+        }
+
+    }
+  }
+}

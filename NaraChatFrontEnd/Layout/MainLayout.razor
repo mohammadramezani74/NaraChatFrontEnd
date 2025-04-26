@@ -1,0 +1,179 @@
+﻿@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.IdentityModel.JsonWebTokens
+@using NaraChat.Application.Services.Auth
+@using NaraChat.Contract.Models.BaseResponse
+@using NaraChatFrontEnd.Models.BaseModels
+@using System.Security.Claims
+@using NaraChatFrontEnd.Pages.ChatPages.Components.DialogComponents
+
+@inherits LayoutComponentBase
+@inject IDialogService DialogService
+@inject NavigationManager nm
+@inject IAuthService auth
+@implements IDisposable
+
+
+<MudRTLProvider RightToLeft="true">
+    <CascadingValue Name="Theme" Value="ThemeChanging">
+        <MudThemeProvider IsDarkMode="@IsDarkMode" Theme="_myTheme" />
+        <MudPopoverProvider  />
+        <MudDialogProvider />
+        <MudSnackbarProvider />
+
+        <MudLayout>
+            <MudAppBar>
+
+                <AuthorizeView>
+                    <Authorized>
+                        <div>
+                            <MudButton @onclick="Logout" Style="margin-left: 10px;" Variant="Variant.Filled" Color="Color.Error">خروج</MudButton>
+                            <span>
+                                سلام
+                            </span>
+                            <span>
+                                @context.User.FindFirst("name")?.Value
+                            </span>
+                        </div>
+
+                    </Authorized>
+                    <NotAuthorized>
+                        <h1>نارا مسنجر</h1>
+                    </NotAuthorized>
+                    <Authorizing>
+
+                    </Authorizing>
+                </AuthorizeView>
+
+
+                <MudSpacer />
+                <MudIconButton @onclick="SettingsShow" Icon="@Icons.Material.Filled.Settings" Color="Color.Inherit" />
+                <MudIconButton @onclick="DarkModel" Icon="@(IsDarkMode? @Icons.Material.Filled.LightMode:@Icons.Material.Filled.DarkMode)" Color="Color.Inherit" />
+
+
+            </MudAppBar>
+
+
+
+            <MudMainContent>
+                @Body
+            </MudMainContent>
+
+        </MudLayout>
+    </CascadingValue>
+</MudRTLProvider>
+@code {
+    [CascadingParameter]
+    public ThemeChanging ThemeChanging { get; set; } = new ThemeChanging("background-color:#eff2fd", " color:rgb(255 64 129);", " box-shadow: 0 16px 45px #ecc7ee");
+    bool _drawerOpen = true;
+
+
+
+
+    bool IsDarkMode = false;
+    void DrawerToggle()
+    {
+        _drawerOpen = !_drawerOpen;
+    }
+    void DarkModel()
+    {
+
+        IsDarkMode = !IsDarkMode;
+        if(!IsDarkMode){
+            ThemeChanging = new ThemeChanging("", " color:rgb(255 64 129);", " box-shadow: 0 16px 45px #ecc7ee;");
+            ThemeChanging.backGroundChatStyle = "height: 100%; overflow-y: auto;background-image:url(lib/assets/Images/light.jpg);    background-size: cover;background-repeat:no-repeat;background-position: center; background-attachment: scroll;";
+            ThemeChanging.myColorChat = "rgb(235 198 255 / 56%)";
+            ThemeChanging.OtherColorChat = "rgb(233 236 239 / 86%)";
+            ThemeChanging.SeenColor = Color.Secondary;
+            ThemeChanging.ClockColor = "#270aff";
+            ThemeChanging.MyColorReply = "#c4beff";
+            ThemeChanging.OtherColorReply = "#f6effd";
+            StateHasChanged();
+        }
+        else{
+            ThemeChanging = new ThemeChanging("", " color:#776be7;", " box-shadow: 0 16px 45px #776be77d");
+            ThemeChanging.backGroundChatStyle = "height: 100%; overflow-y: auto;background-image:url(lib/assets/Images/pxfuel.jpg);    background-size: cover;background-repeat:no-repeat;background-position: center; background-attachment: scroll;";
+            ThemeChanging.OtherColorChat = "#495057e0";
+            ThemeChanging.myColorChat = "rgb(28 62 95 / 86%)";
+            ThemeChanging.SeenColor = Color.Info;
+            ThemeChanging.ClockColor = "#00fdff";
+            ThemeChanging.MyColorReply = "#112539";
+            ThemeChanging.OtherColorReply = "#373740";
+            StateHasChanged();
+        }
+
+    }
+
+    private async Task Logout()
+    {
+        var parameters = new DialogParameters<DialogTemplate>
+    {
+        { x => x.ContentText, "کاربر گرامی آیا شما مطمئن هستید که می‌خواهید خارج شوید؟" },
+        { x => x.ButtonText, "بله" },
+        { x => x.Color, Color.Error }
+    };
+
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Large ,};
+
+        var dialog = await DialogService.ShowAsync<DialogTemplate>("خروج", parameters, options);
+        var res= await dialog.Result;
+        if (!res.Canceled)
+        {
+            await PerformLogoutAsync();
+        }
+    }
+
+    public async Task PerformLogoutAsync(){
+        try
+        {
+
+
+            await auth.LogoutAsync();
+            nm.NavigateTo("/");
+        }
+        catch (Exception ex)
+        {
+            nm.NavigateTo("/");
+        }
+    }
+    public void SettingsShow(){
+
+        ThemeChanging.IsShowSetting = !ThemeChanging.IsShowSetting;
+       
+        StateHasChanged();
+    }
+}
+
+@code{
+    private MudTheme _myTheme = new MudTheme()
+        {
+            Typography = new Typography()
+            {
+                Default = new DefaultTypography()
+                {
+                    FontFamily = new string[] { "iransans-medium" }
+                },
+                H1 = new DefaultTypography()
+                {
+                    FontFamily = new string[] { "iransans-bold" }
+                },
+                H2 = new DefaultTypography()
+                {
+                    FontFamily = new string[] { "iransans-bold" }
+                },
+                H3 = new DefaultTypography()
+                {
+                    FontFamily = new string[] { "iransans-medium" }
+                },
+                Body1 = new DefaultTypography()
+                {
+                    FontFamily = new string[] { "iransans-medium" }
+                },
+            }
+        };
+        public void Dispose()
+        {
+
+        }
+
+
+}

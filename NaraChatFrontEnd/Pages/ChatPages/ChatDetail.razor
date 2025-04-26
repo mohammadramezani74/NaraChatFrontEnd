@@ -1,0 +1,570 @@
+﻿@using NaraChat.Contract.Utilities.FilesExtensions
+@using static NaraChatFrontEnd.Pages.ChatPages.Components.DialogComponents.UploadDialogComponent
+
+@inject IJSRuntime js
+@inject IConversationService chatService
+@inject AuthenticationStateProvider stateprovider
+@inject ISnackbar snackbar
+@inject IMessageService messageService
+@inject IDialogService DialogService
+@implements IAsyncDisposable 
+@attribute [StreamRendering]
+
+<MudCard Class="d-flex flex-column h-100 w-100" >
+
+    <MudCardHeader  Class="border-bottom" Style="flex-shrink:0;">
+        @if (OtherUser  !=null){
+            <MudAvatar Size="Size.Medium">
+                @if (OtherUser.avatar != null)
+                {
+                    <MudImage Src="@($"data:image/png;base64,{OtherUser.avatar }")" Class="rounded-circle"
+                    Style="object-fit:cover;" />
+                }
+                else
+                {
+                    <MudImage Src="lib/assets/Images/avatar.jpg" Class="rounded-circle"
+                    Style="object-fit:cover;" />
+                }
+
+                @* <MudImage Src="@OtherUser.avatar" Class="rounded-circle" /> *@
+            </MudAvatar>
+            <MudStack Row="false">
+                <MudText Typo="Typo.h1" Class="mr-3">@(OtherUser?.Name??Conversation.title)</MudText> 
+                @if (OtherUser.IsOnline) {
+                    <MudText Color="Color.Success" Style="font-size:10px" Class="mr-3"><b> آنلاین</b></MudText>
+
+                }
+                else if (OtherUser?.LastSeen != null) {
+                    if (OtherUser!.LastSeen.Value.Date == DateTime.Today.Date)
+                    {
+                        <MudText Style="font-size:10px; color:gray;" Class="mr-3"><b> آخرین بازدید امروز ساعت  @(OtherUser?.LastSeen.Value.ToString(@"HH\:mm"))</b></MudText>
+                    }
+                    else{
+                        <MudText  Style="font-size:10px; color:gray;" Class="mr-3"><b> آخرین بازدید @(OtherUser?.LastSeen.Value.ToFarsi().ConvertPersianDate()) ساعت  @(OtherUser?.LastSeen.Value.ToString(@"HH\:mm"))</b></MudText>
+                    }
+                }
+
+
+            </MudStack>
+            <MudText>
+                @if(reactionType !=null){
+                    @if(reactionType.UserId==OtherUser.Id)
+                        @ReactionTitle}
+            </MudText>
+            @if(IsMobile){
+                <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
+                OnClick="BackToUserList"></MudIconButton>
+            }
+        }
+
+    </MudCardHeader>
+
+    <!-- بدنه چت -->
+    <MudCardContent Class="flex-grow-1 p-0" Style="overflow-y:auto; width:100%;">
+        <div @ref="_chatContainer" style="@ThemeCascading.backGroundChatStyle">
+
+            <MudStack Spacing="4" Class="w-100 px-2 d-flex flex-column">
+                @if (Loading)
+                {
+                    <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+                }
+                else if(_messages.Count>0){
+                    <MudVirtualize Items="_messages" Context="message" @key="@OtherUser?.Id" >
+
+
+                        @if (lastDate == null || message.SendAt.Date != lastDate.Value.Date)
+                        {
+
+                            if (message.SendAt.Date <= DateTime.Today.Date)
+                            {
+                                <div style="display: flex; align-items: center; gap: 10px; margin: 10px 0;">
+                                    <div style="flex-grow: 1; height: 1px; background-color: gray;"></div>
+                                    <MudChipSet T="string" SelectionMode="SelectionMode.MultiSelection">
+                                        <MudChip Text="pink" Variant="Variant.Text" Color="ThemeCascading.SeenColor">@message.SendAt.ToFarsi().ConvertPersianDate()</MudChip>
+                                    </MudChipSet>
+                                    <div style="flex-grow: 1; height: 1px; background-color: gray;"></div>
+                                </div>
+                            }
+
+
+                            lastDate = message.SendAt.Date;
+                        }
+                        @if(message.Type==MessageType.Text){
+                            <MessageComponent DeletedMessageevent="DeleteTargetMessage"  IsMine="message.IsMine" CurrentUser="CurrentUser" message="message"
+                            ReplyMessageEvent="HandleReplyMessage" Conversation="Conversation" EditMessageEvent="OnEditMessageHandler"
+                            ParentMessage="@HandelParentMessage(message.ParentId)"
+                            OtherAvatar="@OtherUser.avatar"
+                            MessageReactionEvent="SendReactions"></MessageComponent>
+                        }
+                        else{
+                            <FileMessageComponent DeletedMessageevent="DeleteTargetMessage" IsMine="message.IsMine" CurrentUser="CurrentUser" message="message"
+                            ReplyMessageEvent="HandleReplyMessage" Conversation="Conversation" EditMessageEvent="OnEditMessageHandler"
+                            ParentMessage="@HandelParentMessage(message.ParentId)"></FileMessageComponent>
+                        }
+
+
+
+
+
+
+                    </MudVirtualize>
+                }
+                else{
+
+                    <EmptyMessagesComponnent OtherId="@OtherUser"/>
+                }
+
+            </MudStack>
+        </div>
+    </MudCardContent>
+
+
+    <MudCardActions Class="border-top pt-2" Style="flex-shrink:0">
+        <MudStack Row="false" Class="w-100">
+
+
+            @if (ReplyMode)
+            {
+                <MudPaper Class="d-flex align-center px-2 py-1 reply-bar" Elevation="1">
+                    <MudIconButton Icon="@Icons.Material.Filled.Close"
+                    OnClick="()=>ReplyMode = !ReplyMode"
+                    Color="Color.Secondary"
+                    Class="mr-2" />
+                    <MudText Class="text-truncate" >
+                        ریپلای به: @SelectedMessageToReply.Content
+                    </MudText>
+                </MudPaper>
+            }
+            @if(IsUploading){
+                <MudPaper Class="d-flex align-center px-2 py-1 reply-bar" Elevation="1">
+                    <MudIconButton Icon="@Icons.Material.Filled.Close"
+                    OnClick="cancelUpload"
+                    Color="Color.Secondary"
+                    Class="mr-2" />
+                    <MudProgressLinear Color="ThemeCascading.SeenColor" Indeterminate="true" Class="my-7" />
+
+                </MudPaper>
+            }
+
+
+            <MudGrid Class="align-center w-100" Spacing="2">
+                <MudItem xs="8">
+                    <MudTextField T="string"
+                    @bind-value="NewMessage"
+                    @onkeypress="ReactionToAnotherUser"
+                    Variant="Variant.Outlined"
+                    Placeholder="پیام خود را بنویسید..."
+                    Clearable="true"
+                    AutoGrow
+                    Lines="3" />
+                </MudItem>
+
+
+                <MudItem xs="2" Class="d-flex justify-content-start">
+
+                    <MudButton  Variant="Variant.Filled"
+                    Color="@(EditMode ? Color.Warning : Color.Primary)"
+                    EndIcon="@Icons.Material.Rounded.Message"
+                    IconSize="Size.Small"
+                    OnClick="SendMessage"
+                    Disabled="@(OtherUser==null)">
+                        ارسال
+                    </MudButton>
+                    @if (EditMode)
+                    {
+                        <MudIconButton Color="Color.Error"
+                        Variant="Variant.Filled"
+                        Icon="@Icons.Material.Filled.Close"
+                        OnClick="()=>EditMode = false" />
+                    }
+                </MudItem>
+
+                @if (!isRecording)
+                {
+                    <MudButton Disabled="@(OtherUser==null)" OnClick="RecordVoice">
+                        <MudIcon Color="Color.Primary" Icon="@Icons.Material.Filled.Mic"></MudIcon>
+                    </MudButton>
+                }
+                else
+                {
+                    <MudButton OnClick="StopRecording">
+                        <MudIcon Color="Color.Primary" Icon="@Icons.Material.Filled.Stop"></MudIcon>
+                    </MudButton>
+                }
+
+
+                <MudButton @onclick="@uploadDialog" Disabled="@(IsUploading||OtherUser==null)" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AttachFile" Size="Size.Small">
+
+                </MudButton>
+
+                <!-- ایموجی آیکون -->
+                <MudItem xs="1">
+                    <MudIconButton Icon="@Icons.Material.Filled.InsertEmoticon"
+                    OnClick="()=>ShowEmojiPicker=!ShowEmojiPicker" /> 
+                    @if (ShowEmojiPicker)
+                    {
+                        <EmojiComponent OnEmojiSelected="BindEmoji" ShowEmojiPicker="ShowEmojiPicker" OnClosepopover="CloseEmojies"></EmojiComponent>
+                    }
+                </MudItem>
+
+
+
+
+
+
+            </MudGrid>
+
+
+        </MudStack>
+    </MudCardActions>
+
+
+
+</MudCard>
+
+@code {
+    public bool Loading { get; set; } = false;
+    private bool isRecording { get; set; } = false;
+    private async Task RecordVoice()
+    {
+        bool hasMic = await js.InvokeAsync<bool>("checkAudioDevices");
+        if (!hasMic)
+        {
+            ErrorMessage("🚨  هیچ میکروفونی متصل نیست یا اجازه میکروفون را به مرورگر نداده اید!");
+            return;
+        }
+
+        isRecording = true;
+        await js.InvokeVoidAsync("startRecording");
+    }
+    private async Task StopRecording()
+    {
+        isRecording = false;
+        var file=  await js.InvokeAsync<string>("stopRecording");
+        byte[] audioData = Convert.FromBase64String(file);
+        IBrowserFile browserFile = new CustomBrowserFile(audioData, "recorded_audio.wav", "audio/wav");
+        await UploadFile(browserFile, string.Empty);
+
+        StateHasChanged();
+    }
+
+
+    private async Task HandleCancelClick()
+    {
+        var userHasMessages = _messages.Any();
+        var shouldRemoveFromChatsList = !userHasMessages;
+        await OnCancel.InvokeAsync(shouldRemoveFromChatsList);
+    }
+
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if(DeletedMessageId!=null){
+            var targetMessage = _messages.Where(m => m.Id == DeletedMessageId.Value).FirstOrDefault();
+            if (targetMessage!=null)
+                _messages.Remove(targetMessage);
+            DeletedMessageId = null;
+        }
+        if (reactionType != null)
+        {
+            await GetReaction();
+            reactionType = null;
+            await  NullReaction.InvokeAsync();
+
+        }
+        if (EmojiReaction != null)
+        {
+            var message = _messages.Where(m => m.Id == EmojiReaction.MessageId).FirstOrDefault();
+            if (message != null)
+            {
+                message.Reaction = EmojiReaction.Reaction;
+                StateHasChanged();
+            }
+            EmojiReaction = null;
+            await NullEmojiReactioncallBack.InvokeAsync();
+
+        }
+        if(NewIncomingEditedMessage is not null){
+            var targetMessage=  _messages.Where(m => m.Id == NewIncomingEditedMessage.Id).FirstOrDefault();
+            if (targetMessage!=null){
+                targetMessage.Content = NewIncomingEditedMessage.Message;
+                targetMessage.isEdited = true;
+            }
+            NewIncomingEditedMessage = null;
+        }
+        if (NewIncomingMessage is not null)
+        {
+            _messages.Add(NewIncomingMessage);
+            await IncommingMessageRecieved.InvokeAsync();
+        }
+        if (MissedUserMessage.Count > 0)
+        {
+           var newMessages = MissedUserMessage
+    .Where(m => !_messages.Any(existing => existing.Id == m.Id))
+    .OrderBy(x=>x.SendAt)
+    .ToList();
+
+_messages.AddRange(newMessages);
+await ClearMissedMessageUser.InvokeAsync();
+        }
+        if (MessagedSeened.Count>0){
+            var messages = _messages.Where(m => MessagedSeened.Contains(m.Id)).ToList();
+            if(messages.Count>0){
+                foreach (var chatMessage in messages)
+                {
+                    
+                    chatMessage.IsSeen = true;
+                }
+
+
+            }
+
+
+        }
+        if (OtherUser is not null && OtherUser.Id != PreviousSelectedUserId)
+        {
+            if(CurrentUser is null)
+            {
+                CurrentUser = await ((CustomAuthenticationStateProvider)stateprovider).GetUserInfoAsync();
+            }
+
+            PreviousSelectedUserId = OtherUser.Id;
+
+            Loading = true;
+            NewMessage = string.Empty;
+            var myId = CurrentUser.Id;
+            var otherId = OtherUser?.Id;
+
+
+            await LoadMesages();
+          
+
+            
+
+            CurrentUser.avatar =MyAvatar;
+            Loading = false;
+
+            StateHasChanged();
+
+        }
+
+
+    }
+
+
+
+
+    protected override async Task OnInitializedAsync()
+    {
+
+        CurrentUser = await ((CustomAuthenticationStateProvider)stateprovider).GetUserInfoAsync();
+        await OnSendMessageSession.InvokeAsync();
+
+    }
+
+
+    private void BindEmoji(string emoji)
+    {
+        NewMessage += emoji;
+    }
+
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+
+      
+
+            var refrence = DotNetObjectReference.Create(this);
+            await js.InvokeVoidAsync("initScrollListener", _chatContainer, refrence);
+            await ScrollToBottom();
+        }
+        else{
+            if(!IsloadedOldMessages){
+                await ScrollToBottom();
+            }
+            else{
+                IsloadedOldMessages = false;
+            }
+
+
+
+        }
+
+    }
+
+
+
+    private async Task ScrollToBottom()
+    {
+        await js.InvokeVoidAsync("scrollToBottom", _chatContainer);
+        if (_messages.Count > 0)
+        {
+
+            var messages = _messages.Where(m => m.IsSeen == false && m.UserId != CurrentUser!.Id).ToList();
+            if (messages.Count > 0)
+            {
+                var userId = OtherUser?.Id;
+                if (userId is not null)
+                {
+                    if (messages.Count > 0)
+                    {
+                        messages.ForEach(m => m.IsSeen = true);
+                         await HandleMessageSeen(new MessageSeenDto(messages.Select(m => m.Id).ToList(), userId.Value));
+                        StateHasChanged();
+
+                    }
+                }
+            }
+        }
+    }
+
+    private async Task HandleMessageSeen(MessageSeenDto messagesForSeen)
+    {
+        await OnMessageSeen.InvokeAsync(messagesForSeen);
+    }
+    public async Task CloseEmojies(){
+        ShowEmojiPicker = false;
+    }
+
+    public async Task OnEditMessageHandler(EditedMessageDto messageDto){
+        EditedMessage = messageDto;
+        NewMessage = messageDto.Message;
+        EditMode = true;
+    }
+    public async Task DeleteTargetMessage(Guid MessageId){
+        var target = _messages.Where(m => m.Id == MessageId).FirstOrDefault();
+        if(target!=null){
+            _messages.Remove(target);
+        }
+    }
+    public async Task HandleReplyMessage(ChatMessageDto message){
+        ReplyMode = true;
+        SelectedMessageToReply = message;
+    }
+    public string? HandelParentMessage(Guid? ParentMessageId){
+        if (ParentMessageId == null)
+            return null;
+        var parent = _messages.Where(x => x.Id == ParentMessageId.Value).FirstOrDefault();
+        return parent?.Content;
+    }
+    private void SuccessMessage()
+    {
+        snackbar.Clear();
+        snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomRight;
+        snackbar.Add("عملیات با موفقیت انجام شد", Severity.Success);
+    }
+    private void ErrorMessage(string message)
+    {
+        snackbar.Clear();
+        snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomRight;
+        snackbar.Add(message, Severity.Error);
+    }
+    public async ValueTask DisposeAsync()
+    {
+
+    }
+}
+@code{
+    public int MessageCount { get; set; } =20;
+    public bool IsloadedOldMessages { get; set; } = false;
+
+
+    [JSInvokable]
+    public async Task LoadMoreMessages()
+    {
+        if (_messages.Count >= MessageCount)
+        {
+
+            var previousScrollHeight = await js.InvokeAsync<int>("getScrollHeight", _chatContainer);
+
+            MessageCount += 20;
+            await LoadMoreMesages(MessageCount);
+            IsloadedOldMessages = true;
+
+
+            StateHasChanged();
+
+
+            await Task.Delay(100);
+
+
+            var newScrollHeight = await js.InvokeAsync<int>("getScrollHeight", _chatContainer);
+            var previousScrollTop = await js.InvokeAsync<int>("getScrollPosition", _chatContainer);
+
+            var newScrollTop = newScrollHeight - previousScrollHeight + previousScrollTop;
+
+            await js.InvokeVoidAsync("setScrollPosition", _chatContainer, newScrollTop);
+        }
+        else
+        {
+            MessageCount = 20;
+        }
+
+    }
+
+    private System.Timers.Timer? typingTimer;
+    private const int TypingDelay = 1000;
+    private void OnUserTyping()
+    {
+
+
+
+        typingTimer?.Stop();
+        typingTimer?.Dispose();
+
+
+        typingTimer = new System.Timers.Timer(TypingDelay);
+        typingTimer.Elapsed += async (sender, args) =>
+        {
+            typingTimer?.Stop();
+            typingTimer?.Dispose();
+            // await InvokeAsync(ReactionToAnotherUser);
+        };
+        typingTimer.AutoReset = false;
+        typingTimer.Start();
+    }
+    public void ReactionToAnotherUser( KeyboardEventArgs e)
+    {
+
+        @if (e.Code == "Space")
+        {
+            if (OtherUser != null)
+            {
+                SendReaction.InvokeAsync(OtherUser.Id);
+            }
+        }
+    }
+    public async Task GetReaction(){
+        if( reactionType?.MessageType==0){
+
+
+
+            ReactionTitle = "...در حال نوشتن";
+            await Task.Delay(3000);
+
+
+
+
+        }
+
+    }
+    public async Task uploadDialog(){
+        var dialog = await DialogService.ShowAsync<UploadDialogComponent>();
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is UploadResult uploadResult)
+        {
+            await UploadFile(uploadResult.File, uploadResult.Caption??string.Empty);
+
+        }
+
+
+    }
+}
+
+
+
+
+       

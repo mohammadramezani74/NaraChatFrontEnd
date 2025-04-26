@@ -1,0 +1,9 @@
+﻿namespace NaraChat.Contract.Models.Chat.Conversation
+{
+    public class ChatFilesDto
+    {
+        public Guid FileId { get; set; }
+        public string? FileName { get; set; }
+        public string? FileSize { get; set; }
+    }
+}

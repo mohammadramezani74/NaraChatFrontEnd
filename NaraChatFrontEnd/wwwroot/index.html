@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NaraChatFrontEnd</title>
+    <base href="/" />
+    <link rel="stylesheet" href="lib/bootstrap/dist/css/bootstrap.min.css" />
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js">
+    </script>
+
+    </script>
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <link href="NaraChatFrontEnd.styles.css" rel="stylesheet" />
+    <link href="manifest.webmanifest" rel="manifest" />
+    <link rel="apple-touch-icon" sizes="512x512" href="icon-512.png" />
+    <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png" />
+    <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/app.css" />
+
+
+</head>
+
+<body>
+    <div id="app">
+        <svg class="loading-progress">
+            <circle r="40%" cx="50%" cy="50%" />
+            <circle r="40%" cx="50%" cy="50%" />
+        </svg>
+        <div class="loading-progress-text"></div>
+    </div>
+
+    <div id="blazor-error-ui" style="
+    background-color: #f44336 !important;
+
+">
+        <span>خطا در عملیات</span>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <a href="." onclick="document.getElementById('blazor-error-ui').style.display='none';"  class="reload" style="color: white; text-decoration: underline;">مجدد بارگذاری کنید</a>
+            <span  onclick="document.getElementById('blazor-error-ui').style.display='none';" class="dismiss" style="cursor: pointer; font-weight: bold;">🗙</span>
+        </div>
+    </div>
+    <script src="_framework/blazor.webassembly.js"></script>
+
+    <script src="_content/MudBlazor/MudBlazor.min.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.js"></script>
+    <script>navigator.serviceWorker.register('service-worker.js');</script>
+    <script src="/js/site.js"></script>
+    <script src="/js/videoplayer.js"></script>
+    <script src="js/voiceRecorder.js"></script>
+    <script src="js/cropper.js"></script>
+
+</body>
+
+</html>

@@ -1,0 +1,106 @@
+﻿@using NaraChat.Application.Services.TokenProvider
+@using NaraChatFrontEnd.Pages.ChatPages.Components.DialogComponents
+@inject IDialogService DialogService
+@inject IJSRuntime JS
+@inject IMessageService _messageservice
+@inject ITokenService tokenservice
+
+                @if (message.FileContent != null)
+                {
+                    <div style="display: flex; flex-direction: column; align-items: center; max-width: 300px; margin: auto; padding: 10px; position: relative;">
+
+                        <!-- تصویر -->
+                        <div style="position: relative; display: inline-block;">
+                            <MudImage @onclick="OpenPictureDialog"
+                            ObjectFit="ObjectFit.Cover"
+                            Height="250"
+                            Width="300"
+                            Src="@(ImageData!=null?$"data:image/png;base64, {ImageData}":@CurrentImageSrc)"
+                            Elevation="25"
+                            Class="rounded-lg" />
+
+
+                            @if (!ImageLoaded)
+                            {
+                                <MudButton OnClick="()=>LoadImage(message.FileContent!.FileId)"
+                                Color="Color.Dark"
+                                Variant="Variant.Filled"
+                                Class="download-button"
+                                Disabled="@IsLoading">
+                                    @if (IsLoading)
+                                    {
+                                        <MudProgressCircular Color="@ThemeCascading.SeenColor" Indeterminate="true" />
+                                    }
+                                    else
+                                    {
+                                        <MudIcon Size="Size.Medium" Icon="@Icons.Material.Filled.Download"  Color="Color.Tertiary"/>
+                                    }
+                                </MudButton>
+                            }
+                        </div>
+                    </div>
+                }
+              
+
+<style>
+
+
+    .download-button {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.2);
+    }
+
+</style>
+
+@code {
+    [CascadingParameter(Name = "Theme")]
+    public ThemeChanging ThemeCascading { get; set; }
+    [Parameter]
+    public ChatMessageDto message { get; set; } = null!;
+ 
+
+}
+
+@code {
+    private bool ImageLoaded = false;
+    public string? ImageData { get; set; } = null;
+    private bool IsLoading = false;
+    private string CurrentImageSrc = "lib/assets/Images/blured.jpg";
+  
+
+    public async Task LoadImage(Guid imageId)
+    {
+        IsLoading = true;
+        var message= await _messageservice.GetImageById(imageId);
+        if(message!=null){
+            ImageData = message.Data;
+            StateHasChanged();
+        }
+        ImageLoaded = true;
+        IsLoading = false;
+
+    }
+
+}
+@code{
+    public async Task OpenPictureDialog(){
+     
+        if(ImageData!=null){
+            var parameters = new DialogParameters
+{
+    { "ImageData", ImageData }
+};
+
+            await DialogService.ShowAsync<ImageDialogComponent>("نمایش تصویر", parameters);
+        }
+    }
+}

@@ -1,0 +1,422 @@
+﻿@using NaraChat.Application.Services.TokenProvider
+@using NaraChatFrontEnd.Pages.ChatPages.Components.DialogComponents
+@inject IDialogService DialogService
+@inject IMessageService _messageservice
+@inject ISnackbar snackbar
+@inject IJSRuntime JS
+@inject ITokenService tokenservice
+<MudItem xs="12" Class="w-100">
+    <div class="d-flex justify-@(IsMine ? "end" : "start") w-100">
+
+        <MudChat ChatPosition="@(message.IsMine?ChatBubblePosition.Start:ChatBubblePosition.End)">
+
+
+            <MudAvatar>
+
+                @if (GetAvatar() != null)
+                {
+                    <MudImage Src="@($"data:image/png;base64,{GetAvatar()}")" />
+                }
+                else
+                {
+                    <MudImage Src="lib/assets/Images/avatar.jpg" />
+
+                }
+            </MudAvatar>
+
+            <MudChatBubble Style="@Style()" Variant="Variant.Text" OnClick="@(e => OnRightClick(e, message))"
+            @onmouseenter="@((args) => HoverStart(args, message))"
+            @onmouseleave="@(() => HoverStop("bubble"))">
+
+
+                <!-- ریپلای نمایش -->
+                @if (ParentMessage != null && message.ParentId != null)
+                {
+                    <MudPaper Class="reply-preview px-2 py-1 mb-1" style="@replyColor()">
+                        @if (IsMine)
+                        {
+                            <a href="javascript:void(0)" @onclick="() => ScrollToMessage(message.ParentId!.Value)">
+                                <MudText Class="text-truncate" Style="text-align: right; color:gray;font-size: 10px;    padding-bottom: 6px;">
+                                    @OtherName
+                                </MudText>
+                            </a>
+                        }
+                        else
+                        {
+                            <MudText Class="text-truncate" Style="text-align: right; color:gray;font-size: 10px;    padding-bottom: 6px;">
+                                @CurrentUser.Name
+                            </MudText>
+                        }
+                        <MudText Class="text-truncate" Style="font-size: 12px;">
+                            @ParentMessage
+                        </MudText>
+                    </MudPaper>
+                }
+                @if (message.Type==MessageType.Document)
+                {
+
+
+
+                    <div style="display: flex; align-items: center; gap: 10px; max-width: 300px; margin: auto; padding: 10px;">
+                        @if (IsLoading){
+                            <MudProgressCircular Color="ThemeCascading.SeenColor==Color.Secondary?Color.Primary:ThemeCascading.SeenColor" Size="Size.Large" Indeterminate="true" />
+                        }else{
+                            <MudFab @onclick="async () => await LoadFile(message.FileContent!.FileId)" Color="ThemeCascading.SeenColor==Color.Secondary?Color.Primary:ThemeCascading.SeenColor" StartIcon="@Icons.Material.Filled.Download" />
+
+                        }
+                        <div style="display: flex; flex-direction: column;">
+                            <MudText>@message.FileContent.FileName</MudText>
+                            <MudText Style="font-size: 12px; color: gray;">@message.FileContent.FileSize کیلوبایت</MudText>
+                        </div>
+                    </div>
+
+
+
+                }
+                else if (message.Type == MessageType.Video){
+                    <VideoMessageComponent message="message"></VideoMessageComponent>
+                }
+                else if (message.Type == MessageType.Image){
+                    <PhotosMessageComponent_ message="message" ></PhotosMessageComponent_>
+                }
+                else{
+                    <AudioMessageComponent message="message"></AudioMessageComponent>
+                }
+
+                <!-- کپشن (توضیحات ویدیو) -->
+                <MudText id="@message.Id" Color="Color.Default" Style="margin-top: 10px; font-size: 14px; text-align: right; ">
+                    @((MarkupString)message.Content.Replace("\n", "<br />"))
+                </MudText>
+
+
+
+                @if (IsMine)
+                {
+                    <MudStack Row="true">
+
+                        @if (message.isEdited)
+                        {
+                            <MudIcon Size="Size.Small" Color="@(message.IsSeen? Color.Warning:Color.Dark)" Icon="@Icons.Material.Filled.CheckCircleOutline"></MudIcon>
+
+                            <MudText Class="mt-2 " Style="font-size:8px;">ویرایش شده</MudText>
+                        }
+                        else
+                        {
+                            <MudIcon Size="Size.Small" Color="@(message.IsSeen? ThemeCascading.SeenColor:Color.Dark)" Icon="@Icons.Material.Filled.CheckCircleOutline"></MudIcon>
+
+                        }
+                    </MudStack>
+                }
+                else
+                {
+                    @if (message.isEdited)
+                    {
+                        <MudText Class="mt-2 " Style="font-size:8px; text-align: right;">ویرایش شده</MudText>
+                    }
+                }
+                @if (IsMine)
+                {
+                    <MudPopover Open="@(Hovering && message.Equals(_hoverMessage))" Class="hoverarea"
+                    AnchorOrigin="Origin.TopLeft"
+                    TransformOrigin="Origin.BottomLeft"
+                    @onscroll="@(() => HoverStop("scroll"))"
+                    @onmouseenter="@(() => _paperHovering = true)"
+                    @onmouseleave="@(() => HoverStop("paper"))">
+                        <div class="d-flex" style="width: 100%;" @onclick:stopPropagation="true" @onclick:preventDefault="true">
+
+                            <MudTooltip Text="رونوشت">
+                                <span class="emoji" @onclick="()=>copyMessage(message)">📝</span>
+                            </MudTooltip>
+                            <MudTooltip Text="پاسخ">
+                                <span class="emoji" @onclick="()=>ReplyMessage(message)">↩️</span>
+                            </MudTooltip>
+                            <MudTooltip Text="ویرایش">
+                                <span class="emoji" @onclick="()=>EditMessage(message.Id,message.Content)">✏️</span>
+                            </MudTooltip>
+                            <MudTooltip Text="حذف">
+                                <span class="emoji" @onclick="()=>DeleteMessagePopUp(message.Id)">❌</span>
+                            </MudTooltip>
+                        </div>
+                    </MudPopover>
+                }
+                else
+                {
+                    <MudPopover Open="@(Hovering && message.Equals(_hoverMessage))" Class="hoverarea"
+                    AnchorOrigin="Origin.TopLeft"
+                    TransformOrigin="Origin.BottomLeft"
+                    @onscroll="@(() => HoverStop("scroll"))"
+                    @onmouseenter="@(() => _paperHovering = true)"
+                    @onmouseleave="@(() => HoverStop("paper"))">
+                        <div class="d-flex" style="width: 100%;" @onclick:stopPropagation="true" @onclick:preventDefault="true">
+                        
+                            <MudTooltip Text="پاسخ ">
+                                <span class="emoji" @onclick="()=>ReplyMessage(message)">↩️</span>
+                            </MudTooltip>
+                            <MudTooltip Text="رونوشت">
+                                <span class="emoji" @onclick="()=>copyMessage(message)">📝</span>
+                            </MudTooltip>
+                        </div>
+                    </MudPopover>
+                }
+
+
+            </MudChatBubble>
+
+
+            <MudChatFooter Style="@ClockColor()" Text="@message.SendAt.ToString(@"HH\:mm")" />
+
+
+
+
+        </MudChat>
+
+
+    </div>
+</MudItem>
+
+<style>
+    .reply-preview {
+    border-radius: 8px;
+    }
+
+    .hoverarea {
+    cursor: pointer !important;
+    background-color: var(--mud-palette-appbar-background);
+    color: var(--mud-palette-appbar-text);
+    transition: opacity 0.3s ease;
+    opacity: .8;
+    }
+
+    .actionarea {
+    background-color: var(--mud-palette-appbar-background);
+    color: var(--mud-palette-appbar-text);
+    }
+
+    .actionarea:focus {
+    opacity: 1;
+    }
+
+    span.emoji {
+    font-size: 12px;
+    padding: 1px 1px;
+    align-self: center;
+    }
+
+    .download-btn {
+    display: inline-block;
+    padding: 10px 20px;
+    font-size: 16px;
+    color: #fff;
+    background-color: #007bff;
+    border: none;
+    border-radius: 5px;
+    text-decoration: none;
+    transition: background-color 0.3s ease;
+    }
+
+    .download-btn:hover {
+    background-color: #0056b3;
+    }
+
+
+    /* طراحی دکمه */
+    .play-button {
+    background-color: rgba(0, 0, 0, 0.5);
+    color: white;
+    font-size: 16px;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    opacity: 1;
+    transition: opacity 0.3s ease;
+    }
+
+    /* مخفی کردن دکمه وقتی ویدیو در حال پخش است */
+    .video-overlay.hidden {
+    display: none;
+    }
+</style>
+
+@code {
+    [CascadingParameter(Name = "Theme")]
+    public ThemeChanging ThemeCascading { get; set; }
+    [Parameter]
+    [EditorRequired]
+    public bool IsMine { get; set; }
+    [Parameter]
+    public ChatMessageDto message { get; set; } = null!;
+    [Parameter]
+    [EditorRequired]
+    public UserDto CurrentUser { get; set; } = null!;
+    [Parameter]
+    [EditorRequired]
+    public PrivateConversationDto Conversation { get; set; } = null!;
+    [Parameter]
+    public EventCallback<EditedMessageDto> EditMessageEvent { get; set; }
+    [Parameter]
+    public EventCallback<ChatMessageDto> ReplyMessageEvent { get; set; }
+    [Parameter]
+    public EventCallback<Guid> DeletedMessageevent { get; set; }
+    [Parameter]
+    public string? ParentMessage { get; set; } = null;
+    private bool showContextMenu = false;
+    private Guid? showContextMenuForMessageId = null;
+    private int contextMenuX;
+    private int contextMenuY;
+    public string? myAvatar { get; set; }
+    public string? OtherAvatar { get; set; }
+    public string? myName { get; set; }
+    public string? OtherName { get; set; }
+    public string? GetAvatar() => CurrentUser.Id == message.UserId ? myAvatar : OtherAvatar;
+    public string replyColor() { return message.IsMine ? $"background-color: {ThemeCascading.MyColorReply}" : $"background-color: {ThemeCascading.OtherColorReply}"; }
+    public string ClockColor() => $"color: {ThemeCascading.ClockColor};";
+    public string Style() { return message.IsMine ? $"background-color: {ThemeCascading.myColorChat}; width:300px;" : $"background-color: {ThemeCascading.OtherColorChat}; width:300px;"; }
+    protected override async Task OnInitializedAsync()
+    {
+        var me = Conversation.users.Where(c => c.Id == CurrentUser.Id).FirstOrDefault();
+        var other = Conversation.users.Where(c => c.Id != CurrentUser.Id).FirstOrDefault();
+        myAvatar = CurrentUser.avatar;
+        OtherAvatar = other?.avatar;
+        myName = me?.Name;
+        OtherName = other?.Name;
+    }
+    private async Task OnRightClick(MouseEventArgs e, ChatMessageDto message)
+    {
+        if (IsMine)
+        {
+            showContextMenuForMessageId = message.Id;
+            contextMenuX = (int)e.ClientX;
+            contextMenuY = (int)e.ClientY;
+            showContextMenu = true;
+            StateHasChanged();
+        }
+    }
+    private async Task EditMessage(Guid MessageId, string Message)
+    {
+        var message = new EditedMessageDto(MessageId, Message);
+        message.OtherId = Conversation.users.Where(c => c.Id != CurrentUser.Id).FirstOrDefault()!.Id;
+        await EditMessageEvent.InvokeAsync(message);
+    }
+    private async Task DeleteMessagePopUp(Guid MessageId)
+    {
+        var parameters = new DialogParameters<DialogTemplate>
+    {
+        { x => x.ContentText, "آیا از حذف این پیام اطمینان دارید؟" },
+        { x => x.ButtonText, "بله" },
+        { x => x.Color, Color.Error }
+    };
+
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Large, };
+
+        var dialog = await DialogService.ShowAsync<DialogTemplate>("حذف پیام", parameters, options);
+        var res = await dialog.Result;
+        if (!res.Canceled)
+        {
+            await PerformDeleteMessageAsync(MessageId);
+        }
+    }
+    public async Task PerformDeleteMessageAsync(Guid MessageId)
+    {
+        var otherId = Conversation.users.Where(c => c.Id != CurrentUser.Id).FirstOrDefault()!.Id;
+        var result = await _messageservice.DeleteMessageAsync(MessageId, otherId);
+        if (result.Item1)
+        {
+            await DeletedMessageevent.InvokeAsync(MessageId);
+            snackbar.Clear();
+            snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomRight;
+            snackbar.Add($"حذف پیام با موفقیت انجام شد ", Severity.Success, x =>
+            {
+
+            });
+        }
+        else
+        {
+            snackbar.Clear();
+            snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomRight;
+            snackbar.Add($"حذف پیام با خطا مواجه شد ", Severity.Error, x =>
+            {
+
+            });
+        }
+    }
+
+}
+@code {
+    private bool Hovering => _paperHovering || _bubbleHovering;
+    private bool _bubbleHovering;
+    private bool _paperHovering;
+    private ChatMessageDto? _hoverMessage;
+    private void HoverStart(MouseEventArgs args, ChatMessageDto message)
+    {
+        _bubbleHovering = true;
+        _hoverMessage = message;
+    }
+    public string? ImageData { get; set; } = null;
+
+    private void HoverStop(string typeOfStop)
+    {
+        try
+        {
+            switch (typeOfStop)
+            {
+                case "paper":
+                    _paperHovering = false;
+                    break;
+                case "bubble":
+                    _bubbleHovering = false;
+                    break;
+                case "scroll":
+                    _paperHovering = false;
+                    _bubbleHovering = false;
+                    StateHasChanged();
+                    break;
+                default:
+                    break;
+            }
+        }
+        catch { }
+    }
+}
+@code {
+    private bool IsLoading = false;
+    private string FileData { get; set; } = string.Empty;
+    private string FileName { get; set; } = "downloaded_file";
+    private string FileSize = "0 kb";
+
+    public async Task ReplyMessage(ChatMessageDto message)
+    {
+        await ReplyMessageEvent.InvokeAsync(message);
+    }
+    public async Task copyMessage(ChatMessageDto message)
+    {
+        await JS.InvokeVoidAsync("copyToClipboard", message.Content);
+    }
+    private async Task ScrollToMessage(Guid parentId)
+    {
+        await JS.InvokeVoidAsync("scrollToElement", parentId);
+    }
+    public async Task LoadFile(Guid imageId)
+    {
+        IsLoading = true;
+        var message = await _messageservice.GetImageById(imageId);
+        if (message != null)
+        {
+            FileData = $"data:application/octet-stream;base64,{message.Data}";
+            FileName = message.fileDownloadName ?? "downloaded_file";
+            FileSize = GetFileSize(message.Data);
+
+            await JS.InvokeVoidAsync("triggerDownload", FileData, FileName);
+        }
+        IsLoading = false;
+
+    }
+    private string GetFileSize(string base64String)
+    {
+        if (string.IsNullOrEmpty(base64String)) return "0 KB";
+        int fileSizeInBytes = (base64String.Length * 3) / 4 - (base64String.EndsWith("=") ? (base64String.EndsWith("==") ? 2 : 1) : 0);
+        return fileSizeInBytes < 1024 ? $"{fileSizeInBytes} B" : $"{fileSizeInBytes / 1024} KB";
+    }
+}
+
+

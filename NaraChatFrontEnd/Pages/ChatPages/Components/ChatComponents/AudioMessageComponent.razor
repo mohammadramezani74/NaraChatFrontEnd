@@ -1,0 +1,121 @@
+﻿@using NaraChat.Application.Services.TokenProvider
+@using NaraChatFrontEnd.Pages.ChatPages.Components.DialogComponents
+@inject IJSRuntime JS
+@inject IMessageService service
+@inject ITokenService tokenservice
+
+@if (message.FileContent != null)
+{
+    <div style="display: flex; flex-direction: column; align-items: center; max-width: 200px; margin: auto; padding: 10px;  box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1); direction: rtl;">
+
+
+        <!-- ویدیو -->
+        <audio src="@($"data:audio/mp3;base64,{AudioData}")" controls>
+
+            مرورگر شما از ویدیو پشتیبانی نمی‌کند.
+        </audio>
+
+
+    </div>
+}
+
+
+<style>
+
+    video {
+    position: relative; 
+    width: 300px;
+    height: 250px;
+    border-radius: 10px;
+    object-fit: cover;
+    }
+
+
+    .video-overlay {
+    position: absolute;
+    top: 40%;
+    left: 50%;
+    right: 10%;
+    transform: translate(-50%, -50%);
+    z-index: 10; 
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    opacity: 0.8; 
+    cursor: pointer; 
+    }
+
+
+    .play-button {
+    background-color: rgba(0, 0, 0, 0.5);
+    color: white;
+    font-size: 16px;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    opacity: 1;
+    transition: opacity 0.3s ease;
+    }
+
+
+    .video-overlay.hidden {
+    display: none;
+    }
+</style>
+
+@code {
+    [CascadingParameter(Name = "Theme")]
+    public ThemeChanging ThemeCascading { get; set; }
+    [Parameter]
+    public ChatMessageDto message { get; set; } = null!;
+    public bool Loading { get; set; } = false;
+    protected override async Task OnInitializedAsync()
+    {
+        var file = await service.GetImageById(message.FileContent.FileId);
+
+        AudioData = file.Data;
+    }
+}
+@code {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    private bool isAudioPlaying = false;
+    public string? AudioData { get; set; } = null;
+
+    public async Task loadAudio(Guid FileId)
+    {
+
+        Loading = true;
+        var file= await service.GetImageById(FileId);
+
+        AudioData = file.Data;
+        Loading = false;
+    }
+    private void OnAudioPlay()
+    {
+        isAudioPlaying = true;
+        StateHasChanged();
+    }
+
+
+    private void OnAudioEnded()
+    {
+        isAudioPlaying = false;
+        StateHasChanged();
+    }
+}

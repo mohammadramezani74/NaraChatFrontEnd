@@ -1,0 +1,83 @@
+﻿
+.emoji-wrapper {
+    display: inline-block;
+    transition: transform 0.3s ease;
+    filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1));
+}
+
+    .emoji-wrapper:hover {
+        transform: rotate(15deg) scale(1.1);
+    }
+
+.floating-dots {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+}
+
+.dot {
+    position: absolute;
+    background: rgba(var(--mud-palette-primary-rgb), 0.3);
+    border-radius: 50%;
+    animation: dot-float 2s infinite;
+}
+
+.dot-1 {
+    top: 30%;
+    left: 20%;
+    width: 12px;
+    height: 12px;
+}
+
+.dot-2 {
+    top: 50%;
+    left: 70%;
+    width: 8px;
+    height: 8px;
+    animation-delay: 0.5s;
+}
+
+.dot-3 {
+    top: 70%;
+    left: 30%;
+    width: 10px;
+    height: 10px;
+    animation-delay: 1s;
+}
+
+@@keyframes float {
+    0%, 100% {
+        transform: translateY(0) scale(1);
+    }
+
+    50% {
+        transform: translateY(-20px) scale(1.05);
+    }
+}
+
+@@keyframes dot-float {
+    0% {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
+
+    100% {
+        transform: translateY(-60px) scale(0.5);
+        opacity: 0;
+    }
+}
+
+@@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

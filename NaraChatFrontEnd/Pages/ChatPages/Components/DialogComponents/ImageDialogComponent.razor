@@ -1,0 +1,35 @@
+﻿@inject IJSRuntime js
+<MudDialog>
+    <DialogContent>
+        <div style="display: flex; gap: 10px; justify-content: center; margin-top: 10px;">
+            <MudButton OnClick="ZoomIn">🔍 زوم +</MudButton>
+            <MudButton OnClick="ZoomOut">🔍 زوم -</MudButton>
+            <MudButton OnClick="Rotate">↻ چرخش</MudButton>
+            <MudButton OnClick="Flip">⇆ برگرداندن</MudButton>
+        </div>
+        <div style="max-width: 100%;height:auto; position: relative;">
+            <img id="image" src="@($" data:image /png;base64, {ImageData}")" class="image" style="background-color: white;" />
+        </div>
+
+        <!-- دکمه‌ها -->
+    
+    </DialogContent>
+
+</MudDialog>
+
+@code {
+    [Parameter]
+    public string ImageData { get; set; } = string.Empty;
+    private async Task ZoomIn() => await js.InvokeVoidAsync("cropper.zoom", 0.1);
+    private async Task ZoomOut() => await js.InvokeVoidAsync("cropper.zoom", -0.1);
+    private async Task Rotate() => await js.InvokeVoidAsync("cropper.rotate", 90);
+    private async Task Flip() => await js.InvokeVoidAsync("cropper.scaleX");
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await js.InvokeVoidAsync("cropper.init");
+        }
+    }
+}

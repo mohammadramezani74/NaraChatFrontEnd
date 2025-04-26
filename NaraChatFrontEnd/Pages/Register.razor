@@ -1,0 +1,110 @@
+﻿@page "/register"
+@using NaraChat.Application.Services.Auth
+@using NaraChat.Contract.Models.Auth
+@using NaraChatFrontEnd.Models.BaseModels
+@inject IAuthService _service
+@inject NavigationManager navigation
+
+<div class="Login-card row d-flex justify-content-center align-items-center" style="height: 50vh;">
+    <div class="col-4" style="margin-top: 70px;">
+        <div Class="test" Style="@(ThemeChanging.boxShadow);" >
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudImage Style="margin-right:140px;max-width: 180px;" Src="./lib/assets/Images/logo.png"></MudImage>
+                    <MudText Style="text-align:center; font-weight:400;color:gray">ورود  به حساب کاربری</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <EditForm Model="RegisterUserDto" FormName="Register" OnValidSubmit="RegisterAsync">
+                <DataAnnotationsValidator/>
+                <MudCardContent>
+
+                    <div class="row">
+
+                        <div class=" col-md-6">
+                            <MudTextField Style="margin-bottom: 20px;" ShrinkLabel @bind-Value="RegisterUserDto.FirstName" Label="نام " Variant="Variant.Text"></MudTextField>
+                            <ValidationMessage For="()=>RegisterUserDto.FirstName" />
+                        </div>
+                        <div class=" col-md-6">
+                            <MudTextField Style="margin-bottom: 20px;" ShrinkLabel @bind-Value="RegisterUserDto.LastName" Label="نام خانوادگی" Variant="Variant.Text"></MudTextField>
+                            <ValidationMessage For="()=>RegisterUserDto.LastName" />
+                        </div>
+                    </div>
+                    <MudGrid>
+
+                        <MudItem xs="4">
+                            <MudNumericField @bind-Value="RegisterUserDto.Age" Label="سن" Variant="Variant.Text" Min="10" Max="100" />
+                            <ValidationMessage For="()=>RegisterUserDto.Age" />
+                        </MudItem>
+                        <MudItem xs="4">
+                            <MudRadioGroup @bind-Value="RegisterUserDto.Gender" Class="border-black">
+                                <MudRadio Value="true" Color="Color.Primary" Dense="true">آقا</MudRadio>
+                                <MudRadio Value="false" Color="Color.Secondary" Dense="false">خانم</MudRadio>
+                            </MudRadioGroup>
+                            <ValidationMessage For="()=>RegisterUserDto.Gender" />
+                        </MudItem>
+                        <MudItem xs="4">
+
+                            <MudTextField Style="margin-bottom: 20px;" ShrinkLabel @bind-Value="RegisterUserDto.City" Label="شهر" Variant="Variant.Text"></MudTextField>
+                            <ValidationMessage For="()=>RegisterUserDto.City" />
+                        </MudItem>
+                    </MudGrid>
+                    <MudGrid>
+                        <MudItem xs="12">
+                            <MudTextField Style="margin-bottom: 20px;" ShrinkLabel @bind-Value="RegisterUserDto.UserName" Label="نام کاربری" Variant="Variant.Text"></MudTextField>
+                       
+
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudTextField Style="margin-bottom: 20px;" @bind-Value="RegisterUserDto.Password" Label="رمز عبور" Variant="Variant.Text" InputType="@PasswordInput" Adornment="Adornment.End" AdornmentIcon="@PasswordInputIcon" OnAdornmentClick="ButtonTestclick" AdornmentAriaLabel="نمایش رمز عبور" />
+                        </MudItem>
+
+                    </MudGrid>
+                </MudCardContent>
+                <MudCardActions >
+                    <MudButton  ButtonType="ButtonType.Submit" Style="margin-bottom: 20px;" Variant="Variant.Filled" Color="Color.Primary">ثبت نام</MudButton>
+
+                </MudCardActions>
+            </EditForm>
+            <MudPaper>
+                <MudText Style="@ThemeChanging.Color">از قبل حساب کاربری فعال دارید؟ <a href="/"> هم اکنون  وارد شوید.</a>  </MudText>
+            </MudPaper>
+        </div>
+    </div>
+</div>
+
+
+@code {
+    [CascadingParameter(Name = "Theme")]
+    public ThemeChanging ThemeChanging { get; set; }
+    public RegisterUserDto RegisterUserDto { get; set; } = new();
+    @attribute [AllowAnonymous]
+
+    bool isShow;
+    InputType PasswordInput = InputType.Password;
+    string PasswordInputIcon = Icons.Material.Filled.VisibilityOff;
+
+    void ButtonTestclick()
+    {
+        @if (isShow)
+        {
+            isShow = false;
+            PasswordInputIcon = Icons.Material.Filled.VisibilityOff;
+            PasswordInput = InputType.Password;
+        }
+        else
+        {
+            isShow = true;
+            PasswordInputIcon = Icons.Material.Filled.Visibility;
+            PasswordInput = InputType.Text;
+        }
+    }
+    public async Task RegisterAsync(){
+        var result = await _service.RegisterAsync(RegisterUserDto);
+        if(result){
+            navigation.NavigateTo("/");
+        }
+        else{
+
+        }
+    }
+}
