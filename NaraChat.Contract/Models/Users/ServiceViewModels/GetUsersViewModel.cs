@@ -16,5 +16,8 @@ namespace NaraChat.Contract.Models.Users.ServiceViewModels
         public string LastName { get; set; } = null!;
         public string Avatar { get; set; }
         public int MessageUnreadedCount { get; set; }
+        public string LastReceivedMessage { get; set; }
+        public Guid? LastReceivedMessageId { get; set; }
+        public bool IsLastReceivedMessageForMe { get; set; }
     }
 }

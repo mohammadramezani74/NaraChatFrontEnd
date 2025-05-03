@@ -24,6 +24,8 @@
                         MissedMessageCount="missedMassage"
                         ReeadMissedMessage="EmptyReadMessage"
                         Loading="LoadingUsers"
+                        newIncomingMessage="_newIncomingMessageForUsers"
+                        NullIncommengMessage="()=>_newIncomingMessageForUsers=null"
                         OnUserSelected="OnUserSelected" OnOtherUserSelected="OnOtherUserSelected" />
                     </MudItem>
                 }
@@ -32,6 +34,7 @@
                     <MudItem xs="12" sm="@( ThemeChanging.IsShowSetting  ? 6 : 9)" Class="h-100 d-flex px-0">
                         <ChatDetail @key="ThemeChanging.IsShowSetting" OtherUser="OtherUser"
                         NewIncomingMessage="_newIncomingMessage"
+                        changeUserLastMessage="ChangeMyMessageOnUser"
                         IncommingMessageRecieved="NullIncomingMessage"
                         OnCancel="HandleChatDetailsCancel"
                         OnMessageSeen="SendMessageSeenIdsToHub"
@@ -116,6 +119,7 @@
     private HubConnection? _hubConnection;
     private bool LoadingUsers = false;
     private ChatMessageDto? _newIncomingMessage = null;
+    private ChatMessageDto? _newIncomingMessageForUsers = null;
     private ChatMessageDto? LastReceivedMessage = null;
     private EditedMessageDto? _newIncomingEditedMessage = null;
     public Guid? DeletedMessageId { get; set; } = null;
@@ -286,11 +290,13 @@
        });
         hubConnection.On<ChatMessageDto>(nameof(IChatHubClient.MessagedReceived), (MessageDto) =>
        {
+           _newIncomingMessageForUsers = MessageDto;
            var fromusers = Users.FirstOrDefault(x => x.Id == MessageDto.UserId);
            if (!Users.Any(x => x.Id == MessageDto.UserId))
            {
                Users.Insert(0, fromusers!);
                _newIncomingMessage = MessageDto;
+           
                Users.Where(x => x.Id == MessageDto.UserId).First().messageUnreadedCount -= 1;
            }
            else
@@ -298,6 +304,7 @@
                if (OtherUser?.Id == MessageDto.UserId)
                {
                    _newIncomingMessage = MessageDto;
+                 
                    Users.Where(x=>x.Id==MessageDto.UserId).First().messageUnreadedCount -= 1;
                }
            }
@@ -356,12 +363,12 @@
         {
             missedMassage = missedMessagess;
             if (OtherUser != null)
-        {
-            missedTargetUserMassages=   missedMassage.Where(x => x.UserId == OtherUser.Id).ToList();
+            {
+                missedTargetUserMassages=   missedMassage.Where(x => x.UserId == OtherUser.Id).ToList();
+            }
+            StateHasChanged();
         }
-        StateHasChanged();
-    }
-      
+
 
     });
         hubConnection.On<NotificationModelDto>(nameof(IChatHubClient.ReceivedNotifications), async (notify) =>
@@ -519,6 +526,11 @@
     {
         LastReceivedMessage = _newIncomingMessage;
         _newIncomingMessage = null;
+    }
+    public async Task ChangeMyMessageOnUser(ChatMessageDto message)
+    {
+        _newIncomingMessageForUsers = message;
+        StateHasChanged();
     }
 
 }

@@ -1,6 +1,7 @@
 ﻿
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
+using Microsoft.AspNetCore.Components.Web;
 using MudBlazor;
 using NaraChat.Contract.Models.Chat.Conversation;
 using NaraChat.Contract.Models.Users;
@@ -14,6 +15,7 @@ public partial class ChatDetail:ComponentBase
     #region parameters
     [CascadingParameter(Name = "Theme")]
     public ThemeChanging ThemeCascading { get; set; }
+    private MudTextField<string> messageInput;
     private CancellationTokenSource? _cancellationTokenSource;
     public bool IsUploading { get; set; } = false;
     public UserAvatar Avatars { get; set; } = new();
@@ -91,6 +93,8 @@ public partial class ChatDetail:ComponentBase
     [Parameter]
     public List<ChatMessageDto> MissedUserMessage { get; set; }
     public string? ReactionTitle { get; set; } = null;
+    [Parameter]
+    public EventCallback<ChatMessageDto> changeUserLastMessage { get; set; }
     #endregion
 
     private async Task LoadMesages(int count=20)
@@ -171,8 +175,8 @@ public partial class ChatDetail:ComponentBase
             var result = await messageService.SendMessageAsync(Conversation!.id, NewMessage, ParentId);
             if (result.Item1)
             {
-               
-                var me = Conversation.users.Where(c => c.Id == CurrentUser!.Id).FirstOrDefault();
+                changeUserLastMessage.InvokeAsync();
+                 var me = Conversation.users.Where(c => c.Id == CurrentUser!.Id).FirstOrDefault();
                 var other = Conversation.users.Where(c => c.Id != CurrentUser!.Id).FirstOrDefault();
                 var newMessage = new ChatMessageDto
                 {
@@ -188,6 +192,21 @@ public partial class ChatDetail:ComponentBase
 
 
                 };
+                var newMessageForUsers = new ChatMessageDto
+                {
+                    Id = result.MessageId,
+                    SendAt = DateTime.Now,
+                    SenderName = me.Name,
+                    IsMine = true,
+                    Content = NewMessage,
+                    Type = 0,
+                    UserId = other.Id,
+                    ParentId = ParentId,
+
+
+
+                };
+                await changeUserLastMessage.InvokeAsync(newMessageForUsers);
                 _messages.Add(newMessage);
                 await ScrollToBottom();
                 NewMessage = string.Empty;
@@ -202,6 +221,13 @@ public partial class ChatDetail:ComponentBase
             ErrorMessage("ارسال مسیج با مشکل مواجه شد");
         }
 
+    }
+    private async Task SendWithInter(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && OtherUser != null)
+        {
+            await SendMessage();
+        }
     }
     private async Task UploadFile(IBrowserFile file,string caption)
     {

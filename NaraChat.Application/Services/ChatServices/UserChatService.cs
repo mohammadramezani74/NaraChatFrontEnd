@@ -37,7 +37,8 @@ namespace NaraChat.Application.Services.ChatServices
                 PropertyNameCaseInsensitive = true
             });
             if (response?.isSucceded??false) {
-                var users=response.result.Select(x=>new UserDto(x.Id,x.LastName+" "+x.FirstName,x.Avatar,messageUnreadedCount:x.MessageUnreadedCount,lastseen:x.LastSeen)).ToList();
+                var users=response.result.Select(x=>new UserDto(x.Id,x.LastName+" "+x.FirstName,x.Avatar,messageUnreadedCount:x.MessageUnreadedCount,lastseen:x.LastSeen,lastReceivedMessage: x.LastReceivedMessage,
+                   lastReceivedMessageId: x.LastReceivedMessageId,isLastReceivedMessageForMe: x.IsLastReceivedMessageForMe)).ToList();
                 return users;
             }
             return Enumerable.Empty<UserDto>();

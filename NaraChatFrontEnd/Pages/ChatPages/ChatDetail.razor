@@ -150,6 +150,7 @@
             <MudGrid Class="align-center w-100" Spacing="2">
                 <MudItem xs="8">
                     <MudTextField T="string"
+                                  @ref="messageInput"
                     @bind-value="NewMessage"
                     @onkeypress="ReactionToAnotherUser"
                     Variant="Variant.Outlined"
@@ -167,6 +168,7 @@
                     EndIcon="@Icons.Material.Rounded.Message"
                     IconSize="Size.Small"
                     OnClick="SendMessage"
+
                     Disabled="@(OtherUser==null)">
                         ارسال
                     </MudButton>
@@ -299,20 +301,20 @@
         }
         if (MissedUserMessage.Count > 0)
         {
-           var newMessages = MissedUserMessage
-    .Where(m => !_messages.Any(existing => existing.Id == m.Id))
-    .OrderBy(x=>x.SendAt)
-    .ToList();
+            var newMessages = MissedUserMessage
+     .Where(m => !_messages.Any(existing => existing.Id == m.Id))
+     .OrderBy(x=>x.SendAt)
+     .ToList();
 
-_messages.AddRange(newMessages);
-await ClearMissedMessageUser.InvokeAsync();
+            _messages.AddRange(newMessages);
+            await ClearMissedMessageUser.InvokeAsync();
         }
         if (MessagedSeened.Count>0){
             var messages = _messages.Where(m => MessagedSeened.Contains(m.Id)).ToList();
             if(messages.Count>0){
                 foreach (var chatMessage in messages)
                 {
-                    
+
                     chatMessage.IsSeen = true;
                 }
 
@@ -337,9 +339,9 @@ await ClearMissedMessageUser.InvokeAsync();
 
 
             await LoadMesages();
-          
 
-            
+
+
 
             CurrentUser.avatar =MyAvatar;
             Loading = false;
@@ -374,7 +376,7 @@ await ClearMissedMessageUser.InvokeAsync();
         if (firstRender)
         {
 
-      
+
 
             var refrence = DotNetObjectReference.Create(this);
             await js.InvokeVoidAsync("initScrollListener", _chatContainer, refrence);
@@ -411,7 +413,7 @@ await ClearMissedMessageUser.InvokeAsync();
                     if (messages.Count > 0)
                     {
                         messages.ForEach(m => m.IsSeen = true);
-                         await HandleMessageSeen(new MessageSeenDto(messages.Select(m => m.Id).ToList(), userId.Value));
+                        await HandleMessageSeen(new MessageSeenDto(messages.Select(m => m.Id).ToList(), userId.Value));
                         StateHasChanged();
 
                     }
@@ -525,14 +527,26 @@ await ClearMissedMessageUser.InvokeAsync();
         typingTimer.AutoReset = false;
         typingTimer.Start();
     }
-    public void ReactionToAnotherUser( KeyboardEventArgs e)
+    public async Task ReactionToAnotherUser( KeyboardEventArgs e)
     {
 
         @if (e.Code == "Space")
         {
             if (OtherUser != null)
             {
-                SendReaction.InvokeAsync(OtherUser.Id);
+                await  SendReaction.InvokeAsync(OtherUser.Id);
+            }
+
+        }
+        if (e.Key == "Enter" && !e.ShiftKey)
+        {
+          //  StateHasChanged();
+            await messageInput.BlurAsync();
+            if (!string.IsNullOrWhiteSpace(NewMessage))
+            {
+                await SendMessage();
+                await Task.Delay(50); 
+                await messageInput.FocusAsync();
             }
         }
     }

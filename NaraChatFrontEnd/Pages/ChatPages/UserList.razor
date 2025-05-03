@@ -20,11 +20,11 @@
 
 
                 <MudListItem @onclick="()=>HandleUserClick(user)" Class="py-3 px-2"
-                Style="height:50px;">
+                Style="height:69px;">
 
                     <AvatarContent>
                         <MudBadge Dot="true" Color="@(user.IsOnline? Color.Success:Color.Default)" Class="mx-6 my-4">
-                            <MudAvatar Size="Size.Small">
+                            <MudAvatar Size="Size.Medium">
                                 @if(user.avatar!=null){
                                     <MudImage Src="@($"data:image/png;base64,{user.avatar}")" Class="rounded-circle"
                                     Style="width:100%; height:100%; object-fit:inherit;" />
@@ -40,14 +40,17 @@
 
 
                     <ChildContent>
-                        <MudStack Row="true">
-                            @if(user.messageUnreadedCount>0){
-                                <MudText Style="font-size:12px;">@user.Name</MudText>
-                                <MudBadge Content="user.messageUnreadedCount" Color="Color.Error" Overlap="true" Origin="Origin.TopRight" Class="mx-6 my-4">      </MudBadge>
-                            }
-                            else{
-                                <MudText Style="font-size:12px;">@user.Name</MudText>
-                            }
+                        <MudStack Row=false>
+                            <MudStack Row="true">
+                                @if(user.messageUnreadedCount>0){
+                                    <MudText Style="font-size:12px;">@user.Name</MudText>
+                                    <MudBadge Content="user.messageUnreadedCount" Color="Color.Error" Overlap="true" Origin="Origin.TopRight" Class="mx-6 my-4">      </MudBadge>
+                                }
+                                else{
+                                    <MudText Style="font-size:12px;">@user.Name</MudText>
+                                }
+                            </MudStack>
+                            <p style="@GetLastMessageStyle(user)">@user.LastReceivedMessage</p>
                         </MudStack>
                     </ChildContent>
 
@@ -71,12 +74,16 @@
     public EventCallback<UserDto> OnUserSelected { get; set; }
     [Parameter]
     public EventCallback<UserDto> OnOtherUserSelected { get; set; }
+    [Parameter]
+    public EventCallback<UserDto> NullIncommengMessage { get; set; }
 
 
-      [Parameter]
+    [Parameter]
     public List<ChatMessageDto> MissedMessageCount { get; set; } = new List<ChatMessageDto>();
     [Parameter]
     public EventCallback ReeadMissedMessage { get; set; }
+    [Parameter]
+    public ChatMessageDto? newIncomingMessage { get; set; }
     public bool HaveFilter { get; set; } = false;
     private string search;
     private string Search
@@ -85,7 +92,7 @@
         set
         {
             search = value;
-            SearchUsers(); // فراخوانی متد جستجو هنگام تغییر مقدار
+            SearchUsers(); 
         }
     }
 
@@ -127,32 +134,92 @@
         }
         StateHasChanged();
     }
+    public string GetLastMessageStyle(UserDto user)
+    {
+        if (user.IsLastReceivedMessageForMe)
+        {
+            return "font-size:10px;color:gray";
+        }
+        else
+        {
+            return $"font-size:10px;color:{themeChanging.ClockColor}";
+        }
+
+    }
     protected override async Task OnParametersSetAsync()
     {
         if (!HaveFilter)
             AllUsers = Users.OrderByDescending(u => u.messageUnreadedCount > 0).ToList();
+        // if (MissedMessageCount.Count > 0)
+        // {
+
+        //     var groupedMissed = MissedMessageCount
+        //         .GroupBy(m => m.UserId)
+        //         .ToDictionary(g => g.Key, g => g.Count());
+
+        //     foreach (var kvp in groupedMissed)
+        //     {
+        //         var userId = kvp.Key;
+        //         var count = kvp.Value;
+
+        //         var targetUser = AllUsers.FirstOrDefault(x => x.Id == userId);
+
+        //         if (targetUser != null)
+        //         {
+        //             targetUser.messageUnreadedCount += count;
+        //         }
+        //     }
+        //     await ReeadMissedMessage.InvokeAsync();
+        //     StateHasChanged();
+        // }
         if (MissedMessageCount.Count > 0)
         {
-
             var groupedMissed = MissedMessageCount
                 .GroupBy(m => m.UserId)
-                .ToDictionary(g => g.Key, g => g.Count());
-
-            foreach (var kvp in groupedMissed)
-            {
-                var userId = kvp.Key;
-                var count = kvp.Value;
-
-                var targetUser = AllUsers.FirstOrDefault(x => x.Id == userId);
-
-                if (targetUser != null)
+                .ToDictionary(g => g.Key, g => new 
                 {
-                    targetUser.messageUnreadedCount += count;
+                    Count = g.Count(),
+                    LastMessage = g.OrderByDescending(x => x.SendAt).FirstOrDefault()?.Content,
+                    LastId=g.OrderByDescending(x => x.SendAt).FirstOrDefault()?.Id,
+                });
+
+            var usersDictionary = Users.ToDictionary(u => u.Id);
+
+            foreach (var (userId, info) in groupedMissed)
+            {
+                if (usersDictionary.TryGetValue(userId, out var targetUser))
+                {
+                  
+                        targetUser.messageUnreadedCount += info.Count;
+              
+
+                    if (!string.IsNullOrEmpty(info.LastMessage))
+                    {
+                        targetUser.LastReceivedMessage = info.LastMessage; 
+                    }
                 }
             }
+
             await ReeadMissedMessage.InvokeAsync();
             StateHasChanged();
         }
+        if (newIncomingMessage != null)
+        {
+
+            var user=   Users.Where(x => x.Id == newIncomingMessage.UserId).FirstOrDefault();
+            if (user != null)
+            {
+                user.LastReceivedMessage = newIncomingMessage.Content.TruncateMessage();
+                user.LastReceivedMessageId = newIncomingMessage.Id;
+                user.IsLastReceivedMessageForMe = newIncomingMessage.IsMine;
+
+
+                await  NullIncommengMessage.InvokeAsync();
+                StateHasChanged();
+
+            }
+        }
+
 
     }
   }

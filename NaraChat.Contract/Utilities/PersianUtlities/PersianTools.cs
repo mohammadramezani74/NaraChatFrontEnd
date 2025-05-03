@@ -141,5 +141,12 @@ namespace NaraChat.Contract.Utilities.PersianUtlities
 
             return $"{day} {MonthNames[month - 1]}";
         }
+        public static string TruncateMessage( this string message)
+        {
+            if (string.IsNullOrEmpty(message))
+                return "";
+
+            return message.Length > 30 ? message.Substring(0, 30) + "..." : message;
+        }
     }
 }
