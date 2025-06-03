@@ -20,5 +20,7 @@ namespace NaraChat.Contract.Models.Chat.Conversation
         public MessageType Type { get; set; } = MessageType.Text;
         public ChatFilesDto? FileContent { get; set; }
         public string? Reaction { get; set; }
+        public float? Latitude { get; set; }
+        public float? Longitude { get; set; }
     }
 }

@@ -9,5 +9,27 @@
     overflow: hidden;
     text-overflow: ellipsis;
 }
+.chat-input {
+    border: none;
+    background-color: transparent; /* Paper شفاف */
+}
+
+.chat-textarea {
+    min-height: 40px;
+    max-height: 120px;
+    overflow-y: auto;
+    outline: none;
+    padding: 6px;
+    border-radius: 8px;
+    background-color: transparent; /* بدون سفیدی */
+    width: 100%;
+    font-size: 15px;
+    color: inherit; /* رنگ متن مثل صفحه */
+}
+
+    .chat-textarea:empty:before {
+        content: attr(placeholder);
+        color: #bbb;
+    }
 
 

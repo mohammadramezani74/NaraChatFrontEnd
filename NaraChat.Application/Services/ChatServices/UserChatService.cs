@@ -38,7 +38,7 @@ namespace NaraChat.Application.Services.ChatServices
             });
             if (response?.isSucceded??false) {
                 var users=response.result.Select(x=>new UserDto(x.Id,x.LastName+" "+x.FirstName,x.Avatar,messageUnreadedCount:x.MessageUnreadedCount,lastseen:x.LastSeen,lastReceivedMessage: x.LastReceivedMessage,
-                   lastReceivedMessageId: x.LastReceivedMessageId,isLastReceivedMessageForMe: x.IsLastReceivedMessageForMe)).ToList();
+                   lastReceivedMessageId: x.LastReceivedMessageId,isLastReceivedMessageForMe: x.IsLastReceivedMessageForMe,lastReceivedMessageSendDate:x.LastReceivedMessageSendDate)).ToList();
                 return users;
             }
             return Enumerable.Empty<UserDto>();
@@ -99,6 +99,25 @@ namespace NaraChat.Application.Services.ChatServices
                 return (false, "مشکلی در ثبت بیو به وجود آمده لطفا بعدا مراجعه فرمایید!");
             }
         
+        }
+        public async Task<bool> StoreToken(string? token, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var result = await _httpClient.PostAsJsonAsync("/api/v1/conversation/StoreFCMToken", new { token = token });
+                if (result.IsSuccessStatusCode)
+                {
+                    return true;
+                }
+                return false;
+
+            }
+            catch (Exception ex)
+            {
+
+                return false;
+            }
+
         }
         public async Task<(bool success, string Message)> SubmitEmail(string? email, CancellationToken cancellationToken = default)
         {

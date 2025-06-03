@@ -1,4 +1,5 @@
 ﻿@using NaraChat.Contract.Utilities.FilesExtensions
+@using System.Text.Json
 @using static NaraChatFrontEnd.Pages.ChatPages.Components.DialogComponents.UploadDialogComponent
 
 @inject IJSRuntime js
@@ -69,8 +70,9 @@
                     <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
                 }
                 else if(_messages.Count>0){
-                    <MudVirtualize Items="_messages" Context="message" @key="@OtherUser?.Id" >
-
+                    <MudVirtualize Items="_messages" Context="message"   OverscanCount="5" >
+                        <ItemContent>
+                            <div @key="message.Id" >
 
                         @if (lastDate == null || message.SendAt.Date != lastDate.Value.Date)
                         {
@@ -88,24 +90,26 @@
 
 
                             lastDate = message.SendAt.Date;
-                        }
-                        @if(message.Type==MessageType.Text){
+                        } 
+                        @if(message.Type==MessageType.Text||message.Type==MessageType.Location){
+                           
                             <MessageComponent DeletedMessageevent="DeleteTargetMessage"  IsMine="message.IsMine" CurrentUser="CurrentUser" message="message"
                             ReplyMessageEvent="HandleReplyMessage" Conversation="Conversation" EditMessageEvent="OnEditMessageHandler"
                             ParentMessage="@HandelParentMessage(message.ParentId)"
                             OtherAvatar="@OtherUser.avatar"
                             MessageReactionEvent="SendReactions"></MessageComponent>
+                      
                         }
                         else{
                             <FileMessageComponent DeletedMessageevent="DeleteTargetMessage" IsMine="message.IsMine" CurrentUser="CurrentUser" message="message"
                             ReplyMessageEvent="HandleReplyMessage" Conversation="Conversation" EditMessageEvent="OnEditMessageHandler"
                             ParentMessage="@HandelParentMessage(message.ParentId)"></FileMessageComponent>
                         }
+     </div>
+                        </ItemContent>
 
 
-
-
-
+                   
 
                     </MudVirtualize>
                 }
@@ -146,28 +150,36 @@
                 </MudPaper>
             }
 
-
             <MudGrid Class="align-center w-100" Spacing="2">
+
                 <MudItem xs="8">
+                    @if (ShowEmojiPicker)
+                    {
+                        <EmojiComponent OnEmojiSelected="BindEmoji" ShowEmojiPicker="ShowEmojiPicker" OnClosepopover="CloseEmojies"></EmojiComponent>
+                    }
                     <MudTextField T="string"
-                                  @ref="messageInput"
+                    @ref="messageInput"
                     @bind-value="NewMessage"
                     @onkeypress="ReactionToAnotherUser"
                     Variant="Variant.Outlined"
                     Placeholder="پیام خود را بنویسید..."
                     Clearable="true"
                     AutoGrow
-                    Lines="3" />
-                </MudItem>
+                    Lines="3"
+                    Adornment="Adornment.End"
+                    AdornmentIcon="@Icons.Material.Filled.InsertEmoticon"
+                    OnAdornmentClick="()=>ShowEmojiPicker=!ShowEmojiPicker" />
 
+
+                </MudItem>
 
                 <MudItem xs="2" Class="d-flex justify-content-start">
 
                     <MudButton  Variant="Variant.Filled"
-                    Color="@(EditMode ? Color.Warning : Color.Primary)"
-                    EndIcon="@Icons.Material.Rounded.Message"
+                    Color="@(EditMode ? Color.Warning : ThemeCascading.SeenColor)"
+                    EndIcon="@Icons.Custom.Brands.Telegram"
                     IconSize="Size.Small"
-                    OnClick="SendMessage"
+                               OnClick="@(()=>SendMessage())"
 
                     Disabled="@(OtherUser==null)">
                         ارسال
@@ -180,34 +192,31 @@
                         OnClick="()=>EditMode = false" />
                     }
                 </MudItem>
-
-                @if (!isRecording)
-                {
-                    <MudButton Disabled="@(OtherUser==null)" OnClick="RecordVoice">
-                        <MudIcon Color="Color.Primary" Icon="@Icons.Material.Filled.Mic"></MudIcon>
-                    </MudButton>
-                }
-                else
-                {
-                    <MudButton OnClick="StopRecording">
-                        <MudIcon Color="Color.Primary" Icon="@Icons.Material.Filled.Stop"></MudIcon>
-                    </MudButton>
-                }
-
-
-                <MudButton @onclick="@uploadDialog" Disabled="@(IsUploading||OtherUser==null)" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AttachFile" Size="Size.Small">
-
-                </MudButton>
-
-                <!-- ایموجی آیکون -->
-                <MudItem xs="1">
-                    <MudIconButton Icon="@Icons.Material.Filled.InsertEmoticon"
-                    OnClick="()=>ShowEmojiPicker=!ShowEmojiPicker" /> 
-                    @if (ShowEmojiPicker)
+                <MudMenu Disabled="@(OtherUser==null)" Icon="@Icons.Material.Filled.MoreVert"
+                AriaLabel="Open user menu">
+                    @if (!isRecording)
                     {
-                        <EmojiComponent OnEmojiSelected="BindEmoji" ShowEmojiPicker="ShowEmojiPicker" OnClosepopover="CloseEmojies"></EmojiComponent>
+                        <MudButton Disabled="@(OtherUser==null)" OnClick="RecordVoice">
+                            <MudIcon Color="Color.Tertiary" Icon="@Icons.Material.Filled.Mic" Title="میکروفون"></MudIcon>
+                        </MudButton>
                     }
-                </MudItem>
+                    else
+                    {
+                        <MudButton OnClick="StopRecording">
+                            <MudIcon Color="Color.Secondary" Icon="@Icons.Material.Filled.Stop" Title="توقف ضبط صدا"></MudIcon>
+                        </MudButton>
+                    }
+                    <MudButton @onclick="@uploadDialog"  Disabled="@(IsUploading||OtherUser==null)" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AttachFile" Size="Size.Small">
+
+                    </MudButton>
+                    <MudButton Disabled="@(OtherUser==null)" OnClick="GetLocation">
+                        <MudIcon Color="Color.Error"  Icon="@Icons.Material.Filled.MyLocation" Title="لوکیشن"></MudIcon>
+                    </MudButton>
+
+
+                </MudMenu>
+
+
 
 
 
@@ -226,7 +235,13 @@
 
 @code {
     public bool Loading { get; set; } = false;
+    DotNetObjectReference<ChatDetail>? objRef;
     private bool isRecording { get; set; } = false;
+    async Task GetLocation()
+    {
+
+        await js.InvokeVoidAsync("startLocationWatcher", objRef);
+    }
     private async Task RecordVoice()
     {
         bool hasMic = await js.InvokeAsync<bool>("checkAudioDevices");
@@ -249,6 +264,7 @@
 
         StateHasChanged();
     }
+
 
 
     private async Task HandleCancelClick()
@@ -349,6 +365,11 @@
             StateHasChanged();
 
         }
+        if (LoadScroll)
+        {
+            await ScrollToBottom();
+            await FalseScroll.InvokeAsync();
+        }
 
 
     }
@@ -360,6 +381,7 @@
     {
 
         CurrentUser = await ((CustomAuthenticationStateProvider)stateprovider).GetUserInfoAsync();
+        objRef = DotNetObjectReference.Create(this);
         await OnSendMessageSession.InvokeAsync();
 
     }
@@ -383,12 +405,12 @@
             await ScrollToBottom();
         }
         else{
-            if(!IsloadedOldMessages){
-                await ScrollToBottom();
-            }
-            else{
-                IsloadedOldMessages = false;
-            }
+            // if(!IsloadedOldMessages){
+            //      await ScrollToBottom();
+            // }
+            // else{
+            //     IsloadedOldMessages = false;
+            // }
 
 
 
@@ -465,11 +487,11 @@
     }
     public async ValueTask DisposeAsync()
     {
-
+        objRef?.Dispose();
     }
 }
 @code{
-    public int MessageCount { get; set; } =20;
+    public int MessageCount { get; set; } =15;
     public bool IsloadedOldMessages { get; set; } = false;
 
 
@@ -478,30 +500,28 @@
     {
         if (_messages.Count >= MessageCount)
         {
+            IsloadedOldMessages = true;
 
             var previousScrollHeight = await js.InvokeAsync<int>("getScrollHeight", _chatContainer);
 
-            MessageCount += 20;
-            await LoadMoreMesages(MessageCount);
-            IsloadedOldMessages = true;
+            MessageCount += 15;
 
+            await LoadMoreMesages(MessageCount); 
 
             StateHasChanged();
 
+        
+            await Task.Delay(50);
 
-            await Task.Delay(100);
-
-
+           
             var newScrollHeight = await js.InvokeAsync<int>("getScrollHeight", _chatContainer);
-            var previousScrollTop = await js.InvokeAsync<int>("getScrollPosition", _chatContainer);
+            var scrollDiff = newScrollHeight - previousScrollHeight;
 
-            var newScrollTop = newScrollHeight - previousScrollHeight + previousScrollTop;
-
-            await js.InvokeVoidAsync("setScrollPosition", _chatContainer, newScrollTop);
+            await js.InvokeVoidAsync("setScrollPosition", _chatContainer, scrollDiff);
         }
         else
         {
-            MessageCount = 20;
+            MessageCount = 15;
         }
 
     }
@@ -540,13 +560,13 @@
         }
         if (e.Key == "Enter" && !e.ShiftKey)
         {
-          //  StateHasChanged();
             await messageInput.BlurAsync();
             if (!string.IsNullOrWhiteSpace(NewMessage))
             {
                 await SendMessage();
-                await Task.Delay(50); 
+           
                 await messageInput.FocusAsync();
+  
             }
         }
     }
@@ -564,6 +584,7 @@
         }
 
     }
+
     public async Task uploadDialog(){
         var dialog = await DialogService.ShowAsync<UploadDialogComponent>();
         var result = await dialog.Result;
@@ -573,9 +594,11 @@
             await UploadFile(uploadResult.File, uploadResult.Caption??string.Empty);
 
         }
+      
 
 
     }
+
 }
 
 

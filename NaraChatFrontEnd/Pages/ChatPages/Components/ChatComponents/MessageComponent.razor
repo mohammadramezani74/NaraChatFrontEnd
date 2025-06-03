@@ -20,152 +20,158 @@
 
             </MudAvatar>
             <MudStack Row="false" Spacing="0">
-            <MudChatBubble Style="@Style()" Variant="Variant.Text"  OnClick="@(e => OnRightClick(e, message))"
-            @onmouseenter="@((args) => HoverStart(args, message))"
-            @onmouseleave="@(() => HoverStop("bubble"))">
-                <p style="text-align: right; color:gray;font-size: 10px;"><small> @(CurrentUser.Id == message.UserId ? myName : OtherName) </small></p>
+                <MudChatBubble Style="@Style()" Variant="Variant.Text"  OnClick="@(e => OnRightClick(e, message))"
+                @onmouseenter="@((args) => HoverStart(args, message))"
+                @onmouseleave="@(() => HoverStop("bubble"))">
+                    <p style="text-align: right; color:gray;font-size: 10px;"><small> @(CurrentUser.Id == message.UserId ? myName : OtherName) </small></p>
 
-                <!-- ریپلای نمایش -->
-                @if (ParentMessage != null)
-                {
-                    <MudPaper Class="reply-preview px-2 py-1 mb-1" style="@replyColor()">
-                        @if(IsMine){
-                            <a href="javascript:void(0)" @onclick="() => ScrollToMessage(message.ParentId!.Value)">
+                    <!-- ریپلای نمایش -->
+                    @if (ParentMessage != null)
+                    {
+                        <MudPaper Class="reply-preview px-2 py-1 mb-1" style="@($"{replyColor()}; max-width: 100%; box-sizing: border-box;")">
+                            @if(IsMine){
+                                <a href="javascript:void(0)" @onclick="() => ScrollToMessage(message.ParentId!.Value)">
+                                    <MudText Class="text-truncate" Style="text-align: right; color:gray;font-size: 10px;    padding-bottom: 6px;">
+                                        @OtherName
+                                    </MudText>
+                                </a>
+                            }else{
                                 <MudText Class="text-truncate" Style="text-align: right; color:gray;font-size: 10px;    padding-bottom: 6px;">
-                                    @OtherName
+                                    @CurrentUser.Name
                                 </MudText>
-                            </a>
-                        }else{
-                            <MudText Class="text-truncate" Style="text-align: right; color:gray;font-size: 10px;    padding-bottom: 6px;">
-                                @CurrentUser.Name
+                            }
+                            <MudText Class="text-truncate" Style="font-size: 12px;">
+                                @ParentMessage.TruncateMessage()
                             </MudText>
+                        </MudPaper>
+                    }
+
+                    <MudText id="@message.Id" Color="Color.Default">
+                        @((MarkupString)message.Content.Replace("\n", "<br />"))
+                        @if (message.Type==MessageType.Location)
+                        {
+                            <MudPaper Class="pa-2 mt-2" Style="border:1px solid #ccc;border-radius:12px;width:300px;margin:20px;">
+                                <div id="map-@message.Id" style="height:350px;border-radius:12px;"></div>
+                            </MudPaper>
                         }
-                        <MudText Class="text-truncate" Style="font-size: 12px;">
-                            @ParentMessage
-                        </MudText>
-                    </MudPaper>
-                }
+                    </MudText>
+                    @if (IsMine)
+                    {
+                        <MudStack Row="true">
 
-                <MudText id="@message.Id" Color="Color.Default">
-                    @((MarkupString)message.Content.Replace("\n", "<br />"))
-                </MudText>
-                @if (IsMine)
-                {
-                    <MudStack Row="true">
+                            @if (message.isEdited)
+                            {
+                                <MudIcon Size="Size.Small" Color="@(message.IsSeen? Color.Warning:Color.Dark)" Icon="@Icons.Material.Filled.CheckCircleOutline"></MudIcon>
 
+                                <MudText Class="mt-2 " Style="font-size:8px;">ویرایش شده</MudText>
+                            }else{
+                                <MudIcon Size="Size.Small" Color="@(message.IsSeen? ThemeCascading.SeenColor:Color.Dark)" Icon="@Icons.Material.Filled.CheckCircleOutline"></MudIcon>
+
+                            }
+                        </MudStack>
+                    }
+                    else
+                    {
                         @if (message.isEdited)
                         {
-                            <MudIcon Size="Size.Small" Color="@(message.IsSeen? Color.Warning:Color.Dark)" Icon="@Icons.Material.Filled.CheckCircleOutline"></MudIcon>
+                            <MudText Class="mt-2 " Style="font-size:8px; text-align: right;">ویرایش شده</MudText>
+                        }
+                    }
+                    @if (IsMine)
+                    {
+                        <MudPopover Open="@(Hovering && message.Equals(_hoverMessage))" Class="hoverarea"
+                        AnchorOrigin="Origin.TopLeft"
+                        TransformOrigin="Origin.BottomLeft"
+                        @onscroll="@(() => HoverStop("scroll"))"
+                        @onmouseenter="@(() => _paperHovering = true)"
+                        @onmouseleave="@(() => HoverStop("paper"))">
+                            <div class="d-flex" style="width: 100%;" @onclick:stopPropagation="true" @onclick:preventDefault="true">
 
-                            <MudText Class="mt-2 " Style="font-size:8px;">ویرایش شده</MudText>
-                        }else{
-                            <MudIcon Size="Size.Small" Color="@(message.IsSeen? ThemeCascading.SeenColor:Color.Dark)" Icon="@Icons.Material.Filled.CheckCircleOutline"></MudIcon>
+                                <MudTooltip Text="رونوشت">
+                                    <span class="emoji" @onclick="()=>copyMessage(message)">📝</span>
+                                </MudTooltip>
+                                <MudTooltip Text="پاسخ">
+                                    <span class="emoji" @onclick="()=>ReplyMessage(message)">↩️</span>
+                                </MudTooltip>
+                                <MudTooltip Text="ویرایش">
+                                    <span class="emoji" @onclick="()=>EditMessage(message.Id,message.Content)">✏️</span>
+                                </MudTooltip>
+                                <MudTooltip Text="حذف">
+                                    <span class="emoji" @onclick="()=>DeleteMessagePopUp(message.Id)">❌</span>
+                                </MudTooltip>
+
+                            </div>
+                        </MudPopover>
+                        <p  Style="@ClockColor() font-size:11px;text-align: right; margin-top: 17px;margin-bottom: 0px;">@message.SendAt.ToString(@"HH\:mm")</p> 
+
+                    }
+                    else
+                    {
+                        <MudPopover Open="@(Hovering && message.Equals(_hoverMessage))" Class="hoverarea"
+                        AnchorOrigin="Origin.TopLeft"
+                        TransformOrigin="Origin.BottomLeft"
+                        @onscroll="@(() => HoverStop("scroll"))"
+                        @onmouseenter="@(() => _paperHovering = true)"
+                        @onmouseleave="@(() => HoverStop("paper"))">
+                            <div class="d-flex" style="width: 100%;" @onclick:stopPropagation="true" @onclick:preventDefault="true">
+
+                                <MudTooltip Text="پاسخ ">
+                                    <span class="emoji" @onclick="()=>ReplyMessage(message)">↩️</span>
+                                </MudTooltip>
+                                <MudTooltip Text="رونوشت">
+                                    <span class="emoji" @onclick="()=>copyMessage(message)">📝</span>
+                                </MudTooltip>
+                                <span class="emoji" @onclick="@(() => MessageAction("liked",message))">👍</span>
+                                <span class="emoji" @onclick="@(() => MessageAction("Merci",message))">🙏</span>
+                                <span class="emoji" @onclick="@(() => MessageAction("Loved",message))">❤️</span>
+                                <span class="emoji" @onclick="@(() => MessageAction("Lough",message))">😂</span>
+                                <span class="emoji" @onclick="@(() => MessageAction("cried",message))">😭</span>
+                                <span class="emoji" @onclick="@(() => MessageAction("Flower",message))">🌸</span>
+                            </div>
+                        </MudPopover>
+                        <p  Style="@ClockColor() font-size:11px;text-align: left; margin-top: 17px;margin-bottom: 0px;">@message.SendAt.ToString(@"HH\:mm")</p> 
+
+                    }
+
+                </MudChatBubble>
+                <MudPaper Class="actionarea mt-0" Elevation="0" Style="margin-top: 0; padding-top: 0;">
+                    <div class="d-flex" style="width: 100%;" @onclick:stopPropagation="true" @onclick:preventDefault="true">
+                        @if (message.Reaction=="Liked")
+                        {
+                            <span class="myemoji" >👍</span>
 
                         }
-                    </MudStack>
-                }
-                else
-                {
-                    @if (message.isEdited)
-                    {
-                        <MudText Class="mt-2 " Style="font-size:8px; text-align: right;">ویرایش شده</MudText>
-                    }
-                }
-                @if (IsMine)
-                {
-                    <MudPopover Open="@(Hovering && message.Equals(_hoverMessage))" Class="hoverarea"
-                    AnchorOrigin="Origin.TopLeft"
-                    TransformOrigin="Origin.BottomLeft"
-                    @onscroll="@(() => HoverStop("scroll"))"
-                    @onmouseenter="@(() => _paperHovering = true)"
-                    @onmouseleave="@(() => HoverStop("paper"))">
-                        <div class="d-flex" style="width: 100%;" @onclick:stopPropagation="true" @onclick:preventDefault="true">
+                        else if (message.Reaction =="cried")
+                        {
+                            <span class="myemoji">😭</span>
 
-                            <MudTooltip Text="رونوشت">
-                                <span class="emoji" @onclick="()=>copyMessage(message)">📝</span>
-                            </MudTooltip>
-                            <MudTooltip Text="پاسخ">
-                                <span class="emoji" @onclick="()=>ReplyMessage(message)">↩️</span>
-                            </MudTooltip>
-                            <MudTooltip Text="ویرایش">
-                                <span class="emoji" @onclick="()=>EditMessage(message.Id,message.Content)">✏️</span>
-                            </MudTooltip>
-                            <MudTooltip Text="حذف">
-                                <span class="emoji" @onclick="()=>DeleteMessagePopUp(message.Id)">❌</span>
-                            </MudTooltip>
+                        }
+                        else if (message.Reaction =="Loved")
+                        {
+                            <div style="opacity: 1;">
+                                <span class="myemoji">❤️</span>
+                            </div>
 
-                        </div>
-                    </MudPopover>
-                    <p  Style="@ClockColor() font-size:11px;text-align: right; margin-top: 17px;margin-bottom: 0px;">@message.SendAt.ToString(@"HH\:mm")</p> 
+                        }
+                        else if (message.Reaction =="Merci")
+                        {
+                            <span class="myemoji" >🙏</span>
 
-                }
-                else
-                {
-                    <MudPopover Open="@(Hovering && message.Equals(_hoverMessage))" Class="hoverarea"
-                    AnchorOrigin="Origin.TopLeft"
-                    TransformOrigin="Origin.BottomLeft"
-                    @onscroll="@(() => HoverStop("scroll"))"
-                    @onmouseenter="@(() => _paperHovering = true)"
-                    @onmouseleave="@(() => HoverStop("paper"))">
-                        <div class="d-flex" style="width: 100%;" @onclick:stopPropagation="true" @onclick:preventDefault="true">
+                        }
+                        else if (message.Reaction =="Lough")
+                        {
+                            <span class="myemoji" >😂</span>
 
-                            <MudTooltip Text="پاسخ ">
-                                <span class="emoji" @onclick="()=>ReplyMessage(message)">↩️</span>
-                            </MudTooltip>
-                            <MudTooltip Text="رونوشت">
-                                <span class="emoji" @onclick="()=>copyMessage(message)">📝</span>
-                            </MudTooltip>
-                            <span class="emoji" @onclick="@(() => MessageAction("liked",message))">👍</span>
-                            <span class="emoji" @onclick="@(() => MessageAction("Merci",message))">🙏</span>
-                            <span class="emoji" @onclick="@(() => MessageAction("Loved",message))">❤️</span>
-                            <span class="emoji" @onclick="@(() => MessageAction("Lough",message))">😂</span>
-                            <span class="emoji" @onclick="@(() => MessageAction("cried",message))">😭</span>
-                            <span class="emoji" @onclick="@(() => MessageAction("Flower",message))">🌸</span>
-                        </div>
-                    </MudPopover>
-                    <p  Style="@ClockColor() font-size:11px;text-align: left; margin-top: 17px;margin-bottom: 0px;">@message.SendAt.ToString(@"HH\:mm")</p> 
+                        }
+                        else if (message.Reaction =="Flower")
+                        {
+                            <span class="myemoji" >🌸</span>
 
-                }
+                        }
 
-            </MudChatBubble>
-            <MudPaper Class="actionarea mt-0" Elevation="0" Style="margin-top: 0; padding-top: 0;">
-                <div class="d-flex" style="width: 100%;" @onclick:stopPropagation="true" @onclick:preventDefault="true">
-                    @if (message.Reaction=="Liked")
-                    {
-                        <span class="myemoji" >👍</span>
-
-                    }
-                    else if (message.Reaction =="cried")
-                    {
-                        <span class="myemoji">😭</span>
-
-                    }
-                    else if (message.Reaction =="Loved")
-                    {
-                        <div style="opacity: 1;">
-                            <span class="myemoji">❤️</span>
-                        </div>
-
-                    }
-                    else if (message.Reaction =="Merci")
-                    {
-                        <span class="myemoji" >🙏</span>
-
-                    }
-                    else if (message.Reaction =="Lough")
-                    {
-                        <span class="myemoji" >😂</span>
-
-                    }
-                    else if (message.Reaction =="Flower")
-                    {
-                        <span class="myemoji" >🌸</span>
-
-                    }
-
-                </div>
-            </MudPaper>
-</MudStack>
+                    </div>
+                </MudPaper>
+            </MudStack>
 
 
 
@@ -176,6 +182,28 @@
 
     </div>
 </MudItem>
+<script>
+window.showMiniMap = function (mapId, lat, lng) {
+    var mapElement = document.getElementById(mapId);
+    if (!mapElement) return;
+
+    var map = L.map(mapId, {
+        zoomControl: true,
+        dragging: false,
+        doubleClickZoom: false,
+        scrollWheelZoom: false,
+        attributionControl: false
+    }).setView([lat, lng], 14);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    L.marker([lat, lng]).addTo(map);
+    map.on('click', function () {
+        var url = `https://www.google.com/maps?q=${lat},${lng}`;
+        window.open(url, '_blank');
+    });
+};
+</script>
+
 
 <style>
     .reply-preview {
@@ -267,6 +295,13 @@
 
         myName = me?.Name;
         OtherName = other?.Name;
+    }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if(firstRender)
+   if(message.Type==MessageType.Location)
+        await JS.InvokeVoidAsync("showMiniMap", $"map-{message.Id}", message.Latitude, message.Longitude);
+    
     }
     public async Task copyMessage(ChatMessageDto message)
     {
@@ -427,6 +462,24 @@
             }
           await MessageReactionEvent.InvokeAsync(reactionInstance);
             StateHasChanged();
+
+           
         }
+    }
+     bool _mapDialogVisible = false;
+    double? _selectedLat;
+    double? _selectedLng;
+
+  public  void OpenMap(double lat, double lng)
+    {
+        _selectedLat = lat;
+        _selectedLng = lng;
+        _mapDialogVisible = true;
+
+
+        _ = Task.Delay(200).ContinueWith(async _ =>
+        {
+            await JS.InvokeVoidAsync("showMapWithMarker", lat, lng);
+        });
     }
 }

@@ -57,11 +57,18 @@
             {
                 <MudImage Src="@($"data:image/png;base64,{TargetUserInfoResponse.Avatar}")" Class="rounded-circle"
                 @onclick="OpenPictureDialog" Style="object-fit:cover;" />
-            }else if(MyAvatar!=null)
+            }
+                else if(MyAvatar!=null&& ChosenUser==null)
             {
                 <MudImage Src="@($"data:image/png;base64,{MyAvatar}")" Class="rounded-circle"
                 @onclick="OpenPictureDialog" Style="object-fit:cover;" />
             }
+            else if (TargetUserInfoResponse.Avatar == null)
+            {
+                  <MudImage Src="lib/assets/Images/avatar.jpg" Class="rounded-circle"
+                Style="object-fit:cover;" />
+            }
+        
             else
             {
                 <MudImage Src="lib/assets/Images/avatar.jpg" Class="rounded-circle"
@@ -247,19 +254,6 @@
     public EventCallback<UserDto> OnClearChosenUser { get; set; }
     private Guid? lastUserId;
 
-    // protected override async Task OnParametersSetAsync()
-    // {
-    //     if (ChosenUser is not null)
-    //     {
-    //         IsOnline = ChosenUser.IsOnline;
-    //         TargetUserInfoResponse = await userService.GetUserInfo(ChosenUser.Id);
-    //         ChosenUser = null;
-
-    //     }
-
-    // }
-
-
     protected override async Task OnParametersSetAsync()
     {
         if (ChosenUser is not null && ChosenUser.Id != lastUserId)
@@ -276,11 +270,6 @@
     protected async override Task OnInitializedAsync()
     {
         CurrentUser = await ((CustomAuthenticationStateProvider)stateprovider).GetUserInfoAsync();
-        // if (ChosenUser is not null && !ThemeChanging.IsShowSetting)
-        // {
-        //     TargetUserInfoResponse = await userService.GetUserInfo(ChosenUser.Id);
-        //     ChosenUser = null;
-        // }
 
         if (ThemeChanging.IsShowSetting && ChosenUser==null)
         {

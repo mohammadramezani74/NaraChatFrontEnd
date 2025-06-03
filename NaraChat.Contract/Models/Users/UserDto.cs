@@ -18,9 +18,10 @@ namespace NaraChat.Contract.Models.Users
         public string? LastReceivedMessage { get; set; }
         public Guid? LastReceivedMessageId { get; set; }
         public bool IsLastReceivedMessageForMe { get; set; }
+        public string? LastReceivedMessageSendDate { get; set; }
 
         public UserDto(Guid id, string name, string? Avatar = null, bool Isonline = false, int messageUnreadedCount = 0, DateTime? lastseen = null, string? lastReceivedMessage = null,
-            Guid? lastReceivedMessageId=null,bool isLastReceivedMessageForMe=false)
+            Guid? lastReceivedMessageId=null,bool isLastReceivedMessageForMe=false,string? lastReceivedMessageSendDate=null)
         {
             Id = id;
             Name = name;
@@ -31,6 +32,7 @@ namespace NaraChat.Contract.Models.Users
             LastReceivedMessage = lastReceivedMessage;
             LastReceivedMessageId = lastReceivedMessageId;
             IsLastReceivedMessageForMe=isLastReceivedMessageForMe;
+            LastReceivedMessageSendDate = lastReceivedMessageSendDate;
         }
     }
     public class UserAvatar

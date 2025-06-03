@@ -19,5 +19,6 @@ namespace NaraChat.Contract.Models.Users.ServiceViewModels
         public string LastReceivedMessage { get; set; }
         public Guid? LastReceivedMessageId { get; set; }
         public bool IsLastReceivedMessageForMe { get; set; }
+        public string? LastReceivedMessageSendDate { get; set; }
     }
 }

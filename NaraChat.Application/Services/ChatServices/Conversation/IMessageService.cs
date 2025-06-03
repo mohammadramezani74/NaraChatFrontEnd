@@ -10,7 +10,7 @@ namespace NaraChat.Application.Services.ChatServices.Conversation
     public interface IMessageService
     {
          Task<List<ChatMessageDto>?>LoadMessages(Guid ConverSationId,int MessageCount=50,CancellationToken cancellationToken=default);
-        Task<(bool, Guid MessageId)> SendMessageAsync(Guid ConversationId, string Message,Guid? ParentId=null, CancellationToken cancellationToken = default);
+        Task<(bool, Guid MessageId)> SendMessageAsync(Guid ConversationId, string Message,Guid? ParentId=null, float? latitude = null, float? Longitude = null, CancellationToken cancellationToken = default);
         Task<(bool, string message)> EditMessageAsync(EditedMessageDto messageDto, CancellationToken cancellationToken = default);
         Task<(bool, string message)> DeleteMessageAsync(Guid MessageId,Guid OtherId, CancellationToken cancellationToken = default);
         Task<(bool, string message, UploadFileResult? result)>UploadChatFileAsync(UploadFileDto uploaddto, CancellationToken cancellationToken = default);

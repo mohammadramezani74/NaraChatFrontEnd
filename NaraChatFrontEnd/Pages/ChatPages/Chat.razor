@@ -53,7 +53,11 @@
                         EmojiReaction="Reaction"
                         NullEmojiReactioncallBack="NullReact"
                         MissedUserMessage="missedTargetUserMassages"
-                        ClearMissedMessageUser="ClearMissedTargetUserMessages"/>
+                        ClearMissedMessageUser="ClearMissedTargetUserMessages"
+                        LoadScroll="LoadScroll" 
+                        FalseScroll="FalsingScrol"
+                        trueScroll="trueingScrol" />
+
 
 
                     </MudItem>
@@ -79,7 +83,6 @@
     public ThemeChanging ThemeChanging { get; set; }
     [Parameter]
     public Guid id { get; set; }
-    private Timer pingTimer;
     public string? myAvatar { get; set; }
     protected override void OnParametersSet()
     {
@@ -88,7 +91,16 @@
             StateHasChanged();
         }
     }
-
+    public void FalsingScrol()
+    {
+        LoadScroll = false;
+        StateHasChanged();
+    }
+    public void trueingScrol()
+    {
+        LoadScroll = true;
+        StateHasChanged();
+    }
 
     private void ToggleUserInfo()
     {
@@ -129,10 +141,10 @@
     private bool IsMobile { get; set; } = false;
     private bool gotoDetailByMobile { get; set; } = false;
     public TypingReactionDto? reaction { get; set; } = null;
-    private Timer _pingTimer;
     private MessageReaction? Reaction = null;
     private List<ChatMessageDto> missedMassage = new List<ChatMessageDto>();
     private List<ChatMessageDto> missedTargetUserMassages = new List<ChatMessageDto>();
+    public bool LoadScroll { get; set; } = false;
 
 
     public async Task HandleBackToUserListMobile(){
@@ -146,6 +158,18 @@
     {
         try
         {
+            var token = await js.InvokeAsync<string>("requestPermission");
+
+            if (!string.IsNullOrEmpty(token))
+            {
+                await userService.StoreToken(token);
+            }
+            snackbar.Clear();
+            snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomRight;
+            snackbar.Add($" token:  {token} ", Severity.Success, x =>
+            {
+
+            });
             Console.WriteLine( "OnInitializedAsync Called one Time");
             LoadingUsers = true;
             Logineduser = await ((CustomAuthenticationStateProvider)AuthenticationStateProvider).GetUserInfoAsync();
@@ -171,17 +195,7 @@
                 await _hubConnection.SendAsync("SetUserOnline", Logineduser);
             }
 
-            //         pingTimer = new Timer(async _ =>
-            // {
-            //     try
-            //     {
-            //         await _hubConnection.InvokeAsync("Ping");
-            //     }
-            //     catch (Exception ex)
-            //     {
-            //         Console.WriteLine($"Ping error: {ex.Message}");
-            //     }
-            // }, null, TimeSpan.Zero, TimeSpan.FromSeconds(15));
+
 
             LoadingUsers = false;
             var myImage= await ConversationService.GetImageConversation(Logineduser.Id,Guid.NewGuid());
@@ -296,7 +310,7 @@
            {
                Users.Insert(0, fromusers!);
                _newIncomingMessage = MessageDto;
-           
+
                Users.Where(x => x.Id == MessageDto.UserId).First().messageUnreadedCount -= 1;
            }
            else
@@ -304,11 +318,11 @@
                if (OtherUser?.Id == MessageDto.UserId)
                {
                    _newIncomingMessage = MessageDto;
-                 
+
                    Users.Where(x=>x.Id==MessageDto.UserId).First().messageUnreadedCount -= 1;
                }
            }
-
+           LoadScroll = true;
            StateHasChanged();
 
        });
@@ -444,6 +458,7 @@
         @if(IsMobile){
             gotoDetailByMobile = true;
         }
+        LoadScroll = true;
         StateHasChanged();
     }
     public async Task ReactionToUser(Guid Id){

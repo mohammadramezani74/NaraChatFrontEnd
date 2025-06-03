@@ -148,5 +148,65 @@ namespace NaraChat.Contract.Utilities.PersianUtlities
 
             return message.Length > 30 ? message.Substring(0, 30) + "..." : message;
         }
+        public static string FormatPersianDate(this DateTime inputDate)
+        {
+            var now = DateTime.Now;
+            var persianCalendar = new PersianCalendar();
+
+            var today = now.Date;
+            var inputDateOnly = inputDate.Date;
+
+            var diffDays = (today - inputDateOnly).Days;
+
+            var inputYear = persianCalendar.GetYear(inputDate);
+            var currentYear = persianCalendar.GetYear(now);
+
+            if (diffDays == 0)
+            {
+                // همان روز -> فقط ساعت
+                return inputDate.ToString("HH:mm");
+            }
+            else if (diffDays == 1)
+            {
+                // دیروز
+                return "دیروز";
+            }
+            else if (inputYear == currentYear)
+            {
+                // امسال -> روز و ماه
+                int day = persianCalendar.GetDayOfMonth(inputDate);
+                int month = persianCalendar.GetMonth(inputDate);
+                string monthName = GetPersianMonthName(month);
+                return $"{day} {monthName}";
+            }
+            else
+            {
+                // سال قبل یا سال‌های قبل -> تاریخ کامل
+                int year = persianCalendar.GetYear(inputDate);
+                int month = persianCalendar.GetMonth(inputDate);
+                int day = persianCalendar.GetDayOfMonth(inputDate);
+                return $"{year}/{month:D2}/{day:D2}";
+            }
+        }
+
+        private static string GetPersianMonthName(int month)
+        {
+            return month switch
+            {
+                1 => "فروردین",
+                2 => "اردیبهشت",
+                3 => "خرداد",
+                4 => "تیر",
+                5 => "مرداد",
+                6 => "شهریور",
+                7 => "مهر",
+                8 => "آبان",
+                9 => "آذر",
+                10 => "دی",
+                11 => "بهمن",
+                12 => "اسفند",
+                _ => ""
+            };
+        }
     }
 }

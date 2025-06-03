@@ -35,14 +35,14 @@ namespace NaraChat.Application.Services.ChatServices.Conversation
             }
         }
 
-        public async Task<(bool,Guid MessageId)> SendMessageAsync(Guid ConversationId, string Message, Guid? ParentId = null, CancellationToken cancellationToken = default)
+        public async Task<(bool,Guid MessageId)> SendMessageAsync(Guid ConversationId, string Message, Guid? ParentId = null, float? latitude = null, float? Longitude = null, CancellationToken cancellationToken = default)
         {
             try
             {
 
          
 
-            var result = await _httpClient.PostAsJsonAsync($"api/v1/message/messages", new { conversationId= ConversationId, message= Message, ParentId=ParentId },new System.Text.Json.JsonSerializerOptions
+            var result = await _httpClient.PostAsJsonAsync($"api/v1/message/messages", new { conversationId= ConversationId, message= Message, ParentId=ParentId, latitude=latitude, Longitude=Longitude },new System.Text.Json.JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true,
             });

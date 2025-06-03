@@ -1,44 +1,270 @@
 ﻿<MudItem xs="1">
-    <MudPopover Open="ShowEmojiPicker" @onmouseleave="()=>ShowEmojiPicker=false" AnchorOrigin="Origin.TopRight" TransformOrigin="Origin.TopRight" Style="width:350px;">
-        <MudPaper>
-            <MudGrid>
-                <MudItem xs="12" Style="display: flex; justify-content: space-between; align-items: center;">
+    <MudPopover Open="ShowEmojiPicker"
 
-                    <MudIconButton Icon="@Icons.Material.Filled.Close" OnClick="CloseToggle"  Size="Size.Small" />
-                </MudItem>
-                @foreach (var emoji in Emojis)
+    AnchorOrigin="Origin.TopRight"
+    TransformOrigin="Origin.TopRight"
+    Style="width:380px; border-radius:12px; box-shadow: 0 8px 20px rgba(0,0,0,0.2);">
+        <MudPaper Class="pa-2" Style="border-radius:12px;">
+
+            <!-- هدر -->
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <MudText Typo="Typo.subtitle2" Class="ml-2">ایموجی‌ها</MudText>
+                <MudIconButton Icon="@Icons.Material.Filled.Close"
+                OnClick="CloseToggle"
+                Size="Size.Small"
+                Color="Color.Error"
+                Class="ml-1" />
+            </div>
+
+            <!-- سرچ -->
+            <MudTextField @bind-Value="_searchText"
+            OnInternalInputChanged="OnSearchChanged"
+            Placeholder="جستجو ایموجی..."
+            Adornment="Adornment.Start"
+            AdornmentIcon="@Icons.Material.Filled.Search"
+            AdornmentAriaLabel="برای جستجو اینتر را فشار دهید"
+            Dense="true"
+            Class="mb-2"
+            Style="width:100%;"/>
+
+            <!-- تب دسته‌بندی‌ها -->
+            <MudTabs @bind-ActivePanelIndex="_selectedTabIndex"
+            Rounded="true"
+            Centered="true"
+            Class="emoji-tabs"
+            Style="margin-bottom:8px;">
+                @for (int i = 0; i < EmojiCategories.Count; i++)
                 {
-                    <MudItem xs="3">
-                        <MudButton OnClick="() => SelectEmoji(emoji)" Style=" font-size: 24px;width: 40px;  height: 40px;display: flex; justify-content: center; align-items: center;">
-                            @emoji
-                        </MudButton>
-                    </MudItem>
+                    <MudTabPanel Text="@EmojiCategories[i].Icon" DisableRipple="true"></MudTabPanel>
                 }
-            </MudGrid>
+            </MudTabs>
+
+            <!-- ایموجی ها -->
+            <MudFadeIn TransitionDuration="250">
+                <MudGrid Class="emoji-grid">
+                    @foreach (var emoji in FilteredEmojis)
+                    {
+                        <MudItem xs="3" Class="d-flex justify-center my-1">
+                            <MudButton OnClick="() => SelectEmoji(emoji.Emoji)"
+                            Style="font-size: 24px; width: 42px; height: 42px; border-radius: 8px; transition: 0.2s;"
+                            Variant="Variant.Filled"
+                            Color="Color.Default"
+                            Class="emoji-btn">
+                                @emoji.Emoji
+                            </MudButton>
+                        </MudItem>
+                    }
+                </MudGrid>
+            </MudFadeIn>
+
         </MudPaper>
     </MudPopover>
 </MudItem>
 
+<style>
+    .emoji-btn:hover {
+    background-color: rgba(0, 0, 0, 0.07) !important;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+    transform: scale(1.15);
+    }
+
+    .emoji-grid {
+    max-height: 220px;
+    overflow-y: auto;
+    padding-right: 4px;
+    transition: all 0.2s ease;
+    }
+
+    /* scrollbar قشنگ */
+    .emoji-grid::-webkit-scrollbar {
+    width: 6px;
+    }
+
+    .emoji-grid::-webkit-scrollbar-thumb {
+    background-color: rgba(0,0,0,0.2);
+    border-radius: 4px;
+    }
+
+    /* تب‌ها کوچک‌تر */
+    .emoji-tabs .mud-tabs-toolbar {
+    min-height: 32px;
+    }
+
+    .emoji-tabs .mud-tab {
+    min-width: 40px !important;
+    padding: 4px !important;
+    font-size: 20px;
+    }
+</style>
+
 @code {
+
     [Parameter]
     [EditorRequired]
     public bool ShowEmojiPicker { get; set; }
+
     [Parameter]
     public EventCallback<string> OnEmojiSelected { get; set; }
+
     [Parameter]
-    public EventCallback OnClosepopover{ get; set; }
-    private async Task CloseToggle(){
+    public EventCallback OnClosepopover { get; set; }
+
+    private int _selectedTabIndex = 0;
+    private string _searchText = "";
+
+    private List<EmojiCategory> EmojiCategories = new();
+    protected override void OnInitialized()
+    {
+
+        EmojiCategories=new (){
+      new EmojiCategory("چهره و احساسات", "😀", new List<EmojiItem>
+    {
+        new("😀", "خوشحال"), new("😂", "خنده"), new("😍", "عاشق"),
+        new("😎", "باحال"), new("🤩", "هیجان"), new("🥳", "جشن تولد"),
+        new("😊", "لبخند"), new("😇", "معصوم"), new("🤣", "خنده زیاد"),
+        new("😜", "چشمک"), new("😁", "دندون‌نما"), new("😡", "عصبانی"),
+        new("😭", "گریه زیاد"), new("😳", "شرم"), new("😢", "گریه"),
+        new("🥺", "التماس"), new("🤗", "بغل"), new("🤔", "تفکر"),
+        new("🥰", "عاشقانه"), new("😴", "خواب‌آلود"), new("🤤", "خوشمزه"),
+        new("😅", "خجالت"), new("😐", "بی‌تفاوت"), new("😇", "معصوم"),
+        new("🤯", "شوک"), new("🤬", "فحش"), new("🙃", "برعکس")
+    }),
+    new EmojiCategory("اشارات و دست‌ها", "👍", new List<EmojiItem>
+    {
+        new("👍", "لایک عالی"), new("👎", "بد دیس لایک"), new("👏", " دست زدن کف زدن"),
+        new("🙏", "دعا"), new("👊", "مشت"), new("✌️", "پیروزی"),
+        new("🤙", "تلفن بزن"), new("🖐️", "سلام"),
+        new("🤲", "دست باز"), new("🤝", "دست دادن"), new("👋", "بای بای"),
+        new("👌", "اوکی"), new("✋", "ایست")
+    }),
+    new EmojiCategory("قلب‌ها و عشق", "❤️", new List<EmojiItem>
+    {
+        new("❤️", "قلب قرمز"), new("🧡", "قلب نارنجی"), new("💛", "قلب زرد"),
+        new("💚", "قلب سبز"), new("💙", "قلب آبی"), new("💜", "قلب بنفش"),
+        new("🖤", "قلب مشکی"), new("🤍", "قلب سفید"), new("💔", "قلب شکسته"),
+        new("❤️‍🔥", "قلب سوزان"), new("❤️‍🩹", "قلب ترمیم شده"),
+        new("💕", "دو قلب"), new("💞", "چرخش قلب"), new("💓", "قلب تپنده"),
+        new("💗", "قلب درخشان"), new("💖", "قلب براق")
+    }),
+    new EmojiCategory("حیوانات و طبیعت", "🐶", new List<EmojiItem>
+    {
+        new("🐶", "سگ"), new("🐱", "گربه"), new("🦁", "شیر"), new("🐯", "ببر"),
+        new("🐮", "گاو"), new("🐷", "خوک"), new("🐸", "قورباغه"),
+        new("🐵", "میمون"), new("🐔", "مرغ"), new("🦋", "پروانه"),  new("🐬", "دلفین"), new("🦉", "جغد"),
+           new("🌸", "گل"), new("💐", "دسته گل"), new("🌹", "رز"),
+        new("🌻", "آفتابگردان"), new("🌼", "بابونه"), new("🌺", "هیبیسکوس"),
+        new("🍀", "شبدر"), new("🍃", "برگ"), new("🌴", "نخل"),
+        new("🌞", "خورشید"),
+        new("🐞", "کفشدوزک"), new("🐢", "لاک‌پشت"), new("🐍", "مار")
+
+       , new("🌲", "درخت"), new("🌈", "رنگین‌کمان"),
+        new("🔥", "آتش"), new("💧", "قطره آب"), new("❄️", "برف")
+    }),
+    new EmojiCategory("خوراکی و نوشیدنی", "🍕", new List<EmojiItem>
+    {
+        new("🍏", "سیب سبز"), new("🍎", "سیب قرمز"), new("🍓", "توت فرنگی"),
+        new("🍉", "هندوانه"), new("🍇", "انگور"), new("🍌", "موز"),
+        new("🍍", "آناناس"), new("🥭", "انبه"), new("🍋", "لیمو"),
+        new("🍔", "برگر"), new("🍕", "پیتزا"), new("🍟", "سیب زمینی"),
+        new("🌭", "هات داگ"), new("🍣", "سوشی"), new("🍩", "دونات"),
+        new("🍪", "بیسکوییت"), new("🍫", "شکلات"), new("🍰", " تولد کیک"),
+        new("🍼", "شیشه شیر"), new("☕", "قهوه"), new("🍵", "چای"),
+        new("🥤", "نوشابه")
+    }),
+    new EmojiCategory("سفر و مکان‌ها", "✈️", new List<EmojiItem>
+    {
+        new("🚗", "ماشین"), new("🚕", "تاکسی"), new("🚌", "اتوبوس"),
+        new("🚎", "اتوبوس برقی"), new("🏎️", "ماشین مسابقه"),
+        new("🚓", "پلیس"), new("✈️", "هواپیما"), new("🚀", "موشک"),
+        new("⛵", "قایق"), new("🚢", "کشتی"), new("🏰", "قلعه"),
+        new("🗽", "مجسمه آزادی"), new("🏝️", "جزیره"), new("🏞️", "پارک طبیعی"),
+        new("🌋", "آتشفشان"), new("🗻", "کوه فوجی")
+    }),
+    new EmojiCategory("نمادها", "💯", new List<EmojiItem>
+    {
+        new("💯", "صد درصد"), new("✔️", "تیک"), new("❌", "ضربدر"),
+        new("⚠️", "هشدار"), new("🔞", "محدودیت سنی"), new("✅", "تیک سبز"),
+        new("🔔", "زنگ"), new("🔕", "بی‌صدا"), new("🎵", "نت موسیقی"),
+        new("🔒", "قفل"), new("🔓", "قفل باز"), new("🔑", "کلید"),
+        new("💡", "ایده"), new("📢", "بلندگو"), new("📍", "مکان‌نما"),
+        new("✉️", "نامه"), new("📅", "تقویم")
+    })
+};
+    }
+
+
+    private async Task CloseToggle()
+    {
         await OnClosepopover.InvokeAsync();
     }
 
-
     private async Task SelectEmoji(string emoji)
     {
-      await  OnEmojiSelected.InvokeAsync(emoji);
+        await OnEmojiSelected.InvokeAsync(emoji);
+        FilterEmojis(_searchText);
+    }
+    private List<EmojiCategory> FilteredEmojiis => FilterEmojis(_searchText);
+
+    private List<EmojiCategory> FilterEmojis(string searchText)
+    {
+        if (string.IsNullOrWhiteSpace(searchText))
+            return EmojiCategories; // اگر جستجو خالی بود همه رو برگردون
+
+        var filteredCategories = new List<EmojiCategory>();
+
+        foreach (var category in EmojiCategories)
+        {
+            var filteredEmojis = category.Emojis
+                .Where(e => e.Emoji.Contains(searchText) || e.Keywords.Contains(searchText))
+                .ToList();
+
+            if (filteredEmojis.Any())
+            {
+                filteredCategories.Add(new EmojiCategory(category.Name, category.Icon, filteredEmojis));
+            }
+        }
+
+        return filteredCategories;
+    }
+    private void OnSearchChanged(ChangeEventArgs e)
+    {
+        _searchText = e?.Value?.ToString() ?? string.Empty;
+  EmojiCategories= FilterEmojis(_searchText);
     }
 
-    private List<string> Emojis = new()
+
+    private IEnumerable<EmojiItem> FilteredEmojis =>
+        string.IsNullOrWhiteSpace(_searchText)
+            ? EmojiCategories[_selectedTabIndex].Emojis
+            : EmojiCategories
+                .SelectMany(c => c.Emojis)
+                .Where(e => e.Keywords.Contains(_searchText, StringComparison.OrdinalIgnoreCase) || e.Emoji.Contains(_searchText));
+
+
+    public class EmojiCategory
     {
-        "😀", "😂", "😍", "😎", "🤩", "🥳", "😊", "😇", "🤣", "😜","🌸","💐","🙏","😁","👍","😡","❤️"
-    };
+        public string Name { get; set; }    // نام دسته
+        public string Icon { get; set; }    // ایموجی آیکون دسته
+        public List<EmojiItem> Emojis { get; set; }
+
+        public EmojiCategory(string name, string icon, List<EmojiItem> emojis)
+        {
+            Name = name;
+            Icon = icon;
+            Emojis = emojis;
+        }
+    }
+
+    public class EmojiItem
+    {
+        public string Emoji { get; set; }
+        public string Keywords { get; set; }
+
+        public EmojiItem(string emoji, string keywords)
+        {
+            Emoji = emoji;
+            Keywords = keywords;
+        }
+    }
+
 }

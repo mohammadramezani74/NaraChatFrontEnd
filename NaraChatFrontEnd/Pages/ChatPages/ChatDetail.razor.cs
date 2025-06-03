@@ -2,11 +2,13 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.JSInterop;
 using MudBlazor;
 using NaraChat.Contract.Models.Chat.Conversation;
 using NaraChat.Contract.Models.Users;
 using NaraChatFrontEnd.Models.BaseModels;
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json;
 
 namespace NaraChatFrontEnd.Pages.ChatPages;
 
@@ -97,7 +99,7 @@ public partial class ChatDetail:ComponentBase
     public EventCallback<ChatMessageDto> changeUserLastMessage { get; set; }
     #endregion
 
-    private async Task LoadMesages(int count=20)
+    private async Task LoadMesages(int count=15)
     {
    
         _messages.Clear();
@@ -113,15 +115,16 @@ public partial class ChatDetail:ComponentBase
           if(messageIds?.Count>0)
             await HandleMessageSeen(new MessageSeenDto(messageIds, other.Id));
             var unreadedMessageCount = _messages.Where(x => x.UserId == other.Id && !x.IsSeen).Count();
-            StateHasChanged();
-           
+    
+
             await ReduceMessageSeenedCount.InvokeAsync((OtherUser.Id, 1100));
+            await trueScroll.InvokeAsync();
         }
         else
         {
         }
     }
-    private async Task LoadMoreMesages(int count = 20)
+    private async Task LoadMoreMesages(int count = 15)
     {
 
  
@@ -139,19 +142,58 @@ public partial class ChatDetail:ComponentBase
 
         }
     }
-    private async Task SendMessage()
+    [Parameter]
+    public bool LoadScroll { get; set; }
+    [Parameter]
+    public EventCallback FalseScroll { get; set; }
+    [Parameter]
+    public EventCallback trueScroll {  get; set; }
+    private async Task SendMessage(ChatMessageDto? Mapmessage=null)
     {
-        if (!string.IsNullOrWhiteSpace(NewMessage))
+        if (!string.IsNullOrWhiteSpace(NewMessage)|| Mapmessage!=null)
         {
-            await OnSendMessageSession.InvokeAsync();
+            var messagenew = NewMessage;
             Guid? ParentId = null;
-            if (ReplyMode)
-            {
+            if (ReplyMode ) {
                 ParentId = SelectedMessageToReply!.Id;
             }
+            NewMessage = string.Empty;
+
+            var newMessage = new ChatMessageDto
+            {
+                Id =Guid.Empty,
+                SendAt = DateTime.Now,
+                SenderName = CurrentUser.Name,
+                IsMine = true,
+                Content = messagenew,
+                Type = 0,
+                UserId = CurrentUser.Id,
+                ParentId = ParentId,
+
+
+
+
+            };
+            if (Mapmessage != null) {
+                newMessage= Mapmessage;
+                newMessage.ParentId = ParentId;
+                newMessage.UserId=CurrentUser.Id;
+                newMessage.IsMine = true;
+                newMessage.SenderName = CurrentUser.Name;
+            }
+            if(!EditMode) 
+            _messages.Add(newMessage);
+            await messageInput.FocusAsync();
+            StateHasChanged();
+
+            await OnSendMessageSession.InvokeAsync();
+       
+
+
+           
             if (EditMode)
             {
-                EditedMessage!.Message = NewMessage;
+                EditedMessage!.Message = messagenew;
                 var response = await messageService.EditMessageAsync(EditedMessage!);
                 if (response.Item1)
                 {
@@ -164,56 +206,30 @@ public partial class ChatDetail:ComponentBase
                 EditMode = false;
            
                var message= _messages.Where(x => x.Id == EditedMessage.Id).Single();
-                message.Content = EditedMessage.Message;  
-                NewMessage = string.Empty;
+                message.Content = EditedMessage.Message;
+                messagenew = string.Empty;
                 message.isEdited = true;
                 return;
 
             }
         
 
-            var result = await messageService.SendMessageAsync(Conversation!.id, NewMessage, ParentId);
+            var result = await messageService.SendMessageAsync(Conversation!.id, newMessage.Content, ParentId, newMessage.Latitude,newMessage.Longitude);
             if (result.Item1)
             {
                 changeUserLastMessage.InvokeAsync();
-                 var me = Conversation.users.Where(c => c.Id == CurrentUser!.Id).FirstOrDefault();
+                var me = Conversation.users.Where(c => c.Id == CurrentUser!.Id).FirstOrDefault();
                 var other = Conversation.users.Where(c => c.Id != CurrentUser!.Id).FirstOrDefault();
-                var newMessage = new ChatMessageDto
-                {
-                    Id = result.MessageId,
-                    SendAt = DateTime.Now,
-                    SenderName = me.Name,
-                    IsMine = true,
-                    Content = NewMessage,
-                    Type = 0,
-                    UserId = CurrentUser.Id,
-                    ParentId= ParentId,
 
-
-
-                };
-                var newMessageForUsers = new ChatMessageDto
-                {
-                    Id = result.MessageId,
-                    SendAt = DateTime.Now,
-                    SenderName = me.Name,
-                    IsMine = true,
-                    Content = NewMessage,
-                    Type = 0,
-                    UserId = other.Id,
-                    ParentId = ParentId,
-
-
-
-                };
-                await changeUserLastMessage.InvokeAsync(newMessageForUsers);
-                _messages.Add(newMessage);
+                newMessage.Id=result.MessageId;
                 await ScrollToBottom();
                 NewMessage = string.Empty;
                 SelectedMessageToReply = null;
                 ReplyMode = false;
 
-            };
+
+            }
+            ;
 
         }
         else
@@ -222,13 +238,83 @@ public partial class ChatDetail:ComponentBase
         }
 
     }
-    private async Task SendWithInter(KeyboardEventArgs e)
+  private async Task AddMessageToUi()
     {
-        if (e.Key == "Enter" && OtherUser != null)
+        await OnSendMessageSession.InvokeAsync();
+        Guid? ParentId = null;
+        if (ReplyMode)
         {
-            await SendMessage();
+            ParentId = SelectedMessageToReply!.Id;
         }
-    }
+        var other = Conversation.users.Where(c => c.Id != CurrentUser!.Id).FirstOrDefault();
+        var newMessage = new ChatMessageDto
+        {
+            Id = Guid.Empty,
+            SendAt = DateTime.Now,
+            SenderName = CurrentUser.Name,
+            IsMine = true,
+            Content = NewMessage,
+            Type = 0,
+            UserId = CurrentUser.Id,
+            ParentId = ParentId,
+
+
+
+        };
+        _messages.Add(newMessage);
+        await ScrollToBottom();
+        await messageInput.FocusAsync();
+        NewMessage = string.Empty;
+        SelectedMessageToReply = null;
+        ReplyMode = false;
+        await trueScroll.InvokeAsync();
+ 
+
+        var newMessageForUsers = new ChatMessageDto
+        {
+            Id = Guid.NewGuid(),
+            SendAt = DateTime.Now,
+            SenderName = CurrentUser.Name,
+            IsMine = true,
+            Content = NewMessage,
+            Type = 0,
+            UserId = other.Id,
+            ParentId = ParentId,
+
+
+
+        };
+        await changeUserLastMessage.InvokeAsync(newMessageForUsers);
+
+        if (EditMode)
+        {
+            EditedMessage!.Message = NewMessage;
+            var response = await messageService.EditMessageAsync(EditedMessage!);
+            if (response.Item1)
+            {
+                SuccessMessage();
+            }
+            else
+            {
+                ErrorMessage(response.message);
+            }
+            EditMode = false;
+
+            var message = _messages.Where(x => x.Id == EditedMessage.Id).Single();
+            message.Content = EditedMessage.Message;
+            NewMessage = string.Empty;
+            message.isEdited = true;
+            return;
+
+        }
+        var result = await messageService.SendMessageAsync(Conversation!.id, NewMessage, ParentId);
+        if (result.Item1)
+        {
+            newMessage.Id = result.MessageId;
+            StateHasChanged();
+        }
+
+        }
     private async Task UploadFile(IBrowserFile file,string caption)
     {
         try
@@ -322,4 +408,30 @@ public partial class ChatDetail:ComponentBase
     {
         await MessageReactioncallBack.InvokeAsync(reaction);
     }
+    [JSInvokable]
+   public  async Task ReceiveLocationFromJS(object coords)
+    {
+        var json = JsonSerializer.Serialize(coords);
+        var coordinates = JsonSerializer.Deserialize<LocationModel>(json);
+        var location = new ChatMessageDto
+        {
+            Id = Guid.NewGuid(),
+            Content = " لوکیشن من  👇📍",
+            IsMine = true,
+            Type = MessageType.Location,
+            SendAt = DateTime.Now,
+            Latitude = coordinates.latitude,
+            Longitude = coordinates.longitude,
+
+
+        };
+      
+       await SendMessage(location);
+       
+
+
+    }
+  
+
+
 }

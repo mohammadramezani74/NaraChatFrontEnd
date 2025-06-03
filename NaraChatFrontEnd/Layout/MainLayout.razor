@@ -1,6 +1,7 @@
 ﻿@using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.IdentityModel.JsonWebTokens
 @using NaraChat.Application.Services.Auth
+@using NaraChat.Application.Services.LocalStorage
 @using NaraChat.Contract.Models.BaseResponse
 @using NaraChatFrontEnd.Models.BaseModels
 @using System.Security.Claims
@@ -10,6 +11,8 @@
 @inject IDialogService DialogService
 @inject NavigationManager nm
 @inject IAuthService auth
+@inject IJSRuntime js
+@inject ILocalStorageService localStorage
 @implements IDisposable
 
 
@@ -21,16 +24,18 @@
         <MudSnackbarProvider />
 
         <MudLayout>
-            <MudAppBar>
+            <MudAppBar >
 
                 <AuthorizeView>
                     <Authorized>
                         <div>
-                            <MudButton @onclick="Logout" Style="margin-left: 10px;" Variant="Variant.Filled" Color="Color.Error">خروج</MudButton>
+                              
+                            <MudIconButton @onclick="SettingsShow" Icon="@Icons.Material.Filled.Person" Color="Color.Inherit" />
+                            @* <MudButton @onclick="Logout" Style="margin-left: 10px;" Variant="Variant.Filled" Color="Color.Error">خروج</MudButton> *@
                             <span>
                                 سلام
                             </span>
-                            <span>
+                            <span >
                                 @context.User.FindFirst("name")?.Value
                             </span>
                         </div>
@@ -46,8 +51,9 @@
 
 
                 <MudSpacer />
-                <MudIconButton @onclick="SettingsShow" Icon="@Icons.Material.Filled.Settings" Color="Color.Inherit" />
-                <MudIconButton @onclick="DarkModel" Icon="@(IsDarkMode? @Icons.Material.Filled.LightMode:@Icons.Material.Filled.DarkMode)" Color="Color.Inherit" />
+
+                <MudIconButton @onclick="DarkModel" Icon="@(IsDarkMode? @Icons.Material.Filled.LightMode:@Icons.Material.Filled.DarkMode)" Color="@(IsDarkMode?Color.Warning:Color.Info)" />
+                <MudIconButton @onclick="Logout"  Icon="@Icons.Material.Filled.ExitToApp" Color=" Color.Error" />
 
 
             </MudAppBar>
@@ -66,7 +72,16 @@
     public ThemeChanging ThemeChanging { get; set; } = new ThemeChanging("background-color:#eff2fd", " color:rgb(255 64 129);", " box-shadow: 0 16px 45px #ecc7ee");
     bool _drawerOpen = true;
 
+    protected async override Task OnInitializedAsync()
+    {
+        string? darkMode = await localStorage.GetItemAsync(nameof(IsDarkMode));
+        if (darkMode != null)
+        {
+            IsDarkMode = darkMode == "True" ? true : false;
+            DarkModel();
+        }
 
+    }
 
 
     bool IsDarkMode = false;
@@ -76,7 +91,7 @@
     }
     void DarkModel()
     {
-
+        localStorage.SetItemAsync(nameof(IsDarkMode),IsDarkMode.ToString());
         IsDarkMode = !IsDarkMode;
         if(!IsDarkMode){
             ThemeChanging = new ThemeChanging("", " color:rgb(255 64 129);", " box-shadow: 0 16px 45px #ecc7ee;");
@@ -138,12 +153,16 @@
     public void SettingsShow(){
 
         ThemeChanging.IsShowSetting = !ThemeChanging.IsShowSetting;
-       
+
         StateHasChanged();
     }
 }
 
 @code{
+    public async Task getPermission()
+    {
+         var token = await js.InvokeAsync<string>("requestPermission");
+    }
     private MudTheme _myTheme = new MudTheme()
         {
             Typography = new Typography()

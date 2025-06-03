@@ -7,5 +7,6 @@
         Document = 2,
         Audio = 3,
         Video = 4,
+        Location = 5
     }
 }

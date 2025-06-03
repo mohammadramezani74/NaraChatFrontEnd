@@ -19,8 +19,8 @@
             {
 
 
-                <MudListItem @onclick="()=>HandleUserClick(user)" Class="py-3 px-2"
-                Style="height:69px;">
+                <MudListItem @onclick="()=>HandleUserClick(user)" Class=" py-3 px-2"
+                Style="@(user.IsSelected?$" height:73px;background-color:{chooseColor()};":"height:73px; ")">
 
                     <AvatarContent>
                         <MudBadge Dot="true" Color="@(user.IsOnline? Color.Success:Color.Default)" Class="mx-6 my-4">
@@ -49,9 +49,14 @@
                                 else{
                                     <MudText Style="font-size:12px;">@user.Name</MudText>
                                 }
+
+                            </MudStack >
+                            <MudStack Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Row="true">
+                                <p style="@GetLastMessageStyle(user)">@user.LastReceivedMessage</p>
+                                <p style="font-size:9px;color:silver" >@user.LastReceivedMessageSendDate</p>
                             </MudStack>
-                            <p style="@GetLastMessageStyle(user)">@user.LastReceivedMessage</p>
                         </MudStack>
+
                     </ChildContent>
 
                 </MudListItem>
@@ -64,7 +69,7 @@
 </MudPaper>
 
 @code {
-
+    Guid? selectedUserId = null;
     [Parameter]
     public IEnumerable<UserDto> Users { get; set; } = Enumerable.Empty<UserDto>();
     public IEnumerable<UserDto> AllUsers { get; set; } = Enumerable.Empty<UserDto>();
@@ -98,6 +103,9 @@
 
     public async Task HandleUserClick(UserDto user)
     {
+
+        AllUsers.ToList().ForEach(x => x.IsSelected = false);
+        user.IsSelected = true;
         await OnUserSelected.InvokeAsync(user);
         await HandleAnotherUserClick(user);
     }
@@ -105,12 +113,15 @@
     {
         await OnOtherUserSelected.InvokeAsync(user);
     }
+
+
 }
 
 @code {
     [CascadingParameter(Name = "Theme")]
     public ThemeChanging themeChanging { get; set; }
     private bool IsUserInfoVisible = true;
+    public string chooseColor() => themeChanging.ClockColor == "#270aff" ? "#fff3f3" : "rgb(21 49 76 / 86%)";
 
     private void ToggleUserInfo()
     {
@@ -150,28 +161,6 @@
     {
         if (!HaveFilter)
             AllUsers = Users.OrderByDescending(u => u.messageUnreadedCount > 0).ToList();
-        // if (MissedMessageCount.Count > 0)
-        // {
-
-        //     var groupedMissed = MissedMessageCount
-        //         .GroupBy(m => m.UserId)
-        //         .ToDictionary(g => g.Key, g => g.Count());
-
-        //     foreach (var kvp in groupedMissed)
-        //     {
-        //         var userId = kvp.Key;
-        //         var count = kvp.Value;
-
-        //         var targetUser = AllUsers.FirstOrDefault(x => x.Id == userId);
-
-        //         if (targetUser != null)
-        //         {
-        //             targetUser.messageUnreadedCount += count;
-        //         }
-        //     }
-        //     await ReeadMissedMessage.InvokeAsync();
-        //     StateHasChanged();
-        // }
         if (MissedMessageCount.Count > 0)
         {
             var groupedMissed = MissedMessageCount
@@ -180,6 +169,7 @@
                 {
                     Count = g.Count(),
                     LastMessage = g.OrderByDescending(x => x.SendAt).FirstOrDefault()?.Content,
+                    LastDate=g.OrderByDescending(x => x.SendAt).FirstOrDefault()?.SendAt,
                     LastId=g.OrderByDescending(x => x.SendAt).FirstOrDefault()?.Id,
                 });
 
@@ -189,13 +179,15 @@
             {
                 if (usersDictionary.TryGetValue(userId, out var targetUser))
                 {
-                  
-                        targetUser.messageUnreadedCount += info.Count;
-              
+                    if(info.LastId!=targetUser.LastReceivedMessageId)
+                        targetUser.messageUnreadedCount = info.Count;
+
 
                     if (!string.IsNullOrEmpty(info.LastMessage))
                     {
-                        targetUser.LastReceivedMessage = info.LastMessage; 
+                        targetUser.LastReceivedMessage = info.LastMessage;
+                        if (info.LastDate != null)
+                            targetUser.LastReceivedMessageSendDate = info.LastDate.Value.FormatPersianDate().ToPersianNumber();
                     }
                 }
             }
@@ -212,6 +204,7 @@
                 user.LastReceivedMessage = newIncomingMessage.Content.TruncateMessage();
                 user.LastReceivedMessageId = newIncomingMessage.Id;
                 user.IsLastReceivedMessageForMe = newIncomingMessage.IsMine;
+                user.LastReceivedMessageSendDate = newIncomingMessage.SendAt.FormatPersianDate().ToPersianNumber();
 
 
                 await  NullIncommengMessage.InvokeAsync();
@@ -223,4 +216,4 @@
 
     }
   }
-}
+
