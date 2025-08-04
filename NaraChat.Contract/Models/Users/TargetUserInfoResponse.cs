@@ -17,5 +17,6 @@ namespace NaraChat.Contract.Models.Users
         public string Email { get; set; }
     }
 
-        
+
+
 }

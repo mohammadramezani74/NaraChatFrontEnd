@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 using MudBlazor;
+using NaraChat.Application.Services;
 using NaraChat.Contract.Models.Chat.Conversation;
 using NaraChat.Contract.Models.Users;
 using NaraChatFrontEnd.Models.BaseModels;
@@ -101,6 +102,10 @@ public partial class ChatDetail:ComponentBase
 
     private async Task LoadMesages(int count=15)
     {
+        try
+        {
+
+      
    
         _messages.Clear();
         Conversation = await chatService.ReadyOrCreateConversationBy(OtherUser.Id);
@@ -113,7 +118,7 @@ public partial class ChatDetail:ComponentBase
             _messages = messages;
             var messageIds = messages.Where(x =>  !x.IsSeen).Select(m => m.Id).ToList();
           if(messageIds?.Count>0)
-            await HandleMessageSeen(new MessageSeenDto(messageIds, other.Id));
+            await HandleMessageSeen(new MessageSeenDto(messageIds, other.Id,Conversation.id,CurrentUser.Id));
             var unreadedMessageCount = _messages.Where(x => x.UserId == other.Id && !x.IsSeen).Count();
     
 
@@ -122,6 +127,12 @@ public partial class ChatDetail:ComponentBase
         }
         else
         {
+        }
+        }
+        catch (Exception ex)
+        {
+
+            throw;
         }
     }
     private async Task LoadMoreMesages(int count = 15)
@@ -150,8 +161,17 @@ public partial class ChatDetail:ComponentBase
     public EventCallback trueScroll {  get; set; }
     private async Task SendMessage(ChatMessageDto? Mapmessage=null)
     {
+        
         if (!string.IsNullOrWhiteSpace(NewMessage)|| Mapmessage!=null)
         {
+            var me = Conversation.users.Where(c => c.Id == CurrentUser!.Id).FirstOrDefault();
+            var other = Conversation.users.Where(c => c.Id != CurrentUser!.Id).FirstOrDefault();
+
+            if (OtherUser.IsBlocked || CurrentUser.IsBlocked || OtherUser.OtherUserBlocked)
+            {
+                ErrorMessage("این مکالمه مسدود شده است و امکان ارسال پیام وجود ندارد.");
+                return;
+            }
             var messagenew = NewMessage;
             Guid? ParentId = null;
             if (ReplyMode ) {
@@ -187,10 +207,8 @@ public partial class ChatDetail:ComponentBase
             StateHasChanged();
 
             await OnSendMessageSession.InvokeAsync();
-       
+         
 
-
-           
             if (EditMode)
             {
                 EditedMessage!.Message = messagenew;
@@ -218,8 +236,7 @@ public partial class ChatDetail:ComponentBase
             if (result.Item1)
             {
                 changeUserLastMessage.InvokeAsync();
-                var me = Conversation.users.Where(c => c.Id == CurrentUser!.Id).FirstOrDefault();
-                var other = Conversation.users.Where(c => c.Id != CurrentUser!.Id).FirstOrDefault();
+             
 
                 newMessage.Id=result.MessageId;
                 await ScrollToBottom();
@@ -431,7 +448,127 @@ public partial class ChatDetail:ComponentBase
 
 
     }
-  
+    private void HandleDeletedMessage()
+    {
+        if (DeletedMessageId != null)
+        {
+            var targetMessage = _messages.FirstOrDefault(m => m.Id == DeletedMessageId.Value);
+            if (targetMessage != null)
+                _messages.Remove(targetMessage);
+
+            DeletedMessageId = null;
+        }
+    }
+
+    private async Task HandleReactionAsync()
+    {
+        if (reactionType != null)
+        {
+            await GetReaction();
+            reactionType = null;
+            await NullReaction.InvokeAsync();
+        }
+    }
+
+    private async Task HandleEmojiReactionAsync()
+    {
+        if (EmojiReaction != null)
+        {
+            var message = _messages.FirstOrDefault(m => m.Id == EmojiReaction.MessageId);
+            if (message != null)
+            {
+                message.Reaction = EmojiReaction.Reaction;
+                StateHasChanged(); // لازم چون UI واکنش باید بروز بشه
+            }
+            EmojiReaction = null;
+            await NullEmojiReactioncallBack.InvokeAsync();
+        }
+    }
+
+    private void HandleEditedMessage()
+    {
+        if (NewIncomingEditedMessage != null)
+        {
+            var targetMessage = _messages.FirstOrDefault(m => m.Id == NewIncomingEditedMessage.Id);
+            if (targetMessage != null)
+            {
+                targetMessage.Content = NewIncomingEditedMessage.Message;
+                targetMessage.isEdited = true;
+            }
+            NewIncomingEditedMessage = null;
+        }
+    }
+
+    private async Task HandleNewIncomingMessageAsync()
+    {
+        if (NewIncomingMessage != null)
+        {
+            _messages.Add(NewIncomingMessage);
+            await IncommingMessageRecieved.InvokeAsync();
+            NewIncomingMessage = null;
+        }
+    }
+
+    private async Task HandleMissedMessagesAsync()
+    {
+        if (MissedUserMessage?.Count > 0)
+        {
+            var newMessages = MissedUserMessage
+                .Where(m => !_messages.Any(existing => existing.Id == m.Id))
+                .OrderBy(x => x.SendAt)
+                .ToList();
+
+            if (newMessages.Count > 0)
+            {
+                _messages.AddRange(newMessages);
+                await ClearMissedMessageUser.InvokeAsync();
+            }
+        }
+    }
+
+    private void HandleSeenMessages()
+    {
+        if (MessagedSeened?.Count > 0)
+        {
+            var messages = _messages.Where(m => MessagedSeened.Contains(m.Id)).ToList();
+            foreach (var chatMessage in messages)
+            {
+                chatMessage.IsSeen = true;
+            }
+        }
+    }
+
+    private async Task HandleUserChangedAsync()
+    {
+        if (OtherUser != null && OtherUser.Id != PreviousSelectedUserId)
+        {
+            if (CurrentUser == null)
+            {
+                CurrentUser = await ((CustomAuthenticationStateProvider)stateprovider).GetUserInfoAsync();
+            }
+
+            PreviousSelectedUserId = OtherUser.Id;
+
+            Loading = true;
+            NewMessage = string.Empty;
+
+            await LoadMesages();
+
+            CurrentUser.avatar = MyAvatar;
+            Loading = false;
+
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleScrollAsync()
+    {
+        if (LoadScroll)
+        {
+            await ScrollToBottom();
+            await FalseScroll.InvokeAsync();
+        }
+    }
 
 
 }

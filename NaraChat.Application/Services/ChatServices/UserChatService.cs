@@ -38,7 +38,8 @@ namespace NaraChat.Application.Services.ChatServices
             });
             if (response?.isSucceded??false) {
                 var users=response.result.Select(x=>new UserDto(x.Id,x.LastName+" "+x.FirstName,x.Avatar,messageUnreadedCount:x.MessageUnreadedCount,lastseen:x.LastSeen,lastReceivedMessage: x.LastReceivedMessage,
-                   lastReceivedMessageId: x.LastReceivedMessageId,isLastReceivedMessageForMe: x.IsLastReceivedMessageForMe,lastReceivedMessageSendDate:x.LastReceivedMessageSendDate)).ToList();
+                   lastReceivedMessageId: x.LastReceivedMessageId,isLastReceivedMessageForMe: x.IsLastReceivedMessageForMe,lastReceivedMessageSendDate:x.LastReceivedMessageSendDate,
+                   isPinned:x.IsPin,isBlocked:x.IsBlocked,conversationId:x.ConversationId,otherUserBlocked:x.OtherUserBlocked)).ToList();
                 return users;
             }
             return Enumerable.Empty<UserDto>();
@@ -53,6 +54,16 @@ namespace NaraChat.Application.Services.ChatServices
                 return response.result;
             }
             return new TargetUserInfoResponse(); ;
+        }
+        public async Task<string?> GetAvatar(Guid UserId, CancellationToken cancellationToken = default)
+        {
+            var response = await _httpClient.GetFromJsonAsync<BaseResponseDto<CurrentUserAvatarResponse>>($"/api/v1/users/getavatar?id={UserId}");
+            if (response?.isSucceded ?? false)
+            {
+
+                return response.result.picture;
+            }
+            return null ;
         }
 
         public async Task<(bool success,string Message)> UploadNewProfileImage(StreamContent stream, string ContentType,string extension, CancellationToken cancellationToken = default)

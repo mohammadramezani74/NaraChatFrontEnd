@@ -24,5 +24,6 @@ namespace NaraChat.Application.HunSettings.Abstraction
         Task ReceivedReactions(TypingReactionDto MessageType);
         Task ReceivedEmojiReact(MessageReaction reaction);
         Task GetMissedMessages(List<ChatMessageDto> messages);
+        Task BlockUser(BlockDto blockDto);
     }
 }

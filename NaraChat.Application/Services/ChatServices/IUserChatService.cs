@@ -12,6 +12,7 @@ namespace NaraChat.Application.Services.ChatServices
         Task<(bool success, string Message)> SubmitPhone(string? phone, CancellationToken cancellationToken = default);
         Task<(bool success, string Message)> SubmitCity(string? city, CancellationToken cancellationToken = default);
         Task<bool> StoreToken(string? token, CancellationToken cancellationToken = default);
+        Task<string?> GetAvatar(Guid UserId, CancellationToken cancellationToken = default);
 
 
     }

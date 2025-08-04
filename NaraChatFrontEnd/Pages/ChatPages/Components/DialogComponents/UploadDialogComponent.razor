@@ -1,6 +1,14 @@
 ﻿<MudDialog>
     <DialogContent>
         <MudStack Style="width: 100%">
+            <MudItem>
+                @if (!string.IsNullOrEmpty(_fileError))
+                {
+                    <MudText Color="Color.Error" Typo="Typo.caption">
+                        @_fileError
+                    </MudText>
+                }
+            </MudItem>
             <MudForm Model="@_model"
             @bind-IsValid="_isValid"
             @bind-IsTouched="_isTouched" >
@@ -97,22 +105,35 @@
     private const string FileContent = "this is content";
     private const string DefaultDragClass = "relative rounded-lg border-2 border-dashed pa-4 mt-4 mud-width-full mud-height-full";
     private string _dragClass = DefaultDragClass;
+    private string _fileError = string.Empty;
     private MudTextField<string> multilineReference;
 
 
     private void Upload()
     {
-        if (_fileUpload?.Files is not null && _fileUpload.Files.Any())
-        {
-            var result = new UploadResult
-                {
-                    File = _fileUpload.Files.First(),
-                    Caption = caption
-                };
+        _fileError = string.Empty;
 
-            MudDialog.Close(DialogResult.Ok(result));
+        if (_model.Files == null || !_model.Files.Any())
+        {
+            _fileError = "هیچ فایلی انتخاب نشده است.";
+            _isValid = false;
+            return;
         }
 
+        if (_model.Files.Count > 1)
+        {
+            _fileError = "لطفا فقط یک فایل انتخاب کنید.";
+            _isValid = false;
+            return;
+        }
+
+        var result = new UploadResult
+            {
+                File = _model.Files.First(),
+                Caption = caption
+            };
+
+        MudDialog.Close(DialogResult.Ok(result));
     }
 
     private void SetDragClass()

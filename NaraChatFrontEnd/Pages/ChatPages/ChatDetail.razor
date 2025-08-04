@@ -60,7 +60,6 @@
 
     </MudCardHeader>
 
-    <!-- بدنه چت -->
     <MudCardContent Class="flex-grow-1 p-0" Style="overflow-y:auto; width:100%;">
         <div @ref="_chatContainer" style="@ThemeCascading.backGroundChatStyle">
 
@@ -176,7 +175,7 @@
                 <MudItem xs="2" Class="d-flex justify-content-start">
 
                     <MudButton  Variant="Variant.Filled"
-                    Color="@(EditMode ? Color.Warning : ThemeCascading.SeenColor)"
+                    Color="@(EditMode ? Color.Warning : Color.Primary)"
                     EndIcon="@Icons.Custom.Brands.Telegram"
                     IconSize="Size.Small"
                                OnClick="@(()=>SendMessage())"
@@ -275,103 +274,31 @@
     }
 
 
+    private bool isProcessing = false;
+
     protected override async Task OnParametersSetAsync()
     {
-        if(DeletedMessageId!=null){
-            var targetMessage = _messages.Where(m => m.Id == DeletedMessageId.Value).FirstOrDefault();
-            if (targetMessage!=null)
-                _messages.Remove(targetMessage);
-            DeletedMessageId = null;
-        }
-        if (reactionType != null)
+        if (isProcessing) return;
+        isProcessing = true;
+
+        try
         {
-            await GetReaction();
-            reactionType = null;
-            await  NullReaction.InvokeAsync();
+            HandleDeletedMessage();
+            await HandleReactionAsync();
+            await HandleEmojiReactionAsync();
+            HandleEditedMessage();
+            await HandleNewIncomingMessageAsync();
+            await HandleMissedMessagesAsync();
+            HandleSeenMessages();
 
+            await HandleUserChangedAsync();
+
+            await HandleScrollAsync();
         }
-        if (EmojiReaction != null)
+        finally
         {
-            var message = _messages.Where(m => m.Id == EmojiReaction.MessageId).FirstOrDefault();
-            if (message != null)
-            {
-                message.Reaction = EmojiReaction.Reaction;
-                StateHasChanged();
-            }
-            EmojiReaction = null;
-            await NullEmojiReactioncallBack.InvokeAsync();
-
+            isProcessing = false;
         }
-        if(NewIncomingEditedMessage is not null){
-            var targetMessage=  _messages.Where(m => m.Id == NewIncomingEditedMessage.Id).FirstOrDefault();
-            if (targetMessage!=null){
-                targetMessage.Content = NewIncomingEditedMessage.Message;
-                targetMessage.isEdited = true;
-            }
-            NewIncomingEditedMessage = null;
-        }
-        if (NewIncomingMessage is not null)
-        {
-            _messages.Add(NewIncomingMessage);
-            await IncommingMessageRecieved.InvokeAsync();
-        }
-        if (MissedUserMessage.Count > 0)
-        {
-            var newMessages = MissedUserMessage
-     .Where(m => !_messages.Any(existing => existing.Id == m.Id))
-     .OrderBy(x=>x.SendAt)
-     .ToList();
-
-            _messages.AddRange(newMessages);
-            await ClearMissedMessageUser.InvokeAsync();
-        }
-        if (MessagedSeened.Count>0){
-            var messages = _messages.Where(m => MessagedSeened.Contains(m.Id)).ToList();
-            if(messages.Count>0){
-                foreach (var chatMessage in messages)
-                {
-
-                    chatMessage.IsSeen = true;
-                }
-
-
-            }
-
-
-        }
-        if (OtherUser is not null && OtherUser.Id != PreviousSelectedUserId)
-        {
-            if(CurrentUser is null)
-            {
-                CurrentUser = await ((CustomAuthenticationStateProvider)stateprovider).GetUserInfoAsync();
-            }
-
-            PreviousSelectedUserId = OtherUser.Id;
-
-            Loading = true;
-            NewMessage = string.Empty;
-            var myId = CurrentUser.Id;
-            var otherId = OtherUser?.Id;
-
-
-            await LoadMesages();
-
-
-
-
-            CurrentUser.avatar =MyAvatar;
-            Loading = false;
-
-            StateHasChanged();
-
-        }
-        if (LoadScroll)
-        {
-            await ScrollToBottom();
-            await FalseScroll.InvokeAsync();
-        }
-
-
     }
 
 
@@ -435,7 +362,7 @@
                     if (messages.Count > 0)
                     {
                         messages.ForEach(m => m.IsSeen = true);
-                        await HandleMessageSeen(new MessageSeenDto(messages.Select(m => m.Id).ToList(), userId.Value));
+                        await HandleMessageSeen(new MessageSeenDto(messages.Select(m => m.Id).ToList(), userId.Value,Conversation.id,CurrentUser.Id));
                         StateHasChanged();
 
                     }

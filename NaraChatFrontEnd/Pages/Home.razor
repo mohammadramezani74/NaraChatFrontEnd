@@ -5,6 +5,7 @@
 @using NaraChat.Contract.Models.Auth
 @using NaraChatFrontEnd.Models.BaseModels
 @using NaraChatFrontEnd.Pages.ChatPages.Components.OtpInputComponent
+@using System.ComponentModel.DataAnnotations
 @inject IAuthService _service
 @inject ISnackbar snackbar
 @inject IJSRuntime JS
@@ -12,79 +13,70 @@
 @inject AuthenticationStateProvider auth
 @attribute [AllowAnonymous]
 
-@if(!IsLoadVrifyCodeComponent){
-    <div class="Login-card row d-flex justify-content-center align-items-center" style="height: 50vh;">
-        <div class="col-4" style="margin-top: 70px;">
-            <div class="test" Style="@(ThemeChanging.boxShadow);">
-                <MudCard>
-                    <MudCardHeader>
-                        <CardHeaderContent>
-                            <MudImage Style="margin-right: 140px;;max-width: 180px;" Src="./lib/assets/Images/logo.png"></MudImage>
-                            <MudText  Style="text-align:center; font-weight:400;color:gray">ورود  به حساب کاربری</MudText>
-                        </CardHeaderContent>
-                    </MudCardHeader>
-                    <EditForm Model="PhoneNumber"  OnValidSubmit="SendVerifyCode" >
-                        <MudCardContent>
-                            <MudTextField Style="margin-bottom: 20px;" ShrinkLabel @bind-Value="@PhoneNumber" Label="شماره همراه" Variant="Variant.Text"></MudTextField>
-                        </MudCardContent>
-                        <MudCardActions>
-                            <MudButton ButtonType="ButtonType.Submit" Style="margin-bottom: 20px;" Variant="Variant.Filled" Color="Color.Primary">ورود</MudButton>
-                        </MudCardActions>
-
-                    </EditForm>
-                </MudCard>
-
+@if (!IsLoadVrifyCodeComponent)
+{
+        <div class="Login-card row justify-content-center align-items-center" style="min-height: 80vh;">
+            <div class="col-12 col-sm-10 col-md-8 col-lg-5 col-xl-4 px-3">
+                <div class="test" style="@(ThemeChanging.boxShadow); margin-top: 50px;">
+                    <MudCard>
+                        <MudCardHeader>
+                            <CardHeaderContent>
+                                <MudImage class="mx-auto d-block mb-2" style="max-width: 180px;" Src="./lib/assets/Images/logo.png"></MudImage>
+                                <MudText class="text-center" style="font-weight:400;color:gray">ورود به حساب کاربری</MudText>
+                            </CardHeaderContent>
+                        </MudCardHeader>
+                        <EditForm Model="Model" OnValidSubmit="SendVerifyCode">
+                            <MudCardContent>
+                                <MudTextField class="w-100 mb-4" ShrinkLabel @bind-Value="@Model.PhoneNumber" Label="شماره همراه" Variant="Variant.Text" />
+                            </MudCardContent>
+                            <MudCardActions class="d-flex justify-content-center">
+                                <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary">ورود</MudButton>
+                            </MudCardActions>
+                        </EditForm>
+                    </MudCard>
+                </div>
             </div>
         </div>
-    </div>
-
-
 }
-else{
-    <div class="Login-card row d-flex justify-content-center align-items-center" style="height: 50vh;">
-        <div class="col-4" style="margin-top: 70px;">
-            <div class="test" Style="@(ThemeChanging.boxShadow);">
-                <MudCardHeader>
-                    <CardHeaderContent>
-                        <MudImage Style="margin-right: 140px;;max-width: 180px;" Src="./lib/assets/Images/logo.png"></MudImage>
-                        <MudText  Style="text-align:center; font-weight:400;color:gray">اعتبارسنجی شماره همراه</MudText>
-                    </CardHeaderContent>
-                </MudCardHeader>
-                <EditForm Model="PhoneNumber"  OnValidSubmit="OTPComplete" FormName="Login">
-                    <MudCardContent>
-                        <OtpInput Count="5"
-                        Option="option"
-                        @ref="otp"
-                        OnCompleteEvent="OTPCompleted" />
+else
+{
+        <div class="Login-card row justify-content-center align-items-center" style="min-height: 80vh;">
+            <div class="col-12 col-sm-10 col-md-8 col-lg-5 col-xl-4 px-3">
+                <div class="test" style="@(ThemeChanging.boxShadow); margin-top: 50px;">
+                    <MudCard>
+                        <MudCardHeader>
+                            <CardHeaderContent>
+                                <MudImage class="mx-auto d-block mb-2" style="max-width: 180px;" Src="./lib/assets/Images/logo.png"></MudImage>
+                                <MudText class="text-center" style="font-weight:400;color:gray">اعتبارسنجی شماره همراه</MudText>
+                            </CardHeaderContent>
+                        </MudCardHeader>
+                        <EditForm Model="@Model" OnValidSubmit="OTPComplete" FormName="Login">
+                            <MudCardContent>
+                                <OtpInput Count="5" Option="option" @ref="otp" OnCompleteEvent="OTPCompleted" />
 
-                         <div class="text-center mt-4">
-                        @if (isResendDisabled)
-                        {
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">
-                                ارسال مجدد کد پس از @($"{remainingTime / 60:D2}:{remainingTime % 60:D2}")
-                            </MudText>
-                        }
-                        else
-                        {
-                            <MudButton Variant="Variant.Text" 
-                                      Color="Color.Primary" 
-                                      OnClick="ResendCode"
-                                      Disabled="@isResendDisabled">
-                                ارسال مجدد کد
-                            </MudButton>
-                        }
-                    </div>
-                    </MudCardContent>
-                    <MudCardActions>
-                        <MudButton ButtonType="ButtonType.Submit" Style="margin-bottom: 20px;" Variant="Variant.Filled" Color="Color.Primary">ورود</MudButton>
-                    </MudCardActions>
-
-                </EditForm>
-
-
+                                <div class="text-center mt-4">
+                                @if (isResendDisabled)
+                                {
+                                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                                ارسال مجدد کد پس از @($"{remainingTime / 60:D2}:{remainingTime % 60:D2}")
+                                            </MudText>
+                                }
+                                else
+                                {
+                                            <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="ResendCode" Disabled="@isResendDisabled">
+                                                ارسال مجدد کد
+                                            </MudButton>
+                                }
+                                </div>
+                            </MudCardContent>
+                            <MudCardActions class="d-flex justify-content-center">
+                                <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary">ورود</MudButton>
+                            </MudCardActions>
+                        </EditForm>
+                    </MudCard>
+                </div>
             </div>
         </div>
-    </div>
 }
 <script>
     function googleLogin() {
@@ -177,7 +169,7 @@ else{
     private async Task ResendCode()
     {
         // کد ارسال مجدد
-        await _service.SendVerifyCode(PhoneNumber);
+        await _service.SendVerifyCode( Model.PhoneNumber);
         StartTimer();
     }
 
@@ -194,7 +186,8 @@ else{
     public LoginDTo LoginDTo { get; set; }
     public string VerifyCode { get; set; } = string.Empty;
     public bool IsLoadVrifyCodeComponent { get; set; } = false;
-    public string PhoneNumber { get; set; } = string.Empty;
+
+        private LoginModel Model = new();
     public bool DisableKey { get; set; }
         [Parameter]
     public string token { get; set; }
@@ -240,7 +233,7 @@ else{
     }
     public async Task LoginAsync()
     {
-        if(string.IsNullOrEmpty(PhoneNumber)){
+        if(string.IsNullOrEmpty(Model.PhoneNumber)){
             snackbar.Clear();
             snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomRight;
             snackbar.Add($"شماره همراه وارد شده نباید خالی باشد", Severity.Error, x =>
@@ -248,9 +241,9 @@ else{
 
             });
 
-            PhoneNumber = string.Empty;
+            Model.PhoneNumber = string.Empty;
         }
-        var result = await _service.LoginOrRegisterAsync(PhoneNumber,VerifyCode);
+        var result = await _service.LoginOrRegisterAsync( Model.PhoneNumber,VerifyCode);
         if (result)
         {
             navigation.NavigateTo("/chat");
@@ -265,13 +258,13 @@ else{
 
             });
 
-            PhoneNumber = string.Empty;
+             Model.PhoneNumber = string.Empty;
             IsLoadVrifyCodeComponent = false;
         }
     }
 
     public async Task SendVerifyCode(){
-        if(string.IsNullOrEmpty(PhoneNumber)){
+        if(string.IsNullOrEmpty( Model.PhoneNumber)){
             snackbar.Clear();
             snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomRight;
             snackbar.Add($"شماره همراه وارد شده نباید خالی باشد", Severity.Error, x =>
@@ -279,10 +272,10 @@ else{
 
             });
 
-            PhoneNumber = string.Empty;
+             Model.PhoneNumber = string.Empty;
         }
         else{
-            var result= await _service.SendVerifyCode(PhoneNumber);
+            var result= await _service.SendVerifyCode( Model.PhoneNumber);
             if(result.result){
                 snackbar.Clear();
                 snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomRight;
@@ -302,5 +295,10 @@ else{
            }
         }
     }
+public class LoginModel
+{
+    [Required(ErrorMessage = "شماره همراه نباید خالی باشد")]
 
+    public string PhoneNumber { get; set; } = string.Empty;
+}
 }

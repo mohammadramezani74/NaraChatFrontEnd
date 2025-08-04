@@ -7,4 +7,5 @@ using System.Threading.Tasks;
 namespace NaraChat.Contract.Models.Chat.Conversation
 {
     public record TypingReactionDto(Guid UserId,Guid MyUserId, int MessageType);
+    public record BlockDto(Guid UserId, bool IsBlocked);
 }

@@ -56,7 +56,9 @@
                         ClearMissedMessageUser="ClearMissedTargetUserMessages"
                         LoadScroll="LoadScroll" 
                         FalseScroll="FalsingScrol"
-                        trueScroll="trueingScrol" />
+                        trueScroll="trueingScrol"
+
+                        />
 
 
 
@@ -70,7 +72,12 @@
                         Class="ma-2"
                         Style="position:absolute; right:0; z-index:1000;"
                         OnClick="ToggleUserInfo" />
-                        <UserInfo MyAvatar="@myAvatar" ChosenUser="_selectedUser" OnPictureChanged="OnChanedPicture" OnClearChosenUser="OnClearUserSelected" />
+                        <UserInfo
+                        MyAvatar="@myAvatar" 
+                        ChosenUser="_selectedUser"
+                        OnPictureChanged="OnChanedPicture"
+                        OnClearChosenUser="OnClearUserSelected"
+                        OnBlockedUser="BlockedUser"/>
                     </MudItem>
                 }
             </MudGrid>
@@ -79,6 +86,12 @@
 </MudContainer>
 
 @code {
+    public void BlockedUser(UserDto dto)
+    {
+        var user=Users.Where(x => x.Id == dto.Id).FirstOrDefault();
+        user.IsBlocked = dto.IsBlocked;
+        StateHasChanged();
+    }
     [CascadingParameter(Name = "Theme")]
     public ThemeChanging ThemeChanging { get; set; }
     [Parameter]
@@ -154,64 +167,128 @@
 
 
 
+
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            var token = await js.InvokeAsync<string>("requestPermission");
 
-            if (!string.IsNullOrEmpty(token))
-            {
-                await userService.StoreToken(token);
-            }
-            snackbar.Clear();
-            snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomRight;
-            snackbar.Add($" token:  {token} ", Severity.Success, x =>
-            {
+            _ = RequestNotificationTokenAsync();
 
-            });
-            Console.WriteLine( "OnInitializedAsync Called one Time");
-            LoadingUsers = true;
+
             Logineduser = await ((CustomAuthenticationStateProvider)AuthenticationStateProvider).GetUserInfoAsync();
-            if (!await((CustomAuthenticationStateProvider)AuthenticationStateProvider).IsAuthenticated()){
+
+            if (!await ((CustomAuthenticationStateProvider)AuthenticationStateProvider).IsAuthenticated())
+            {
                 Console.WriteLine("کاربر احراز هویت نشده");
                 nm.NavigateTo("/");
+                return;
             }
 
             _hubConnection = await ConfigureHubConnection();
 
-
             if (_hubConnection.State == HubConnectionState.Disconnected)
-            {
                 await _hubConnection.StartAsync();
-            }
 
-
-            var usersList = await userService.GetUsersAsync();
-            if (usersList is not null)
-                Users = usersList.ToList();
             if (_hubConnection.State == HubConnectionState.Connected)
-            {
                 await _hubConnection.SendAsync("SetUserOnline", Logineduser);
+
+            var cachedIsmobile = await js.InvokeAsync<string>("localStorage.getItem", "IsMobile");
+            if (cachedIsmobile != null)
+            {
+                if (cachedIsmobile.ToLower() == "true")
+                    IsMobile = true;
+                else
+                    IsMobile = false;
             }
-
-
-
-            LoadingUsers = false;
-            var myImage= await ConversationService.GetImageConversation(Logineduser.Id,Guid.NewGuid());
-            myAvatar = myImage.MyAvatar;
-            StateHasChanged();
-            var size = await js.InvokeAsync<WindowSizeDto>("getWindowSize");
-            if(size.Width<=500){
-                IsMobile = true;
-            }
+            _ = LoadDeferredDataAsync();
 
         }
         catch (Exception ex)
         {
             Console.WriteLine("کاربر احراز هویت نشده");
             Console.WriteLine($"هاب ارور داره: {ex.Message}");
+        }
+    }
+    private async Task RequestNotificationTokenAsync()
+    {
+        try
+        {
+            var token = await js.InvokeAsync<string>("requestPermission");
+            snackbar.Clear();
+            snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomRight;
+            if (!string.IsNullOrEmpty(token))
+            {
+                await userService.StoreToken(token);
+                snackbar.Add($" فعال سازی ناتیفیکیشن با موفقیت انجام شد ", Severity.Success);
+            }
+            else
+            {
+                snackbar.Add($" فعال سازی ناتیفیکیشن موفقیت آمیز نبود لطقا یک بار دیگر صفحه را رفرش کنید ", Severity.Warning);
+            }
 
+
+
+
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("توکن نوتیفیکیشن خطا داد: " + ex.Message);
+        }
+    }
+    private async Task LoadDeferredDataAsync()
+    {
+        try
+        {
+            LoadingUsers = true;
+
+            var usersList = await userService.GetUsersAsync();
+            if (usersList is not null)
+                Users = usersList.ToList();
+
+            var cachedAvatar = await js.InvokeAsync<string>("localStorage.getItem", "userAvatar");
+
+            if (string.IsNullOrEmpty(cachedAvatar))
+            {
+                myAvatar = await userService.GetAvatar(Logineduser.Id);
+
+                await js.InvokeVoidAsync("localStorage.setItem", "userAvatar", myAvatar);
+                await js.InvokeVoidAsync("localStorage.setItem", "userAvatarTime", DateTime.UtcNow.ToString("o"));
+
+            }
+            else
+            {
+                myAvatar = cachedAvatar;
+            }
+
+
+            var cachedIsmobile =  await js.InvokeAsync<string>("localStorage.getItem", "IsMobile");
+            if (cachedIsmobile != null)
+            {
+                if (cachedIsmobile.ToLower() == "true")
+                    IsMobile = true;
+                else
+                    IsMobile = false;
+            }
+            else{
+                var size = await js.InvokeAsync<WindowSizeDto>("getWindowSize");
+                if (size.Width <= 500)
+                {
+                    await js.InvokeVoidAsync("localStorage.setItem", "IsMobile", true);
+                    IsMobile = true;
+                }
+                else
+                {
+                    await js.InvokeVoidAsync("localStorage.setItem", "IsMobile", false);
+                    IsMobile = false;
+                }
+            }
+            LoadingUsers = false;
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("LoadDeferredDataAsync خطا داد: " + ex.Message);
         }
     }
 
@@ -302,6 +379,15 @@
            }
            StateHasChanged();
        });
+        hubConnection.On<BlockDto>(nameof(IChatHubClient.BlockUser), (blockedUser) =>
+     {
+         var user = Users.Where(u => u.Id == blockedUser.UserId).FirstOrDefault();
+         if(user!=null)
+         {
+             user.OtherUserBlocked = blockedUser.IsBlocked;
+         }
+         StateHasChanged();
+     });
         hubConnection.On<ChatMessageDto>(nameof(IChatHubClient.MessagedReceived), (MessageDto) =>
        {
            _newIncomingMessageForUsers = MessageDto;

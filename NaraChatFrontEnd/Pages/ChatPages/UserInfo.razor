@@ -4,6 +4,7 @@
 @inject IDialogService DialogService
 @inject ISnackbar snackbar
 @inject IConversationService ConversationService
+@inject IJSRuntime js
 @implements IAsyncDisposable
 <MudPaper Elevation="5" Class="pa-6 h-100 d-flex flex-column">
     <MudStack Justify="Justify.Center" Spacing="1" AlignItems="AlignItems.Center" Class="flex-grow-1" Style="overflow:hidden;">
@@ -13,11 +14,11 @@
 
             <MudChip T="string"
             Class="mt-4"
-            Color="Color.Success"
+            Color="IsBlocked?Color.Error: Color.Success"
             Variant="Variant.Filled"
             Icon="@Icons.Material.Filled.FiberManualRecord"
             Style="flex-shrink:0;">
-                آنلاین
+                @(IsBlocked ?"مسدود شده" :"آنلاین")
             </MudChip>
         }
         else
@@ -39,11 +40,11 @@
                 else{
                     <MudChip T="string"
                     Class="mt-4"
-                    Color="Color.Default"
+                    Color="IsBlocked?Color.Error:Color.Default"
                     Variant="Variant.Filled"
                     Icon="@Icons.Material.Filled.FiberManualRecord"
                     Style="flex-shrink:0;">
-                        آفلاین
+                        @(IsBlocked ? "مسدود شده" : "آفلاین")
                     </MudChip>
                 }
 
@@ -51,31 +52,29 @@
 
         }
 
-        <MudAvatar Style="height:80px; width:80px; margin-top: 30px;" Elevation="8">
-
+        <MudPaper Style="width: 100%; height: 250px; position: relative; overflow: hidden;
+                 border-radius: 16px; border: 2px solid #e0e0e0; box-shadow: 0 6px 20px rgba(0,0,0,0.15);"
+        Elevation="8">
             @if (TargetUserInfoResponse.Avatar != null)
             {
-                <MudImage Src="@($"data:image/png;base64,{TargetUserInfoResponse.Avatar}")" Class="rounded-circle"
-                @onclick="OpenPictureDialog" Style="object-fit:cover;" />
+                <MudImage Src="@($"data:image/png;base64,{TargetUserInfoResponse.Avatar}")"
+                Style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;" 
+                @onclick="OpenPictureDialog" />
             }
-                else if(MyAvatar!=null&& ChosenUser==null)
+            else if (MyAvatar != null && ChosenUser == null)
             {
-                <MudImage Src="@($"data:image/png;base64,{MyAvatar}")" Class="rounded-circle"
-                @onclick="OpenPictureDialog" Style="object-fit:cover;" />
+                <MudImage Src="@($"data:image/png;base64,{MyAvatar}")"
+                Style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;" 
+                @onclick="OpenPictureDialog" />
             }
-            else if (TargetUserInfoResponse.Avatar == null)
-            {
-                  <MudImage Src="lib/assets/Images/avatar.jpg" Class="rounded-circle"
-                Style="object-fit:cover;" />
-            }
-        
             else
             {
-                <MudImage Src="lib/assets/Images/avatar.jpg" Class="rounded-circle"
-                Style="object-fit:cover;" />
+                <MudImage Src="lib/assets/Images/avatar.jpg"
+                Style="width: 100%; height: 100%; object-fit: cover;" />
             }
+        </MudPaper>
 
-        </MudAvatar>
+
         @if (CurrentUser != null)
         {
             @if (CurrentUser.Id == TargetUserInfoResponse.Id)
@@ -119,7 +118,10 @@
 
         <MudStack  Justify="Justify.FlexStart">
 
+            @if (CurrentUser?.Id != TargetUserInfoResponse.Id){
+                <MudSwitch Color="Color.Error" @bind-Value=@(IsBlocked) Label="مسدود سازی" @onclick="BlockedUser"/>
 
+            }
             @if (CurrentUser != null)
             {
                 @if (CurrentUser.Id == TargetUserInfoResponse.Id)
@@ -224,7 +226,7 @@
 
         </MudStack>
 
-        <!-- جداکننده -->
+
         <MudDivider Class="my-4" Style="width:100%;" />
 
 
@@ -236,7 +238,9 @@
     [Parameter]
     public UserDto? ChosenUser { get; set; }
 
+    public bool IsBlocked { get; set; } = false;
     public TargetUserInfoResponse TargetUserInfoResponse { get; set; } = new();
+    public PrivateConversationDto? Conversation { get; set; } = new();
     public UserDto CurrentUser { get; set; }
     private IBrowserFile? fileInfo;
     private bool IsSelectedFile = false;
@@ -246,12 +250,16 @@
     public bool MouseOnEmail { get; set; }
     public bool MouseOnphone { get; set; }
     public bool MouseOnLocation { get; set; }
-     [Parameter]
+    public Color BadgeColor{ get; set; }
+    public string BadgeTitle { get; set; }
+    [Parameter]
     public string? MyAvatar { get; set; }
     [Parameter]
     public EventCallback<UserDto> OnPictureChanged { get; set; }
     [Parameter]
     public EventCallback<UserDto> OnClearChosenUser { get; set; }
+    [Parameter]
+    public EventCallback<UserDto> OnBlockedUser { get; set; }
     private Guid? lastUserId;
 
     protected override async Task OnParametersSetAsync()
@@ -262,7 +270,14 @@
             TargetUserInfoResponse = await userService.GetUserInfo(ChosenUser.Id);
             TargetUserInfoResponse.Avatar = ChosenUser?.avatar;
             lastUserId = ChosenUser.Id;
+
+            TargetUserInfoResponse.Avatar=await userService.GetAvatar(ChosenUser.Id);
+            Conversation = await ConversationService.ReadyOrCreateConversationBy(ChosenUser.Id);
             StateHasChanged();
+            IsBlocked = ChosenUser.IsBlocked;
+            await OnBlockedUser.InvokeAsync(ChosenUser);
+
+
         }
     }
 
@@ -275,13 +290,13 @@
         {
             TargetUserInfoResponse = await userService.GetUserInfo(CurrentUser.Id);
             ChosenUser = null;
+            MyAvatar = await userService.GetAvatar(CurrentUser.Id);
             StateHasChanged();
 
         }
-          
-              
-               
-            
+
+
+
     }
     public async Task UploadFiles(IBrowserFile file)
     {
@@ -295,6 +310,8 @@
             CurrentUser.avatar = result.Message;
             await OnPictureChanged.InvokeAsync(CurrentUser);
             StateHasChanged();
+            await js.InvokeVoidAsync("localStorage.removeItem", "userAvatar");
+            await js.InvokeVoidAsync("localStorage.removeItem", "userAvatarTime");
 
         }
         else{
@@ -309,6 +326,18 @@
             TargetUserInfoResponse.bio = result.Message;
             ClickOnBioEdited = false;
         }
+    }
+    public async Task BlockedUser()
+    {
+        IsBlocked= !IsBlocked;
+        ChosenUser.IsBlocked = IsBlocked;
+        if (Conversation != null)
+        {
+            await ConversationService.BlockedConversation(IsBlocked, Conversation.id);
+            await OnBlockedUser.InvokeAsync(ChosenUser);
+            StateHasChanged();
+        }
+  
     }
     public async ValueTask DisposeAsync(){
         ChosenUser = null;

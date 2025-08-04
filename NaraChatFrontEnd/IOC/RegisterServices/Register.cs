@@ -23,6 +23,7 @@ namespace NaraChatFrontEnd.IOC.RegisterServices
            services.AddScoped<CustomAuthenticationStateProvider>();
             services.AddScoped<AuthenticationStateProvider, CustomAuthenticationStateProvider>();
             services.AddScoped<JwtAuthorizationMessageHandler>();
+            services.AddSingleton<VersionCheckService>();
             services.AddHttpClient("apiwithAuth", client =>
             {
                 client.BaseAddress = new Uri(SiteSettings.ApiUrl);

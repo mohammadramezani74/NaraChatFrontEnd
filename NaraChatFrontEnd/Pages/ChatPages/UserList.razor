@@ -1,4 +1,7 @@
-﻿<MudPaper Class="h-100 w-100 d-flex flex-column">
+﻿@inject IUserChatService userService
+@inject IConversationService conversationService;
+@inject ISnackbar snackbar
+<MudPaper Class="h-100 w-100 d-flex flex-column">
 
     <MudList T="string" Class="overflow-y-auto flex-grow-1" Style="max-height:100%;">
         @if (Loading)
@@ -9,62 +12,103 @@
             Style="height:68px; margin-top: 10px;">
 
                 <ChildContent>
-
-                    <MudTextField @bind-Value="Search" Immediate="true" @onchange="SearchUsers" Placeholder="جستجو" Variant="Variant.Outlined" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search" AdornmentColor="Color.Secondary" />
-
+                    <MudPaper Elevation="0" Class="pa-2 d-flex align-center" Style="border-radius: 12px;">
+                        <MudTextField 
+                        @bind-Value="Search"
+                        Placeholder="جستجو کنید..."
+                        Variant="Variant.Outlined"
+                        Immediate="true"
+                        Adornment="Adornment.End"
+                        AdornmentIcon="@Icons.Material.Filled.Search"
+                        AdornmentColor="Color.Primary"
+                        Class="w-100"
+                        @oninput="SearchUsers"
+                        />
+                    </MudPaper>
                 </ChildContent>
 
             </MudListItem>
-            @foreach (var user in AllUsers)
-            {
+            <Virtualize  items="AllUsers.ToList()" Context="user"  OverscanCount="2" ItemSize="68">
+                <ItemContent>
+                    <MudListItem @ondblclick="()=>PinUser(user)"   @onclick="()=>HandleUserClick(user)"
+                    Class=" py-3 px-2"
+                    Style="@(user.IsSelected?$" height:73px;background-color:{chooseColor()};":"height:73px; ")">
+
+                        <AvatarContent>
+                            <MudBadge Dot="true" Color="@(user.IsOnline? Color.Success:Color.Default)" Class="mx-6 my-4">
+                                <MudAvatar Size="Size.Medium">
+                                    @if(user.avatar!=null){
+                                        <MudImage Src="@($"data:image/png;base64,{user.avatar}")" Class="rounded-circle"
+                                        Style="width:100%; height:100%; object-fit:inherit;" />
+                                    }
+                                    else{
+                                        <MudImage Src="lib/assets/Images/avatar.jpg" Class="rounded-circle"
+                                        Style="width:100%; height:100%; object-fit:inherit;" />
+                                    }
+                                </MudAvatar>
+                            </MudBadge>
+                        </AvatarContent>
 
 
-                <MudListItem @onclick="()=>HandleUserClick(user)" Class=" py-3 px-2"
-                Style="@(user.IsSelected?$" height:73px;background-color:{chooseColor()};":"height:73px; ")">
 
-                    <AvatarContent>
-                        <MudBadge Dot="true" Color="@(user.IsOnline? Color.Success:Color.Default)" Class="mx-6 my-4">
-                            <MudAvatar Size="Size.Medium">
-                                @if(user.avatar!=null){
-                                    <MudImage Src="@($"data:image/png;base64,{user.avatar}")" Class="rounded-circle"
-                                    Style="width:100%; height:100%; object-fit:inherit;" />
-                                }
-                                else{
-                                    <MudImage Src="lib/assets/Images/avatar.jpg" Class="rounded-circle"
-                                    Style="width:100%; height:100%; object-fit:inherit;" />
-                                }
-                            </MudAvatar>
-                        </MudBadge>
-                    </AvatarContent>
+                        <ChildContent>
+                            <MudStack Row=false>
+                                <MudStack Row="true">
 
-
-
-                    <ChildContent>
-                        <MudStack Row=false>
-                            <MudStack Row="true">
-                                @if(user.messageUnreadedCount>0){
-                                    <MudText Style="font-size:12px;">@user.Name</MudText>
-                                    <MudBadge Content="user.messageUnreadedCount" Color="Color.Error" Overlap="true" Origin="Origin.TopRight" Class="mx-6 my-4">      </MudBadge>
-                                }
-                                else{
-                                    <MudText Style="font-size:12px;">@user.Name</MudText>
-                                }
-
-                            </MudStack >
-                            <MudStack Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Row="true">
-                                <p style="@GetLastMessageStyle(user)">@user.LastReceivedMessage</p>
-                                <p style="font-size:9px;color:silver" >@user.LastReceivedMessageSendDate</p>
+                                    @if(user.messageUnreadedCount>0){
+                                        <MudText Style="font-size:12px;">@user.Name</MudText>
+                                        <MudBadge Content="user.messageUnreadedCount" Color="Color.Error" Overlap="true" Origin="Origin.TopRight" Class="mx-6 my-4">      </MudBadge>
+                                    }
+                                    else{
+                                        <MudText Style="font-size:12px;">@user.Name</MudText>
+                                    }
+                                    @if (user.IsPin)
+                                    {
+                                        <MudIcon Icon="@Icons.Material.Filled.PushPin" Color="Color.Error" Class="ms-1" Style="font-size:16px;" />
+                                    }
+                                </MudStack >
+                                <MudStack Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Row="true">
+                                    <p style="@GetLastMessageStyle(user)">@user.LastReceivedMessage</p>
+                                    <p style="font-size:9px;color:silver" >@user.LastReceivedMessageSendDate</p>
+                                </MudStack>
                             </MudStack>
-                        </MudStack>
 
-                    </ChildContent>
+                        </ChildContent>
 
-                </MudListItem>
+                    </MudListItem> 
+                </ItemContent>
+                <Placeholder>
+                    @for (int i = 0; i < 10; i++) 
+                    {
+                        <MudListItem Class="py-3 px-2" Style="height:73px;">
+                            <AvatarContent>
+                                <MudSkeleton Width="40px" Height="40px" Animation="Animation.Pulse" Class="mx-6 my-4 rounded-circle" />
+                            </AvatarContent>
+                            <ChildContent>
+                                <MudStack Row="false" Class="w-full">
+                                    <MudSkeleton Width="50%" Height="15px" Animation="Animation.Pulse" />
+                                    <MudStack Row="true" Justify="Justify.SpaceBetween" Class="w-full">
+                                        <MudSkeleton Width="30%" Height="10px" Animation="Animation.Pulse" />
+                                        <MudSkeleton Width="20%" Height="10px" Animation="Animation.Pulse" />
+                                    </MudStack>
+                                </MudStack>
+                            </ChildContent>
+                        </MudListItem>
+                    }
+                </Placeholder>
+                <EmptyContent>
+                    <MudPaper Class="d-flex flex-column align-center justify-center p-6 my-4" Style="min-height:150px; background-color:#f9f9f9;">
+                        <MudIcon Icon="@Icons.Material.Filled.PersonOff" Size="Size.Large" Color="Color.Dark" />
+                        <MudText Typo="Typo.h6" Class="mt-2">هیچ کاربری برای نمایش وجود ندارد</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">لیست کاربران فعلاً خالی است</MudText>
+                    </MudPaper>
+                </EmptyContent>
+            </Virtualize>
 
 
-            }
         }
     </MudList>
+
 
 </MudPaper>
 
@@ -72,9 +116,9 @@
     Guid? selectedUserId = null;
     [Parameter]
     public IEnumerable<UserDto> Users { get; set; } = Enumerable.Empty<UserDto>();
-    public IEnumerable<UserDto> AllUsers { get; set; } = Enumerable.Empty<UserDto>();
+    public List<UserDto> AllUsers { get; set; } = new();
     [Parameter]
-    public bool Loading { get; set; }
+    public bool Loading { get; set; } = true;
     [Parameter]
     public EventCallback<UserDto> OnUserSelected { get; set; }
     [Parameter]
@@ -127,7 +171,9 @@
     {
         IsUserInfoVisible = !IsUserInfoVisible;
     }
-    private void SearchUsers()
+
+
+    private async Task SearchUsers()
     {
 
         if (!string.IsNullOrWhiteSpace(Search))
@@ -159,8 +205,11 @@
     }
     protected override async Task OnParametersSetAsync()
     {
-        if (!HaveFilter)
-            AllUsers = Users.OrderByDescending(u => u.messageUnreadedCount > 0).ToList();
+        if (!HaveFilter&& AllUsers.Count()==0){
+            AllUsers = Users
+              .OrderByDescending(c => c.IsPin)
+            .OrderByDescending(u => u.messageUnreadedCount > 0).ToList();
+        }
         if (MissedMessageCount.Count > 0)
         {
             var groupedMissed = MissedMessageCount
@@ -215,5 +264,43 @@
 
 
     }
-  }
+    private async Task PinUser(UserDto user)
+    {
+        var targetUser = AllUsers.FirstOrDefault(c => c.Id == user.Id);
+        if (targetUser is null) return;
+
+        var newPinStatus = !targetUser.IsPin;
+        var pinnedUsers= AllUsers.Where(u => u.IsPin).Count();
+        if (pinnedUsers >= 3 &&newPinStatus==true)
+        {
+            snackbar.Clear();
+            snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomRight;
+            snackbar.Add("شما فقط امکان پین کردن سه کاربر را دارید", Severity.Error);
+            return;
+        }
+
+        var result = await conversationService.PinConversation(newPinStatus, targetUser.ConversationId.Value);
+        if (result.IsSuccess)
+        {
+            targetUser.IsPin = newPinStatus;
+            AllUsers = AllUsers
+                .OrderByDescending(c => c.IsPin)
+                .ThenByDescending(c =>c.messageUnreadedCount > 0) 
+                .ToList();
+
+            StateHasChanged();
+            snackbar.Clear();
+            snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomRight;
+
+        }
+        else
+        {
+            snackbar.Clear();
+            snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomRight;
+            snackbar.Add(result.Message, Severity.Error);
+
+    }
+}
+
+}
 

@@ -10,6 +10,7 @@ namespace NaraChat.Contract.Models.Users.ServiceViewModels
     public sealed record GetUsersViewModel
     {
         public Guid Id { get; set; }
+        public Guid ConversationId { get; set; }
         public string UserName { get; set; } = null!;
         public DateTime? LastSeen { get; set; }
         public string FirstName { get; set; } = null!;
@@ -20,5 +21,8 @@ namespace NaraChat.Contract.Models.Users.ServiceViewModels
         public Guid? LastReceivedMessageId { get; set; }
         public bool IsLastReceivedMessageForMe { get; set; }
         public string? LastReceivedMessageSendDate { get; set; }
+        public bool IsPin { get; set; }
+        public bool IsBlocked { get; set; }
+        public bool  OtherUserBlocked{ get; set; }
     }
 }

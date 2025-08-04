@@ -6,5 +6,5 @@ using System.Threading.Tasks;
 
 namespace NaraChat.Contract.Models.Chat.Conversation
 {
-    public  record MessageSeenDto(List<Guid> messageId, Guid UserId);
+    public  record MessageSeenDto(List<Guid> messageId, Guid UserId,Guid ConversationId,Guid MyId);
 }

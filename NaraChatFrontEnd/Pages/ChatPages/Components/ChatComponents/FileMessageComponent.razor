@@ -6,25 +6,15 @@
 @inject IJSRuntime JS
 @inject ITokenService tokenservice
 <MudItem xs="12" Class="w-100">
-    <div class="d-flex justify-@(IsMine ? "end" : "start") w-100">
+    <div class="d-flex w-100 @(message.IsMine ? "justify-start" : "justify-end")">
 
         <MudChat ChatPosition="@(message.IsMine?ChatBubblePosition.Start:ChatBubblePosition.End)">
 
 
-            <MudAvatar>
 
-                @if (GetAvatar() != null)
-                {
-                    <MudImage Src="@($"data:image/png;base64,{GetAvatar()}")" />
-                }
-                else
-                {
-                    <MudImage Src="lib/assets/Images/avatar.jpg" />
-
-                }
-            </MudAvatar>
-
-            <MudChatBubble Style="@Style()" Variant="Variant.Text" OnClick="@(e => OnRightClick(e, message))"
+            <MudChatBubble
+                Style="@($"{Style()};display: inline-block; max-width: 370px; word-wrap: break-word; border-radius: 12px; padding: 8px;")"
+                           Variant="Variant.Text" OnClick="@(e => OnRightClick(e, message))"
             @onmouseenter="@((args) => HoverStart(args, message))"
             @onmouseleave="@(() => HoverStop("bubble"))">
 
@@ -65,7 +55,7 @@
 
                         }
                         <div style="display: flex; flex-direction: column;">
-                            <MudText>@message.FileContent.FileName</MudText>
+                            <MudText>@FormatMessage(message.FileContent.FileName)</MudText>
                             <MudText Style="font-size: 12px; color: gray;">@message.FileContent.FileSize کیلوبایت</MudText>
                         </div>
                     </div>
@@ -83,7 +73,7 @@
                     <AudioMessageComponent message="message"></AudioMessageComponent>
                 }
 
-                <!-- کپشن (توضیحات ویدیو) -->
+           
                 <MudText id="@message.Id" Color="Color.Default" Style="margin-top: 10px; font-size: 14px; text-align: right; ">
                     @((MarkupString)message.Content.Replace("\n", "<br />"))
                 </MudText>
@@ -271,7 +261,7 @@
     public string? GetAvatar() => CurrentUser.Id == message.UserId ? myAvatar : OtherAvatar;
     public string replyColor() { return message.IsMine ? $"background-color: {ThemeCascading.MyColorReply}" : $"background-color: {ThemeCascading.OtherColorReply}"; }
     public string ClockColor() => $"color: {ThemeCascading.ClockColor};";
-    public string Style() { return message.IsMine ? $"background-color: {ThemeCascading.myColorChat}; width:300px;" : $"background-color: {ThemeCascading.OtherColorChat}; width:300px;"; }
+    public string Style() { return message.IsMine ? $"min-width: 305px;background-color: {ThemeCascading.myColorChat}" : $"min-width: 50px;background-color: {ThemeCascading.OtherColorChat}"; }
     protected override async Task OnInitializedAsync()
     {
         var me = Conversation.users.Where(c => c.Id == CurrentUser.Id).FirstOrDefault();
@@ -281,6 +271,22 @@
         myName = me?.Name;
         OtherName = other?.Name;
     }
+  
+        private string FormatMessage(string? content)
+        {
+            if (string.IsNullOrEmpty(content))
+                return string.Empty;
+
+            var trimmed = content.Length > 15
+                ? content.Substring(0, 15) + "..."
+                : content;
+
+      
+
+            return trimmed;
+        }
+        
+
     private async Task OnRightClick(MouseEventArgs e, ChatMessageDto message)
     {
         if (IsMine)

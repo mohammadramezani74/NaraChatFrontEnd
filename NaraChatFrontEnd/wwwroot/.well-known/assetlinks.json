@@ -1,0 +1,14 @@
+[
+    {
+        "relation": [
+            "delegate_permission/common.handle_all_urls"
+        ],
+        "target": {
+            "namespace": "android_app",
+            "package_name": "com.irannara.naragram",
+            "sha256_cert_fingerprints": [
+                "63:16:07:42:D4:20:14:2F:C0:5D:AE:76:14:0A:DC:D9:2A:16:AA:05:C0:0D:31:99:79:34:58:94:A2:14:1F:33"
+            ]
+        }
+    }
+]
