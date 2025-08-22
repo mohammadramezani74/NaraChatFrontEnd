@@ -1,0 +1,193 @@
+﻿@using NaraChatFrontEnd.Pages.ChatPages.Components.DialogComponents
+@inject IDialogService DialogService
+@inject IMessageService _messageservice
+@inject ISnackbar snackbar
+@inject IJSRuntime JS
+
+<MudItem xs="12" Class="w-100">
+    <div class="d-flex w-100 @(message.IsMine ? "justify-start mine-msg" : "justify-end other-msg")">
+        <MudChat ChatPosition="@(message.IsMine ? ChatBubblePosition.Start : ChatBubblePosition.End)" ArrowPosition="ChatArrowPosition.Top">
+            <MudStack Row="false" Spacing="0">
+
+                <MudChatBubble Style="@($"{Style()};display:inline-block; max-width:370px; word-wrap:break-word; border-radius:12px; padding:8px;")"
+                               Variant="Variant.Text"
+                      
+                               @onmouseenter="@((args) => HoverStart(args, message))"
+                               @onmouseleave="@(() => HoverStop("bubble"))">
+
+                    <!-- ✅ نمایش نام فرستنده یا نام چنل -->
+                    <p style="text-align:right; color:gray; font-size:10px;">
+                        <small>@(SelectedChannel.IsChannel ? SelectedChannel.OtherUserBlocked : message.SenderName)</small>
+                    </p>
+
+                    <!-- ✅ ریپلای -->
+                    @if (ParentMessage != null)
+                    {
+                        <MudPaper Class="reply-preview px-2 py-1 mb-1" style="@($"{replyColor()}; max-width:100%; box-sizing:border-box;")">
+                            <MudText Class="text-truncate" Style="text-align:right; color:gray; font-size:10px; padding-bottom:6px;">
+                                @(SelectedChannel.IsChannel ? SelectedChannel.Name : message.SenderName)
+                            </MudText>
+                            <MudText Class="text-truncate" Style="font-size:12px;">
+                                @ParentMessage.TruncateMessage()
+                            </MudText>
+                        </MudPaper>
+                    }
+
+                    <!-- ✅ متن پیام -->
+                    <MudText id="@message.Id" Color="Color.Default">
+                        @((MarkupString)message.Content.Replace("\n", "<br />"))
+
+                        @if (message.Type == MessageType.Location)
+                        {
+                            <MudPaper Class="pa-2 mt-2" Style="border:1px solid #ccc; border-radius:12px; width:300px; margin:20px;">
+                                <div id="map-@message.Id" style="height:350px; border-radius:12px;"></div>
+                            </MudPaper>
+                        }
+                    </MudText>
+
+                    @if (message.isEdited)
+                    {
+                        <MudText Class="mt-2" Style="font-size:8px; text-align:right;">ویرایش شده</MudText>
+                    }
+
+                    <!-- ✅ منوی Hover -->
+                    <MudPopover Open="@(Hovering && message.Equals(_hoverMessage))"
+                                Class="hoverarea"
+                                AnchorOrigin="Origin.TopLeft"
+                                TransformOrigin="Origin.BottomLeft"
+                                @onscroll="@(() => HoverStop("scroll"))"
+                                @onmouseenter="@(() => _paperHovering = true)"
+                                @onmouseleave="@(() => HoverStop("paper"))">
+
+                        <div class="d-flex" style="width:100%;" @onclick:stopPropagation="true" @onclick:preventDefault="true">
+                            <MudTooltip Text="رونوشت">
+                                <span class="emoji" @onclick="()=>copyMessage(message)">📝</span>
+                            </MudTooltip>
+
+                            @if (isAdmin())
+                            {
+                                <MudTooltip Text="پاسخ">
+                                    <span class="emoji" @onclick="()=>ReplyMessage(message)">↩️</span>
+                                </MudTooltip>
+                                <MudTooltip Text="ویرایش">
+                                    <span class="emoji" @onclick="()=>EditMessage(message.Id, message.Content)">✏️</span>
+                                </MudTooltip>
+                                <MudTooltip Text="حذف">
+                                    <span class="emoji" @onclick="()=>DeleteMessagePopUp(message.Id)">❌</span>
+                                </MudTooltip>
+                            }
+                        </div>
+                    </MudPopover>
+
+                    <!-- ✅ ساعت ارسال -->
+                    <p Style="@ClockColor() font-size:11px; text-align:right; margin-top:17px; margin-bottom:0;">
+                        @message.SendAt.ToString("HH:mm")
+                    </p>
+                </MudChatBubble>
+            </MudStack>
+        </MudChat>
+    </div>
+</MudItem>
+
+@code {
+    [CascadingParameter(Name = "Theme")]
+    public ThemeChanging ThemeCascading { get; set; }
+
+    [Parameter] public ChatMessageDto message { get; set; } = null!;
+    [Parameter] public UserDto CurrentUser { get; set; } = null!;
+    [Parameter] public UserDto SelectedChannel { get; set; } = null!;   // ✅ هنوز UserDto هست چون نوع صحیح است
+
+    [Parameter] public EventCallback<EditedMessageDto> EditMessageEvent { get; set; }
+    [Parameter] public EventCallback<ChatMessageDto> ReplyMessageEvent { get; set; }
+    [Parameter] public EventCallback<Guid> DeletedMessageevent { get; set; }
+    [Parameter] public string? ParentMessage { get; set; }
+
+    private bool showContextMenu = false;
+    private Guid? showContextMenuForMessageId = null;
+    private int contextMenuX;
+    private int contextMenuY;
+
+    public bool isAdmin() =>
+        SelectedChannel.IsChannel ? SelectedChannel.channel?.admins.Any(x => x.Id == CurrentUser.Id) ?? false : SelectedChannel.Id == CurrentUser.Id;
+
+    public string replyColor() => message.IsMine
+        ? $"background-color: {ThemeCascading.MyColorReply}"
+        : $"background-color: {ThemeCascading.OtherColorReply}";
+
+    public string ClockColor() => $"color: {ThemeCascading.ClockColor};";
+
+    public string Style() => message.IsMine
+        ? $"min-width:305px; background-color:{ThemeCascading.myColorChat}"
+        : $"min-width:50px; background-color:{ThemeCascading.OtherColorChat}";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && message.Type == MessageType.Location)
+            await JS.InvokeVoidAsync("showMiniMap", $"map-{message.Id}", message.Latitude, message.Longitude);
+    }
+
+    public async Task copyMessage(ChatMessageDto message)
+        => await JS.InvokeVoidAsync("copyToClipboard", message.Content);
+
+    private async Task EditMessage(Guid MessageId, string Message)
+        => await EditMessageEvent.InvokeAsync(new EditedMessageDto(MessageId, Message));
+
+    private async Task DeleteMessagePopUp(Guid MessageId)
+    {
+        var parameters = new DialogParameters<DialogTemplate>
+        {
+            { x => x.ContentText, "آیا از حذف این پیام اطمینان دارید؟" },
+            { x => x.ButtonText, "بله" },
+            { x => x.Color, Color.Error }
+        };
+
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Large };
+        var dialog = await DialogService.ShowAsync<DialogTemplate>("حذف پیام", parameters, options);
+        var res = await dialog.Result;
+        if (!res.Canceled)
+            await PerformDeleteMessageAsync(MessageId);
+    }
+
+    public async Task PerformDeleteMessageAsync(Guid MessageId)
+    {
+        var result = await _messageservice.DeleteMessageAsync(MessageId, SelectedChannel.Id);
+        if (result.Item1)
+        {
+            await DeletedMessageevent.InvokeAsync(MessageId);
+            snackbar.Clear();
+            snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomRight;
+            snackbar.Add("حذف پیام با موفقیت انجام شد", Severity.Success);
+        }
+        else
+        {
+            snackbar.Clear();
+            snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomRight;
+            snackbar.Add("حذف پیام با خطا مواجه شد", Severity.Error);
+        }
+    }
+
+    // ✅ مدیریت Hover
+    private bool Hovering => _paperHovering || _bubbleHovering;
+    private bool _bubbleHovering;
+    private bool _paperHovering;
+    private ChatMessageDto? _hoverMessage;
+
+    private void HoverStart(MouseEventArgs args, ChatMessageDto message)
+    {
+        _bubbleHovering = true;
+        _hoverMessage = message;
+    }
+
+    private void HoverStop(string typeOfStop)
+    {
+        switch (typeOfStop)
+        {
+            case "paper": _paperHovering = false; break;
+            case "bubble": _bubbleHovering = false; break;
+            case "scroll": _paperHovering = _bubbleHovering = false; StateHasChanged(); break;
+        }
+    }
+
+    public async Task ReplyMessage(ChatMessageDto message)
+        => await ReplyMessageEvent.InvokeAsync(message);
+}

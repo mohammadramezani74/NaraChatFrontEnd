@@ -27,6 +27,10 @@ namespace NaraChat.Application.Services.ChatServices
 
         public async Task<IEnumerable<UserDto>> GetUsersAsync(string? Search=null,CancellationToken cancellationToken = default)
         {
+            try
+            {
+
+         
             var queryParams = string.Empty;
             if (!string.IsNullOrWhiteSpace(Search))
             {
@@ -39,10 +43,18 @@ namespace NaraChat.Application.Services.ChatServices
             if (response?.isSucceded??false) {
                 var users=response.result.Select(x=>new UserDto(x.Id,x.LastName+" "+x.FirstName,x.Avatar,messageUnreadedCount:x.MessageUnreadedCount,lastseen:x.LastSeen,lastReceivedMessage: x.LastReceivedMessage,
                    lastReceivedMessageId: x.LastReceivedMessageId,isLastReceivedMessageForMe: x.IsLastReceivedMessageForMe,lastReceivedMessageSendDate:x.LastReceivedMessageSendDate,
-                   isPinned:x.IsPin,isBlocked:x.IsBlocked,conversationId:x.ConversationId,otherUserBlocked:x.OtherUserBlocked)).ToList();
+                   isPinned:x.IsPin,isBlocked:x.IsBlocked,conversationId:x.ConversationId,otherUserBlocked:x.OtherUserBlocked,ischannel: x.IsChannel
+                   ,chanel:x.channel
+                   )).ToList();
                 return users;
             }
             return Enumerable.Empty<UserDto>();
+            }
+            catch (Exception ex)
+            {
+                return Enumerable.Empty<UserDto>();
+
+            }
 
         }
         public async Task<TargetUserInfoResponse> GetUserInfo(Guid UserId, CancellationToken cancellationToken = default)

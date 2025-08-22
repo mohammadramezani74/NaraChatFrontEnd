@@ -1,10 +1,13 @@
 ﻿@using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.IdentityModel.JsonWebTokens
 @using NaraChat.Application.Services.Auth
+@using NaraChat.Application.Services.ChatServices.Channels
 @using NaraChat.Application.Services.LocalStorage
 @using NaraChat.Contract.Models.BaseResponse
+@using NaraChat.Contract.Models.Chat.Channels
 @using NaraChatFrontEnd.Models.BaseModels
 @using System.Security.Claims
+@using NaraChatFrontEnd.Pages.ChatPages
 @using NaraChatFrontEnd.Pages.ChatPages.Components.DialogComponents
 
 @inherits LayoutComponentBase
@@ -17,6 +20,8 @@
 @inject ILocalStorageService localStorage
 @inject VersionCheckService VersionChecker
 @inject NavigationManager Nav
+@inject IChannelService channelservice
+@inject ISnackbar snackbar
 @implements IDisposable
 
 
@@ -37,28 +42,28 @@
 
                             <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
                                 <MudAvatar @onclick="SettingsShow" Size="Size.Medium" Class="elevated-avatar">
-    @if (!string.IsNullOrEmpty(myAvatar))
-    {
-        <MudImage Src="@($"data:image/png;base64,{myAvatar}")"
-                  Class="rounded-circle avatar-img" />
-    }
-    else
-    {
-        <MudImage Src="lib/assets/Images/avatar.jpg"
-                  Class="rounded-circle avatar-img" />
-    }
-</MudAvatar>
+                                    @if (!string.IsNullOrEmpty(myAvatar))
+                                    {
+                                        <MudImage Src="@($"data:image/png;base64,{myAvatar}")"
+                                        Class="rounded-circle avatar-img" />
+                                    }
+                                    else
+                                    {
+                                        <MudImage Src="lib/assets/Images/avatar.jpg"
+                                        Class="rounded-circle avatar-img" />
+                                    }
+                                </MudAvatar>
 
                                 <MudText Typo="Typo.subtitle2" Class="font-weight-bold">
-                                  <b>@CurrentUser?.Name  </b>  
+                                    <b>@CurrentUser?.Name  </b>  
                                 </MudText>
-@if (newVersionAvailable)
-{
-    <div class="update-alert">
-        نسخه جدیدی از برنامه در دسترس است.
-        <button class="btn btn-primary" @onclick="UpdateApp">بارگذاری نسخه جدید</button>
-    </div>
-}
+                                @if (newVersionAvailable)
+                                {
+                                    <div class="update-alert">
+                                        نسخه جدیدی از برنامه در دسترس است.
+                                        <button class="btn btn-primary" @onclick="UpdateApp">بارگذاری نسخه جدید</button>
+                                    </div>
+                                }
 
                             </MudStack>
 
@@ -76,9 +81,17 @@
 
 
                 <MudSpacer />
-
-                <MudIconButton @onclick="DarkModel" title="@(IsDarkMode?"تم لایت":"تم دارک")" Icon="@(IsDarkMode? @Icons.Material.Filled.LightMode:@Icons.Material.Filled.DarkMode)" Color="@(IsDarkMode?Color.Warning:Color.Default)" />
                 <MudIconButton @onclick="Logout" title="خروج"  Icon="@Icons.Material.Filled.ExitToApp" Color=" Color.Error" />
+                <MudIconButton @onclick="DarkModel" title="@(IsDarkMode?"تم لایت":"تم دارک")" Icon="@(IsDarkMode? @Icons.Material.Filled.LightMode:@Icons.Material.Filled.DarkMode)" Color="@(IsDarkMode?Color.Warning:Color.Default)" />
+                <MudIconButton @onclick="RouteToDownload"  title="اپ اندروید ناراگرام"  Icon="@Icons.Material.Filled.Android" Color=" Color.Tertiary" />
+                @* <MudMenu Disabled="@(CurrentUser==null)" Icon="@Icons.Material.Filled.MoreVert" *@
+                @* AriaLabel="Open user menu"> *@
+                @*     <MudIconButton @onclick="RouteToDownload"  title="اپ اندروید ناراگرام"  Icon="@Icons.Material.Filled.Android" Color=" Color.Tertiary" /> *@
+                @*     <MudIconButton @onclick="CreateChannel"  title="ایجاد کانال"  Icon="@Icons.Material.Filled.WifiChannel" Color=" Color.Info" /> *@
+
+
+
+                @* </MudMenu> *@
 
 
             </MudAppBar>
@@ -94,72 +107,77 @@
 </MudRTLProvider>
 <style>
     .elevated-avatar {
-        box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
-        border: 2px solid white;
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
-        cursor: pointer;
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
+    border: 2px solid white;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    cursor: pointer;
     }
 
     .elevated-avatar:hover {
-        transform: scale(1.05);
-        box-shadow: 0px 6px 15px rgba(0, 0, 0, 0.3);
+    transform: scale(1.05);
+    box-shadow: 0px 6px 15px rgba(0, 0, 0, 0.3);
     }
 
     .avatar-img {
-        object-fit: cover;
-        width: 100%;
-        height: 100%;
-        border-radius: 50%;
+    object-fit: cover;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
     }
 </style>
 @code {
-private async Task UpdateApp()
-{
-
-    var keys = await js.InvokeAsync<string[]>("caches.keys");
-
-    foreach (var key in keys)
+    public void RouteToDownload()
     {
-        await js.InvokeVoidAsync("caches.delete", key);
+        Nav.NavigateTo("https://sanaapi.irannara.com/source/naragram.apk");
     }
+    private async Task UpdateApp()
+    {
 
 
-    await VersionChecker.StoreCurrentVersionAsync();
+        var keys = await js.InvokeAsync<string[]>("caches.keys");
+
+        foreach (var key in keys)
+        {
+            await js.InvokeVoidAsync("caches.delete", key);
+        }
 
 
-    Nav.NavigateTo(Nav.Uri, forceLoad: true);
-}
+        await VersionChecker.StoreCurrentVersionAsync();
+
+
+        Nav.NavigateTo(Nav.Uri, forceLoad: true);
+    }
     [CascadingParameter]
     public ThemeChanging ThemeChanging { get; set; } = new ThemeChanging("background-color:#eff2fd", " color:rgb(255 64 129);", " box-shadow: 0 16px 45px #ecc7ee");
     bool _drawerOpen = true;
     public UserDto? CurrentUser { get; set; }
     public string? myAvatar { get; set; } = null;
-        private bool newVersionAvailable = false;
+    private bool newVersionAvailable = false;
     protected async override Task OnInitializedAsync()
     {
-          newVersionAvailable = await VersionChecker.IsNewVersionAvailableAsync();
+        newVersionAvailable = await VersionChecker.IsNewVersionAvailableAsync();
         CurrentUser = await ((CustomAuthenticationStateProvider)stateprovider).GetUserInfoAsync();
-   var cachedAvatar = await js.InvokeAsync<string>("localStorage.getItem", "userAvatar");
+        var cachedAvatar = await js.InvokeAsync<string>("localStorage.getItem", "userAvatar");
 
-if (string.IsNullOrEmpty(cachedAvatar))
-{
-    CurrentUser = await ((CustomAuthenticationStateProvider)stateprovider).GetUserInfoAsync();
+        if (string.IsNullOrEmpty(cachedAvatar))
+        {
+            CurrentUser = await ((CustomAuthenticationStateProvider)stateprovider).GetUserInfoAsync();
 
-    if (CurrentUser != null)
-    {
-       
-        myAvatar = await userservice.GetAvatar(CurrentUser.Id);
+            if (CurrentUser != null)
+            {
 
-        
-        await js.InvokeVoidAsync("localStorage.setItem", "userAvatar", myAvatar);
-        await js.InvokeVoidAsync("localStorage.setItem", "userAvatarTime", DateTime.UtcNow.ToString("o")); 
-    }
-}
-else
-{
-  
-    myAvatar = cachedAvatar;
-}
+                myAvatar = await userservice.GetAvatar(CurrentUser.Id);
+
+
+                await js.InvokeVoidAsync("localStorage.setItem", "userAvatar", myAvatar);
+                await js.InvokeVoidAsync("localStorage.setItem", "userAvatarTime", DateTime.UtcNow.ToString("o")); 
+            }
+        }
+        else
+        {
+
+            myAvatar = cachedAvatar;
+        }
         string? darkMode = await localStorage.GetItemAsync(nameof(IsDarkMode));
         if (darkMode != null)
         {
@@ -207,7 +225,7 @@ else
     private async Task Logout()
     {
         await js.InvokeVoidAsync("localStorage.removeItem", "userAvatar");
-await js.InvokeVoidAsync("localStorage.removeItem", "userAvatarTime");
+        await js.InvokeVoidAsync("localStorage.removeItem", "userAvatarTime");
         var parameters = new DialogParameters<DialogTemplate>
     {
         { x => x.ContentText, "کاربر گرامی آیا شما مطمئن هستید که می‌خواهید خارج شوید؟" },
@@ -241,12 +259,37 @@ await js.InvokeVoidAsync("localStorage.removeItem", "userAvatarTime");
     public void SettingsShow(){
 
         ThemeChanging.IsShowSetting = !ThemeChanging.IsShowSetting;
-
         StateHasChanged();
     }
 }
 
 @code{
+    public async Task CreateChannel()
+    {
+        var dialog = await DialogService.ShowAsync<CreateChannelDialogComponent>("ایجاد چنل جدید");
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is CreateChannelCommand command)
+        {
+
+            var response=  await channelservice.CreateChannel(command);
+            if (response.issuccess)
+            {
+                snackbar.Clear();
+                snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomRight;
+
+                snackbar.Add("ساخت کانال با موفقیت انجام شد.", Severity.Success);
+
+            }
+            else
+            {
+                   snackbar.Clear();
+                snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomRight;
+
+                snackbar.Add(response.message, Severity.Error);
+            }
+        }
+    }
     public async Task getPermission()
     {
          var token = await js.InvokeAsync<string>("requestPermission");

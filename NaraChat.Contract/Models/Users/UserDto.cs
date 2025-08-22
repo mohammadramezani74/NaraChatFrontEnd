@@ -1,8 +1,10 @@
-﻿using System;
+﻿using NaraChat.Contract.Models.Chat.Channels;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 
 namespace NaraChat.Contract.Models.Users
@@ -24,6 +26,8 @@ namespace NaraChat.Contract.Models.Users
         public bool IsBlocked { get; set; }
         public bool OtherUserBlocked { get; set; }
         public Guid? ConversationId { get; set; }
+        public bool IsChannel { get; set; }
+        public ChannelDto? channel { get; set; }
         public UserDto()
         {
                 
@@ -31,7 +35,7 @@ namespace NaraChat.Contract.Models.Users
 
         public UserDto(Guid id, string name, string? Avatar = null, bool Isonline = false, int messageUnreadedCount = 0, DateTime? lastseen = null, string? lastReceivedMessage = null,
             Guid? lastReceivedMessageId=null,bool isLastReceivedMessageForMe=false,string? lastReceivedMessageSendDate=null,bool isPinned=false,bool isBlocked=false,
-        Guid? conversationId=null, bool otherUserBlocked = false)
+        Guid? conversationId=null, bool otherUserBlocked = false, bool ischannel=false, ChannelDto?chanel=null)
         {
             Id = id;
             Name = name;
@@ -47,7 +51,10 @@ namespace NaraChat.Contract.Models.Users
             IsBlocked = isBlocked;
             ConversationId = conversationId;
             OtherUserBlocked = otherUserBlocked;
-                
+            IsChannel=ischannel;
+            channel= chanel;
+
+
         }
     }
     public class UserAvatar

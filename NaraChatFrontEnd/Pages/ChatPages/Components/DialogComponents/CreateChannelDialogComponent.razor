@@ -1,0 +1,38 @@
+﻿@using NaraChat.Contract.Models.Chat.Channels
+<MudDialog>
+    <DialogContent>
+        <MudTextField @bind-Value="_title" Label="عنوان" Required="true" />
+        <MudTextField @bind-Value="_description" Label="توضیحات" Lines="3" />
+        <MudTextField @bind-Value="_userName" Label="نام کاربری" Required="true" />
+        <MudCheckBox T="bool" @bind-Value="_isPublic" Label="عمومی باشد" />
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Cancel">انصراف</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit">ایجاد</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] 
+    private IMudDialogInstance MudDialog { get; set; }
+
+    private string _title;
+    private string _description;
+    private string _userName;
+    private bool _isPublic;
+
+    private void Submit()
+    {
+        var command = new CreateChannelCommand(
+            _title,
+            _description,
+            _userName,
+           _isPublic
+        );
+
+        MudDialog.Close(DialogResult.Ok(command));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

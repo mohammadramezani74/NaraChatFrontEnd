@@ -1,237 +1,440 @@
 ﻿@using System.Text.RegularExpressions
+@using NaraChat.Application.Services.ChatServices.Channels
+@using NaraChat.Contract.Models.Chat.Channels
 @inject IUserChatService userService
+@inject IChannelService _channelService
 @inject AuthenticationStateProvider stateprovider
-@inject IDialogService DialogService
+@inject IDialogService dialogService
 @inject ISnackbar snackbar
 @inject IConversationService ConversationService
 @inject IJSRuntime js
 @implements IAsyncDisposable
 <MudPaper Elevation="5" Class="pa-6 h-100 d-flex flex-column">
-    <MudStack Justify="Justify.Center" Spacing="1" AlignItems="AlignItems.Center" Class="flex-grow-1" Style="overflow:hidden;">
-        @if (IsOnline)
-        {
+    @if (SelectedChannel != null)
+    {
+        <MudStack Justify="Justify.Center" Spacing="1" AlignItems="AlignItems.Center" Class="flex-grow-1" Style="overflow:hidden;">
+
 
 
             <MudChip T="string"
             Class="mt-4"
-            Color="IsBlocked?Color.Error: Color.Success"
+            Color="Color.Primary"
             Variant="Variant.Filled"
             Icon="@Icons.Material.Filled.FiberManualRecord"
             Style="flex-shrink:0;">
-                @(IsBlocked ?"مسدود شده" :"آنلاین")
+                کانال  @SelectedChannel.Name
             </MudChip>
-        }
-        else
-        {
+
+
+            <MudPaper Style="width: 100%; height: 250px; position: relative; overflow: hidden;
+                 border-radius: 16px; border: 2px solid #e0e0e0; box-shadow: 0 6px 20px rgba(0,0,0,0.15);"
+            Elevation="8">
+                @if (SelectedChannel.avatar != null)
+                {
+                    <MudImage Src="@($"data:image/png;base64,{SelectedChannel.avatar}")"
+                    Style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;" 
+                    @onclick="OpenPictureDialog" />
+                }
+                else
+                {
+                    <MudImage Src="lib/assets/Images/chanel.jpg"
+                    Style="width: 100%; height: 100%; object-fit: cover;" />
+                }
+            </MudPaper>
+
+
             @if (CurrentUser != null)
             {
                 @if (CurrentUser.Id == TargetUserInfoResponse.Id)
                 {
+                    <MudFileUpload T="IBrowserFile" FilesChanged="UploadFiles" Disabled="@(IsSelectedFile)">
+                        <ActivatorContent>
+                            <MudIconButton Color="Color.Info"
+                            Icon="@Icons.Material.Filled.PhotoCamera">
+                            </MudIconButton>
+                        </ActivatorContent>
+                    </MudFileUpload>
+                }           }
 
-                    <MudChip T="string"
-                    Class="mt-4"
-                    Color="Color.Success"
-                    Variant="Variant.Filled"
-                    Icon="@Icons.Material.Filled.FiberManualRecord"
-                    Style="flex-shrink:0;">
-                        آنلاین
-                    </MudChip>
-                }
-                else{
-                    <MudChip T="string"
-                    Class="mt-4"
-                    Color="IsBlocked?Color.Error:Color.Default"
-                    Variant="Variant.Filled"
-                    Icon="@Icons.Material.Filled.FiberManualRecord"
-                    Style="flex-shrink:0;">
-                        @(IsBlocked ? "مسدود شده" : "آفلاین")
-                    </MudChip>
-                }
 
-            }
 
-        }
-
-        <MudPaper Style="width: 100%; height: 250px; position: relative; overflow: hidden;
-                 border-radius: 16px; border: 2px solid #e0e0e0; box-shadow: 0 6px 20px rgba(0,0,0,0.15);"
-        Elevation="8">
-            @if (TargetUserInfoResponse.Avatar != null)
+            <MudText Typo="Typo.h1" Class="text-center" Color="Color.Primary" Style="word-break:break-word; margin-bottom: 16px; margin-top: 9px;">@SelectedChannel.Name</MudText>
+            <MudText Typo="Typo.body2" Class="text-center mb-4" Color="Color.Default">
+                سازنده :@SelectedChannel.channel.Creator  </MudText>
+            @if (SelectedChannel.channel.CurrentUserAdmin)
             {
-                <MudImage Src="@($"data:image/png;base64,{TargetUserInfoResponse.Avatar}")"
-                Style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;" 
-                @onclick="OpenPictureDialog" />
-            }
-            else if (MyAvatar != null && ChosenUser == null)
-            {
-                <MudImage Src="@($"data:image/png;base64,{MyAvatar}")"
-                Style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;" 
-                @onclick="OpenPictureDialog" />
-            }
-            else
-            {
-                <MudImage Src="lib/assets/Images/avatar.jpg"
-                Style="width: 100%; height: 100%; object-fit: cover;" />
-            }
-        </MudPaper>
 
-
-        @if (CurrentUser != null)
-        {
-            @if (CurrentUser.Id == TargetUserInfoResponse.Id)
-            {
-                <MudFileUpload T="IBrowserFile" FilesChanged="UploadFiles" Disabled="@(IsSelectedFile)">
-                    <ActivatorContent>
-                        <MudIconButton Color="Color.Info"
-                        Icon="@Icons.Material.Filled.PhotoCamera">
-                        </MudIconButton>
-                    </ActivatorContent>
-                </MudFileUpload>
-            }           }
-
-
-
-        <MudText Typo="Typo.h1" Class="text-center" Color="Color.Primary" Style="word-break:break-word; margin-bottom: 16px; margin-top: 9px;">@TargetUserInfoResponse.Name</MudText>
-
-        @if (CurrentUser != null)
-
-            @if (CurrentUser.Id == TargetUserInfoResponse.Id){
                 if (ClickOnBioEdited){
                     <MudStack Row="true">
                         <MudTextField @bind-Value="bio" Label="بیوگرافی" Variant="Variant.Text"></MudTextField>
                         <MudIconButton OnClick="()=>ClickOnBioEdited=false" Size="Size.Small" Icon="@Icons.Material.Filled.Close" Title="ویرایش بیوگرافی" Color="Color.Error" />
 
-                        <MudIconButton OnClick="SubmitBio" Size="Size.Small" Icon="@Icons.Material.Filled.Check" Title="ویرایش بیوگرافی" Color="Color.Tertiary" />
+                        <MudIconButton OnClick="ChangeBio" Size="Size.Small" Icon="@Icons.Material.Filled.Check" Title="ویرایش بیوگرافی" Color="Color.Tertiary" />
 
 
                     </MudStack>
-                }else{
-                    <MudText Typo="Typo.body2" Class="text-center mb-4" Color="ThemeChanging.SeenColor"> <MudIconButton OnClick="()=>ClickOnBioEdited=true" Size="Size.Small" Icon="@Icons.Material.Filled.Edit" Title="ویرایش بیوگرافی" Color="ThemeChanging.SeenColor" /> @TargetUserInfoResponse.bio </MudText>
-
-                }
-
-            }else{
-                <MudText Typo="Typo.body2" Class="text-center mb-4" Color="ThemeChanging.SeenColor"> @TargetUserInfoResponse.bio </MudText>
-
-            }
-        <hr />
-        <br />
-
-        <MudStack  Justify="Justify.FlexStart">
-
-            @if (CurrentUser?.Id != TargetUserInfoResponse.Id){
-                <MudSwitch Color="Color.Error" @bind-Value=@(IsBlocked) Label="مسدود سازی" @onclick="BlockedUser"/>
-
-            }
-            @if (CurrentUser != null)
-            {
-                @if (CurrentUser.Id == TargetUserInfoResponse.Id)
-                {
-
-                    if (!ChangeEmailToInput){
-                        <MudText Typo="Typo.body2" Class="d-flex align-center">
-                            <MudIconButton @onclick="()=>ChangeEmailToInput=true" @onmousemove="()=>MouseOnEmail=true" @onmouseout="()=>MouseOnEmail=false" Color="Color.Primary" Icon="@(MouseOnEmail? @Icons.Material.Filled.Edit: @Icons.Material.Filled.Email)" Class="ml-2" />
-                            <span style="font-family:iransans-bold;">@TargetUserInfoResponse.Email</span>
-                        </MudText>
-                    }
-                    else{
-                        <MudStack Row="true">
-                            <MudTextField @bind-Value="ChangeEmail" Label="ایمیل جدید" Variant="Variant.Text"></MudTextField>
-                            <MudIconButton OnClick="()=>ChangeEmailToInput=false" Size="Size.Small" Icon="@Icons.Material.Filled.Close" Color="Color.Error" />
-
-                            <MudIconButton OnClick="SubmitEmail" Size="Size.Small" Icon="@Icons.Material.Filled.Check" Title="ثبت ایمیل جدید" Color="Color.Tertiary" />
-
-
-                        </MudStack>
-                    }
-
-
                 }
                 else
                 {
-
-
-                    <MudText Typo="Typo.body2" Class="d-flex align-center">
-                        <MudIcon Color="Color.Primary" Icon="@Icons.Material.Filled.Email" Class="ml-2" />
-                        <span style="font-family:iransans-bold;">@(string.IsNullOrEmpty(TargetUserInfoResponse.Email) ? "هنوز ایمیلی ثبت نشده!" : TargetUserInfoResponse.Email)</span>
-                    </MudText>
-
+                    <MudText Typo="Typo.body2" Class="text-center mb-4" Color="ThemeChanging.SeenColor"> <MudIconButton OnClick="()=>ClickOnBioEdited=true" Size="Size.Small" Icon="@Icons.Material.Filled.Edit" Title="ویرایش بیوگرافی" Color="ThemeChanging.SeenColor" /> کانال رسمی ایران نارا </MudText>
 
                 }
 
             }
-            @if (CurrentUser != null)
+            <hr />
+<MudPaper Class="p-4" 
+          Style="width:100%; max-width:500px; border-radius:12px; border:1px solid #e0e0e0;">
+
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-3">
+        <MudText Typo="Typo.h6" Color="Color.Primary">مدیریت کانال</MudText>
+        @if (SelectedChannel.channel.CreatorId==CurrentUser.Id)
+        {
+            <MudIconButton Icon="@Icons.Material.Filled.Add"
+                           Color="Color.Primary"
+                           Variant="Variant.Filled"
+                           Size="Size.Small"
+                           OnClick="OpenManageAdminsDialog"
+                           Class="ml-2"
+                           Title="اضافه کردن ادمین" />
+        }
+    </MudStack>
+
+
+    <MudStack Style="height:150px; overflow-y:auto; gap:4px; scrollbar-width: none;">
+
+        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.FlexStart" Style="flex-direction:row-reverse; padding:4px; border-bottom:1px solid #e0e0e0;">
+            <MudText Style="font-size:12px;">@SelectedChannel.channel.Creator <span style="color:gold; font-weight:bold; margin-left:4px;">⭐</span></MudText>
+            <MudChip T="string" Size="Size.Small" Color="Color.Warning" Class="mr-2">سازنده</MudChip>
+        </MudStack>
+
+
+        @if (SelectedChannel.channel.admins != null && SelectedChannel.channel.admins.Any())
+        {
+            @foreach (var admin in SelectedChannel.channel.admins)
             {
-                @if (CurrentUser.Id == TargetUserInfoResponse.Id)
-                {
+                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Style="padding:4px; border-bottom:1px solid #e0e0e0;">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.FlexStart" Style="flex-direction:row-reverse;">
+                        <MudText Style="font-size:12px;">@admin.Name</MudText>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Primary" Class="mr-2">ادمین</MudChip>
+                    </MudStack>
 
-
-
-                    <MudText Typo="Typo.body2" Class="d-flex align-center">
-                        <MudIconButton @onclick="()=>ChangePhoneToInput=true" Color="Color.Tertiary" Icon="@(MouseOnphone? @Icons.Material.Filled.Edit:@Icons.Material.Filled.Phone)" Class="ml-2" />
-                        <span style="font-family:iransans-bold;">@(string.IsNullOrWhiteSpace(TargetUserInfoResponse.phoneNumber) ? "هنوز شماه همراهی ثبت نکردی!" : TargetUserInfoResponse.phoneNumber.ToPersianNumber())</span>
-                    </MudText>
-
-                }
-                else
-                {
-
-
-                    <MudText Typo="Typo.body2" Class="d-flex align-center">
-                        <MudIcon Color="Color.Tertiary" Icon="@Icons.Material.Filled.Phone" Class="ml-2" />
-                        <span style="font-family:iransans-bold;">@(string.IsNullOrWhiteSpace(TargetUserInfoResponse.phoneNumber) ? "شماره همراهی وارد نشده است" : TargetUserInfoResponse.phoneNumber.ToPersianNumber())</span>
-                    </MudText>
-
-
-                }
-
+                    @if (SelectedChannel.channel.CreatorId==CurrentUser.Id)
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                       Color="Color.Error" 
+                                       OnClick="()=>RemoveAdmin(admin)" 
+                                       Size="Size.Small" />
+                    }
+                </MudStack>
             }
+        }
+    </MudStack>
+</MudPaper>
 
-            @if (CurrentUser != null)
+
+
+
+
+
+
+
+            <hr />
+            <br />
+
+            <MudStack  Justify="Justify.FlexStart">
+
+
+
+
+
+
+            </MudStack>
+
+
+            <MudDivider Class="my-4" Style="width:100%;" />
+
+
+        </MudStack>
+    }
+    else{
+        <MudStack Justify="Justify.Center" Spacing="1" AlignItems="AlignItems.Center" Class="flex-grow-1" Style="overflow:hidden;">
+            @if (IsOnline)
             {
-                @if (CurrentUser.Id == TargetUserInfoResponse.Id)
-                {
 
-                    if (!ChangeCityToInput)
+
+                <MudChip T="string"
+                Class="mt-4"
+                Color="IsBlocked?Color.Error: Color.Success"
+                Variant="Variant.Filled"
+                Icon="@Icons.Material.Filled.FiberManualRecord"
+                Style="flex-shrink:0;">
+                    @(IsBlocked ?"مسدود شده" :"آنلاین")
+                </MudChip>
+            }
+            else
+            {
+                @if (CurrentUser != null)
+                {
+                    @if (CurrentUser.Id == TargetUserInfoResponse.Id)
                     {
 
-
-                        <MudText Typo="Typo.body2" Class="d-flex align-center">
-                            <MudIconButton @onclick="()=>ChangeCityToInput=true" @onmousemove="()=>MouseOnLocation=true" @onmouseout="()=>MouseOnLocation=false" Color="Color.Error" Icon="@(MouseOnLocation? @Icons.Material.Filled.Edit:@Icons.Material.Filled.LocationOn)" Class="ml-2" />
-                            <span style="font-family:iransans-bold;">ایران ,@TargetUserInfoResponse.Address</span>
-                        </MudText>
+                        <MudChip T="string"
+                        Class="mt-4"
+                        Color="Color.Success"
+                        Variant="Variant.Filled"
+                        Icon="@Icons.Material.Filled.FiberManualRecord"
+                        Style="flex-shrink:0;">
+                            آنلاین
+                        </MudChip>
                     }
                     else{
-                        <MudStack Row="true">
-                            <MudTextField @bind-Value="ChangeCity" Label="شهر جدید" Variant="Variant.Text"></MudTextField>
-                            <MudIconButton OnClick="()=>ChangeCityToInput=false" Size="Size.Small" Icon="@Icons.Material.Filled.Close" Color="Color.Error" />
-
-                            <MudIconButton OnClick="SubmitCity" Size="Size.Small" Icon="@Icons.Material.Filled.Check" Title="ثبت شهز جدید" Color="Color.Tertiary" />
-
-
-                        </MudStack>
+                        <MudChip T="string"
+                        Class="mt-4"
+                        Color="IsBlocked?Color.Error:Color.Default"
+                        Variant="Variant.Filled"
+                        Icon="@Icons.Material.Filled.FiberManualRecord"
+                        Style="flex-shrink:0;">
+                            @(IsBlocked ? "مسدود شده" : "آفلاین")
+                        </MudChip>
                     }
 
+                }
 
+            }
+
+            <MudPaper Style="width: 100%; height: 250px; position: relative; overflow: hidden;
+                 border-radius: 16px; border: 2px solid #e0e0e0; box-shadow: 0 6px 20px rgba(0,0,0,0.15);"
+            Elevation="8">
+                @if (TargetUserInfoResponse.Avatar != null)
+                {
+                    <MudImage Src="@($"data:image/png;base64,{TargetUserInfoResponse.Avatar}")"
+                    Style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;" 
+                    @onclick="OpenPictureDialog" />
+                }
+                else if (MyAvatar != null && ChosenUser == null)
+                {
+                    <MudImage Src="@($"data:image/png;base64,{MyAvatar}")"
+                    Style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;" 
+                    @onclick="OpenPictureDialog" />
                 }
                 else
                 {
-                    <MudText Typo="Typo.body2" Class="d-flex align-center">
-                        <MudIcon Color="Color.Error" Icon="@(@Icons.Material.Filled.LocationOn)" Class="ml-2" />
-                        <span style="font-family:iransans-bold;">ایران ,@TargetUserInfoResponse.Address</span>
-                    </MudText>
+                    <MudImage Src="lib/assets/Images/avatar.jpg"
+                    Style="width: 100%; height: 100%; object-fit: cover;" />
+                }
+            </MudPaper>
 
+
+            @if (CurrentUser != null)
+            {
+                @if (CurrentUser.Id == TargetUserInfoResponse.Id)
+                {
+                    <MudFileUpload T="IBrowserFile" FilesChanged="UploadFiles" Disabled="@(IsSelectedFile)">
+                        <ActivatorContent>
+                            <MudIconButton Color="Color.Info"
+                            Icon="@Icons.Material.Filled.PhotoCamera">
+                            </MudIconButton>
+                        </ActivatorContent>
+                    </MudFileUpload>
                 }           }
 
 
 
-        </MudStack>
+            <MudText Typo="Typo.h1" Class="text-center" Color="Color.Primary" Style="word-break:break-word; margin-bottom: 16px; margin-top: 9px;">@TargetUserInfoResponse.Name</MudText>
+
+            @if (CurrentUser != null)
+
+                @if (CurrentUser.Id == TargetUserInfoResponse.Id){
+                    if (ClickOnBioEdited){
+                        <MudStack Row="true">
+                            <MudTextField @bind-Value="bio" Label="بیوگرافی" Variant="Variant.Text"></MudTextField>
+                            <MudIconButton OnClick="()=>ClickOnBioEdited=false" Size="Size.Small" Icon="@Icons.Material.Filled.Close" Title="ویرایش بیوگرافی" Color="Color.Error" />
+
+                            <MudIconButton OnClick="SubmitBio" Size="Size.Small" Icon="@Icons.Material.Filled.Check" Title="ویرایش بیوگرافی" Color="Color.Tertiary" />
 
 
-        <MudDivider Class="my-4" Style="width:100%;" />
+                        </MudStack>
+                    }else{
+                        <MudText Typo="Typo.body2" Class="text-center mb-4" Color="ThemeChanging.SeenColor"> <MudIconButton OnClick="()=>ClickOnBioEdited=true" Size="Size.Small" Icon="@Icons.Material.Filled.Edit" Title="ویرایش بیوگرافی" Color="ThemeChanging.SeenColor" /> @TargetUserInfoResponse.bio </MudText>
+
+                    }
+
+                }else{
+                    <MudText Typo="Typo.body2" Class="text-center mb-4" Color="ThemeChanging.SeenColor"> @TargetUserInfoResponse.bio </MudText>
+
+                }
+            <hr />
+            <br />
+
+            <MudStack  Justify="Justify.FlexStart">
+
+                @if (CurrentUser?.Id != TargetUserInfoResponse.Id){
+                    <MudSwitch Color="Color.Error" @bind-Value=@(IsBlocked) Label="مسدود سازی" @onclick="BlockedUser"/>
+
+                }
+                @if (CurrentUser != null)
+                {
+                    @if (CurrentUser.Id == TargetUserInfoResponse.Id)
+                    {
+
+                        if (!ChangeEmailToInput){
+                            <MudText Typo="Typo.body2" Class="d-flex align-center">
+                                <MudIconButton @onclick="()=>ChangeEmailToInput=true" @onmousemove="()=>MouseOnEmail=true" @onmouseout="()=>MouseOnEmail=false" Color="Color.Primary" Icon="@(MouseOnEmail? @Icons.Material.Filled.Edit: @Icons.Material.Filled.Email)" Class="ml-2" />
+                                <span style="font-family:iransans-bold;">@TargetUserInfoResponse.Email</span>
+                            </MudText>
+                        }
+                        else{
+                            <MudStack Row="true">
+                                <MudTextField @bind-Value="ChangeEmail" Label="ایمیل جدید" Variant="Variant.Text"></MudTextField>
+                                <MudIconButton OnClick="()=>ChangeEmailToInput=false" Size="Size.Small" Icon="@Icons.Material.Filled.Close" Color="Color.Error" />
+
+                                <MudIconButton OnClick="SubmitEmail" Size="Size.Small" Icon="@Icons.Material.Filled.Check" Title="ثبت ایمیل جدید" Color="Color.Tertiary" />
 
 
-    </MudStack>
+                            </MudStack>
+                        }
+
+
+                    }
+                    else
+                    {
+
+
+                        <MudText Typo="Typo.body2" Class="d-flex align-center">
+                            <MudIcon Color="Color.Primary" Icon="@Icons.Material.Filled.Email" Class="ml-2" />
+                            <span style="font-family:iransans-bold;">@(string.IsNullOrEmpty(TargetUserInfoResponse.Email) ? "هنوز ایمیلی ثبت نشده!" : TargetUserInfoResponse.Email)</span>
+                        </MudText>
+
+
+                    }
+
+                }
+                @if (CurrentUser != null)
+                {
+                    @* @if (CurrentUser.Id == TargetUserInfoResponse.Id) *@
+                    @* { *@
+
+
+
+                    @*     <MudText Typo="Typo.body2" Class="d-flex align-center"> *@
+                    @*         <MudIconButton @onclick="()=>ChangePhoneToInput=true" Color="Color.Tertiary" Icon="@(MouseOnphone? @Icons.Material.Filled.Edit:@Icons.Material.Filled.Phone)" Class="ml-2" /> *@
+                    @*         <span style="font-family:iransans-bold;">@(string.IsNullOrWhiteSpace(TargetUserInfoResponse.phoneNumber) ? "هنوز شماه همراهی ثبت نکردی!" : TargetUserInfoResponse.phoneNumber.ToPersianNumber())</span> *@
+                    @*     </MudText> *@
+
+                    @* } *@
+                    @* else *@
+                    @* { *@
+
+
+                    @*     <MudText Typo="Typo.body2" Class="d-flex align-center"> *@
+                    @*         <MudIcon Color="Color.Tertiary" Icon="@Icons.Material.Filled.Phone" Class="ml-2" /> *@
+                    @*         <span style="font-family:iransans-bold;">@(string.IsNullOrWhiteSpace(TargetUserInfoResponse.phoneNumber) ? "شماره همراهی وارد نشده است" : TargetUserInfoResponse.phoneNumber.ToPersianNumber())</span> *@
+                    @*     </MudText> *@
+
+
+                    @* } *@
+
+                }
+
+                @if (CurrentUser != null)
+                {
+                    @if (CurrentUser.Id == TargetUserInfoResponse.Id)
+                    {
+
+                        if (!ChangeCityToInput)
+                        {
+
+
+                            <MudText Typo="Typo.body2" Class="d-flex align-center">
+                                <MudIconButton @onclick="()=>ChangeCityToInput=true" @onmousemove="()=>MouseOnLocation=true" @onmouseout="()=>MouseOnLocation=false" Color="Color.Error" Icon="@(MouseOnLocation? @Icons.Material.Filled.Edit:@Icons.Material.Filled.LocationOn)" Class="ml-2" />
+                                <span style="font-family:iransans-bold;">ایران ,@TargetUserInfoResponse.Address</span>
+                            </MudText>
+                        }
+                        else{
+                            <MudStack Row="true">
+                                <MudTextField @bind-Value="ChangeCity" Label="شهر جدید" Variant="Variant.Text"></MudTextField>
+                                <MudIconButton OnClick="()=>ChangeCityToInput=false" Size="Size.Small" Icon="@Icons.Material.Filled.Close" Color="Color.Error" />
+
+                                <MudIconButton OnClick="SubmitCity" Size="Size.Small" Icon="@Icons.Material.Filled.Check" Title="ثبت شهز جدید" Color="Color.Tertiary" />
+
+
+                            </MudStack>
+                        }
+
+
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2" Class="d-flex align-center">
+                            <MudIcon Color="Color.Error" Icon="@(@Icons.Material.Filled.LocationOn)" Class="ml-2" />
+                            <span style="font-family:iransans-bold;">ایران ,@TargetUserInfoResponse.Address</span>
+                        </MudText>
+
+                    }           }
+
+
+
+            </MudStack>
+
+
+            <MudDivider Class="my-4" Style="width:100%;" />
+
+
+        </MudStack>}
 </MudPaper>
+@code {
+
+    private List<UserChannelDto> AllChannelUsers = new();
+
+    [Parameter] public List<UserDto> AllUsers { get; set; } = new();
+
+    private async Task OpenManageAdminsDialog()
+    {
+        foreach (var item in AllUsers)
+        {
+            AllChannelUsers.Add(new UserChannelDto
+            {Id=item.Id,
+                IsAdmin=false,
+                Name=item.Name
+
+            });
+        }
+        var parameters = new DialogParameters
+        {
+            ["AllUsers"] = AllChannelUsers,
+            ["CurrentAdmins"] = SelectedChannel.channel.admins,
+
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+
+        var dialog = dialogService.Show<ManageAdminsDialog>("مدیریت ادمین‌ها", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            var selected = (UserChannelDto)result.Data;
+
+            await _channelService.PromoteToAdminOrDemoteUser(new ChangeUserChannelPolicyCommand
+                (SelectedChannel.Id, selected.Id, true));
+
+            SelectedChannel.channel.admins.Add(selected);
+        }
+    }
+
+    private void EditAdmin(UserChannelDto admin)
+    {
+        // منطق ویرایش ادمین (مثلا تغییر نقش)
+    }
+
+    private async Task RemoveAdmin(UserChannelDto admin)
+    {
+        var result = await _channelService.PromoteToAdminOrDemoteUser(
+        new ChangeUserChannelPolicyCommand(SelectedChannel.Id,admin.Id,false));
+        SelectedChannel.channel.admins.Remove(admin);
+        StateHasChanged();
+    }
+}
 @code {
     [CascadingParameter(Name = "Theme")]
     public ThemeChanging ThemeChanging { get; set; }
@@ -260,6 +463,8 @@
     public EventCallback<UserDto> OnClearChosenUser { get; set; }
     [Parameter]
     public EventCallback<UserDto> OnBlockedUser { get; set; }
+    [Parameter]
+    public UserDto? SelectedChannel { get; set; }
     private Guid? lastUserId;
 
     protected override async Task OnParametersSetAsync()
@@ -327,6 +532,14 @@
             ClickOnBioEdited = false;
         }
     }
+        public async Task ChangeBio(){
+        var result = await _channelService.ChangeDescription(new ChangeBioChannelCommand(SelectedChannel.Id,bio));
+        if(result.issuccess){
+            SuccessMessage();
+         
+            ClickOnBioEdited = false;
+        }
+    }
     public async Task BlockedUser()
     {
         IsBlocked= !IsBlocked;
@@ -367,7 +580,7 @@
     { "ImageData", TargetUserInfoResponse.Avatar }
 };
 
-            await DialogService.ShowAsync<ImageDialogComponent>("نمایش تصویر", parameters);
+            await dialogService.ShowAsync<ImageDialogComponent>("نمایش تصویر", parameters);
         }
     }
 

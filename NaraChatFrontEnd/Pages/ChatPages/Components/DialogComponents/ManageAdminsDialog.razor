@@ -1,0 +1,90 @@
+﻿@using MudBlazor
+@using NaraChat.Contract.Models.Chat.Channels
+
+<MudDialog>
+    <DialogContent>
+
+
+        <MudAutocomplete T="UserChannelDto"
+                         @bind-value="SelectedUsersToAdd"
+                         MultiSelection="true"
+                         Label="اضافه کردن ادمین"
+                         Dense="true"
+                         Clearable="true"
+                         CoerceText="true"
+                         SearchFunc="SearchUsers"
+                         ToStringFunc="u => u.Name"
+                         Variant="Variant.Outlined"
+                         Class="mb-4" />
+
+        @* <MudList T="UserChannelDto" Dense="true"> *@
+        @*     @foreach (var admin in CurrentAdmins) *@
+        @*     { *@
+        @*         <MudListItem> *@
+        @*             <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Style="width:100%;"> *@
+        @*                 <MudText>@admin.Name</MudText> *@
+        @*                 <MudStack Row="true" Spacing="1"> *@
+        @*                     <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Info" OnClick="()=>EditAdmin(admin)" Size="Size.Small" /> *@
+        @*                     <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" OnClick="()=>RemoveAdmin(admin)" Size="Size.Small" /> *@
+        @*                 </MudStack> *@
+        @*             </MudStack> *@
+        @*         </MudListItem> *@
+        @*     } *@
+        @* </MudList> *@
+
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton Color="Color.Primary" OnClick="Save">ذخیره</MudButton>
+        <MudButton Color="Color.Secondary" OnClick="Cancel">انصراف</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; }
+
+    [Parameter] 
+    public List<UserChannelDto> AllUsers { get; set; } = new();
+
+    [Parameter] 
+    public List<UserChannelDto> CurrentAdmins { get; set; } = new();
+
+
+    public UserChannelDto SelectedUsersToAdd { get; set; } = new ();
+
+
+    // جستجوی کاربران با CancellationToken
+    private Task<IEnumerable<UserChannelDto>> SearchUsers(string value, CancellationToken cancellationToken)
+    {
+        if (AllUsers == null) return Task.FromResult(Enumerable.Empty<UserChannelDto>());
+
+        IEnumerable<UserChannelDto> users = AllUsers.Except(CurrentAdmins);
+
+        if (!string.IsNullOrWhiteSpace(value))
+            users = users.Where(u => u.Name.Contains(value, StringComparison.OrdinalIgnoreCase));
+
+        return Task.FromResult(users);
+    }
+
+    private void EditAdmin(UserChannelDto admin)
+    {
+        // منطق ویرایش ادمین (مثلاً تغییر نقش)
+    }
+
+    private void RemoveAdmin(UserChannelDto admin)
+    {
+        if (CurrentAdmins.Contains(admin))
+            CurrentAdmins.Remove(admin);
+    }
+
+    private void Save()
+    {
+        MudDialog.Close(DialogResult.Ok(SelectedUsersToAdd));
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Close(DialogResult.Cancel());
+    }
+}

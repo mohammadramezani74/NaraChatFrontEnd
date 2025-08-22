@@ -2,6 +2,7 @@
 using NaraChat.Application.Services;
 using NaraChat.Application.Services.Auth;
 using NaraChat.Application.Services.ChatServices;
+using NaraChat.Application.Services.ChatServices.Channels;
 using NaraChat.Application.Services.ChatServices.Conversation;
 using NaraChat.Application.Services.LocalStorage;
 using NaraChat.Application.Services.TokenProvider;
@@ -38,6 +39,11 @@ namespace NaraChatFrontEnd.IOC.RegisterServices
             {
                 var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient("apiwithAuth");
                 return new ConversationService(httpClient);
+            });
+            services.AddScoped<IChannelService, ChannelService>(sp =>
+            {
+                var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient("apiwithAuth");
+                return new ChannelService(httpClient);
             });
             services.AddScoped<IMessageService, MessageService>(sp =>
             {

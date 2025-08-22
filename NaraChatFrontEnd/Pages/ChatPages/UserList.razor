@@ -1,84 +1,122 @@
 ﻿@inject IUserChatService userService
 @inject IConversationService conversationService;
 @inject ISnackbar snackbar
+
 <MudPaper Class="h-100 w-100 d-flex flex-column">
+
+    <!-- سوییچ تب‌ها (بدون تاثیر روی اسکرول لیست) -->
+    <MudStack Row="true" Class="px-2 pt-2" Style="gap:8px;">
+        <MudButton Size="Size.Small"
+                   Variant="@(_activeTab==PeopleTab.Contacts ? Variant.Filled : Variant.Outlined)"
+                   Color="Color.Primary"
+                   OnClick="@(()=>SetTab(PeopleTab.Contacts))">
+            مخاطبین
+        </MudButton>
+
+        <MudButton Size="Size.Small"
+                   Variant="@(_activeTab==PeopleTab.Chats ? Variant.Filled : Variant.Outlined)"
+                   Color="Color.Primary"
+                   OnClick="@(()=>SetTab(PeopleTab.Chats))">
+            چت‌های من
+        </MudButton>
+    </MudStack>
 
     <MudList T="string" Class="overflow-y-auto flex-grow-1" Style="max-height:100%;">
         @if (Loading)
         {
             <MudProgressCircular />
-        }else{
-            <MudListItem Class="py-3 px-2"
-            Style="height:68px; margin-top: 10px;">
+        }
+        else
+        {
+            @* سرچ فقط در تب مخاطبین *@
+            @if (_activeTab == PeopleTab.Contacts)
+            {
+                <MudListItem Class="py-3 px-2" Style="height:68px; margin-top: 10px;">
+                    <ChildContent>
+                        <MudPaper Elevation="0" Class="pa-2 d-flex align-center" Style="border-radius: 12px;">
+                            <MudTextField @bind-Value="Search"
+                                          Placeholder="جستجو کنید..."
+                                          Variant="Variant.Outlined"
+                                          Immediate="true"
+                                          Adornment="Adornment.End"
+                                          AdornmentIcon="@Icons.Material.Filled.Search"
+                                          AdornmentColor="Color.Primary"
+                                          Class="w-100"
+                                          @oninput="OnSearchInput" />
+                        </MudPaper>
+                    </ChildContent>
+                </MudListItem>
+            }
 
-                <ChildContent>
-                    <MudPaper Elevation="0" Class="pa-2 d-flex align-center" Style="border-radius: 12px;">
-                        <MudTextField 
-                        @bind-Value="Search"
-                        Placeholder="جستجو کنید..."
-                        Variant="Variant.Outlined"
-                        Immediate="true"
-                        Adornment="Adornment.End"
-                        AdornmentIcon="@Icons.Material.Filled.Search"
-                        AdornmentColor="Color.Primary"
-                        Class="w-100"
-                        @oninput="SearchUsers"
-                        />
-                    </MudPaper>
-                </ChildContent>
+            @* سرچِ تب چت‌های من (بدون تغییر استایل/کلاس، عین بالا فقط با متغیر جدا) *@
+            @if (_activeTab == PeopleTab.Chats)
+            {
+                <MudListItem Class="py-3 px-2" Style="height:68px; margin-top: 10px;">
+                    <ChildContent>
+                        <MudPaper Elevation="0" Class="pa-2 d-flex align-center" Style="border-radius: 12px;">
+                            <MudTextField @bind-Value="ChatsSearch"
+                                          Placeholder="جستجو در چت‌ها..."
+                                          Variant="Variant.Outlined"
+                                          Immediate="true"
+                                          Adornment="Adornment.End"
+                                          AdornmentIcon="@Icons.Material.Filled.Search"
+                                          AdornmentColor="Color.Primary"
+                                          Class="w-100"
+                                          @oninput="OnChatsSearchInput" />
+                        </MudPaper>
+                    </ChildContent>
+                </MudListItem>
+            }
 
-            </MudListItem>
-            <Virtualize  items="AllUsers.ToList()" Context="user"  OverscanCount="2" ItemSize="68">
+            <!-- فقط همین خط منبع داده را بر اساس تب فعال عوض می‌کند -->
+                <Virtualize items="@GetActiveItems()" Context="user" OverscanCount="2" ItemSize="68">
                 <ItemContent>
-                    <MudListItem @ondblclick="()=>PinUser(user)"   @onclick="()=>HandleUserClick(user)"
-                    Class=" py-3 px-2"
-                    Style="@(user.IsSelected?$" height:73px;background-color:{chooseColor()};":"height:73px; ")">
+                                <MudListItem @key="@(user.Id+user.Name)"
+                                 @ondblclick="()=>PinUser(user)" @onclick="()=>HandleUserClick(user)"
+                                 Class=" py-3 px-2"
+                                 Style="@(user.IsSelected?$" height:73px;background-color:{chooseColor()};":"height:73px; ")">
 
                         <AvatarContent>
                             <MudBadge Dot="true" Color="@(user.IsOnline? Color.Success:Color.Default)" Class="mx-6 my-4">
-                                <MudAvatar Size="Size.Medium">
-                                    @if(user.avatar!=null){
-                                        <MudImage Src="@($"data:image/png;base64,{user.avatar}")" Class="rounded-circle"
-                                        Style="width:100%; height:100%; object-fit:inherit;" />
-                                    }
-                                    else{
-                                        <MudImage Src="lib/assets/Images/avatar.jpg" Class="rounded-circle"
-                                        Style="width:100%; height:100%; object-fit:inherit;" />
-                                    }
+                                <MudAvatar Size="Size.Medium" Class="@((user.IsChannel ? "channel-shadow" : ""))">
+                                    <MudImage Src="@(user.avatar != null
+                                            ? $"data:image/png;base64,{user.avatar}"
+                                            : $"lib/assets/Images/{GetImageName(user.IsChannel)}")"
+                                              Class="rounded-circle"
+                                              Style="width:100%; height:100%; object-fit:inherit;" />
                                 </MudAvatar>
                             </MudBadge>
                         </AvatarContent>
 
-
-
                         <ChildContent>
                             <MudStack Row=false>
                                 <MudStack Row="true">
-
-                                    @if(user.messageUnreadedCount>0){
-                                        <MudText Style="font-size:12px;">@user.Name</MudText>
-                                        <MudBadge Content="user.messageUnreadedCount" Color="Color.Error" Overlap="true" Origin="Origin.TopRight" Class="mx-6 my-4">      </MudBadge>
+                                    @if (user.messageUnreadedCount > 0)
+                                    {
+                                        <MudText Style="font-size:12px;">@((MarkupString)RenderNameHighlighted(user.Name))</MudText>
+                                        <MudBadge Content="@GetUnreadCap(user.messageUnreadedCount)" Color="Color.Error" Overlap="true" Origin="Origin.TopRight" Class="mx-6 my-4"></MudBadge>
                                     }
-                                    else{
-                                        <MudText Style="font-size:12px;">@user.Name</MudText>
+                                    else
+                                    {
+                                        <MudText Style="font-size:12px;">@((MarkupString)RenderNameHighlighted(user.Name))</MudText>
                                     }
                                     @if (user.IsPin)
                                     {
                                         <MudIcon Icon="@Icons.Material.Filled.PushPin" Color="Color.Error" Class="ms-1" Style="font-size:16px;" />
                                     }
-                                </MudStack >
+                                </MudStack>
                                 <MudStack Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Row="true">
-                                    <p style="@GetLastMessageStyle(user)">@user.LastReceivedMessage</p>
-                                    <p style="font-size:9px;color:silver" >@user.LastReceivedMessageSendDate</p>
+                                    <p style="@GetLastMessageStyle(user)">@((MarkupString)RenderMessageHighlighted(user.LastReceivedMessage))</p>
+                                    <p style="font-size:9px;color:silver">@user.LastReceivedMessageSendDate</p>
                                 </MudStack>
                             </MudStack>
-
                         </ChildContent>
 
-                    </MudListItem> 
+                    </MudListItem>
                 </ItemContent>
+
                 <Placeholder>
-                    @for (int i = 0; i < 10; i++) 
+                    @for (int i = 0; i < 10; i++)
                     {
                         <MudListItem Class="py-3 px-2" Style="height:73px;">
                             <AvatarContent>
@@ -104,50 +142,91 @@
                     </MudPaper>
                 </EmptyContent>
             </Virtualize>
-
-
         }
     </MudList>
-
-
 </MudPaper>
 
+<style>
+    .channel-shadow {
+        box-shadow: 0 0 10px 4px #594ae2;
+    }
+
+    mark {
+        background-color: var(--mud-palette-primary);
+        color: white;
+        padding: 0 2px;
+        border-radius: 3px;
+    }
+</style>
+
 @code {
+    // تب‌ها (فقط منطق)
+    private enum PeopleTab { Contacts, Chats }
+
+    // تب پیش‌فرض: چت‌های من
+    private PeopleTab _activeTab = PeopleTab.Chats;
+
+    private void SetTab(PeopleTab t) { _activeTab = t; StateHasChanged(); }
+
+    // لیست فعال بر اساس تب
+    private List<UserDto> GetActiveItems()
+        => _activeTab == PeopleTab.Contacts
+           ? GetAllUsersView().ToList()
+           : GetMyChatsView().ToList();
+
     Guid? selectedUserId = null;
-    [Parameter]
-    public IEnumerable<UserDto> Users { get; set; } = Enumerable.Empty<UserDto>();
+    [Parameter] public IEnumerable<UserDto> Users { get; set; } = Enumerable.Empty<UserDto>();
     public List<UserDto> AllUsers { get; set; } = new();
-    [Parameter]
-    public bool Loading { get; set; } = true;
-    [Parameter]
-    public EventCallback<UserDto> OnUserSelected { get; set; }
-    [Parameter]
-    public EventCallback<UserDto> OnOtherUserSelected { get; set; }
-    [Parameter]
-    public EventCallback<UserDto> NullIncommengMessage { get; set; }
+    [Parameter] public bool Loading { get; set; } = true;
+    [Parameter] public EventCallback<UserDto> OnUserSelected { get; set; }
+    [Parameter] public EventCallback<UserDto> OnOtherUserSelected { get; set; }
+    [Parameter] public EventCallback<UserDto> NullIncommengMessage { get; set; }
 
+    [Parameter] public List<ChatMessageDto> MissedMessageCount { get; set; } = new List<ChatMessageDto>();
+    [Parameter] public EventCallback ReeadMissedMessage { get; set; }
+    [Parameter] public ChatMessageDto? newIncomingMessage { get; set; }
 
-    [Parameter]
-    public List<ChatMessageDto> MissedMessageCount { get; set; } = new List<ChatMessageDto>();
-    [Parameter]
-    public EventCallback ReeadMissedMessage { get; set; }
-    [Parameter]
-    public ChatMessageDto? newIncomingMessage { get; set; }
     public bool HaveFilter { get; set; } = false;
+
+    // سرچ مخاطبین (با دی‌بونس)
     private string search;
+    private System.Threading.Timer? _searchTimer;
     private string Search
     {
         get => search;
-        set
+        set { search = value; }
+    }
+    private void OnSearchInput(ChangeEventArgs e)
+    {
+        Search = e?.Value?.ToString() ?? string.Empty;
+        _searchTimer?.Dispose();
+        _searchTimer = new System.Threading.Timer( _ =>
         {
-            search = value;
-            SearchUsers(); 
-        }
+            InvokeAsync(StateHasChanged);
+  
+        }, null, 300, System.Threading.Timeout.Infinite);
+    }
+
+    // سرچ «چت‌های من» (با دی‌بونس)
+    private string chatsSearch;
+    private System.Threading.Timer? _chatsTimer;
+    private string ChatsSearch
+    {
+        get => chatsSearch;
+        set { chatsSearch = value; }
+    }
+    private void OnChatsSearchInput(ChangeEventArgs e)
+    {
+        ChatsSearch = e?.Value?.ToString() ?? string.Empty;
+        _chatsTimer?.Dispose();
+        _chatsTimer = new System.Threading.Timer(_ =>
+        {
+            InvokeAsync(StateHasChanged);
+        }, null, 300, System.Threading.Timeout.Infinite);
     }
 
     public async Task HandleUserClick(UserDto user)
     {
-
         AllUsers.ToList().ForEach(x => x.IsSelected = false);
         user.IsSelected = true;
         await OnUserSelected.InvokeAsync(user);
@@ -157,121 +236,214 @@
     {
         await OnOtherUserSelected.InvokeAsync(user);
     }
-
-
 }
 
 @code {
-    [CascadingParameter(Name = "Theme")]
-    public ThemeChanging themeChanging { get; set; }
+    public static string GetImageName(bool ischannel)
+    {
+        if (!ischannel) return "avatar.jpg";
+        return "chanel.png";
+    }
+    [CascadingParameter(Name = "Theme")] public ThemeChanging themeChanging { get; set; }
     private bool IsUserInfoVisible = true;
     public string chooseColor() => themeChanging.ClockColor == "#270aff" ? "#fff3f3" : "rgb(21 49 76 / 86%)";
-
-    private void ToggleUserInfo()
-    {
-        IsUserInfoVisible = !IsUserInfoVisible;
-    }
-
+    private void ToggleUserInfo() => IsUserInfoVisible = !IsUserInfoVisible;
 
     private async Task SearchUsers()
     {
-
         if (!string.IsNullOrWhiteSpace(Search))
         {
             HaveFilter = true;
-
             AllUsers = Users.Where(x => x.Name.Contains(Search, StringComparison.OrdinalIgnoreCase)).ToList();
         }
         else
         {
-
             HaveFilter = false;
-
             AllUsers = Users.ToList();
         }
         StateHasChanged();
     }
+
     public string GetLastMessageStyle(UserDto user)
     {
-        if (user.IsLastReceivedMessageForMe)
-        {
-            return "font-size:10px;color:gray";
-        }
-        else
-        {
-            return $"font-size:10px;color:{themeChanging.ClockColor}";
-        }
-
+        if (user.IsLastReceivedMessageForMe) return "font-size:10px;color:gray";
+        else return $"font-size:10px;color:{themeChanging.ClockColor}";
     }
+
     protected override async Task OnParametersSetAsync()
     {
-        if (!HaveFilter&& AllUsers.Count()==0){
+        // 1) مقداردهی اولیه AllUsers فقط وقتی لازم است + دِداپ بر اساس Id
+        if (!HaveFilter && !AllUsers.Any())
+        {
             AllUsers = Users
-              .OrderByDescending(c => c.IsPin)
-            .OrderByDescending(u => u.messageUnreadedCount > 0).ToList();
+                .Where(u => u != null && u.Id != Guid.Empty)
+                .GroupBy(u => u.Id)
+                .Select(g => g.First()) // اگر تکراری بود، اولین مورد نگه داشته می‌شود
+                .OrderByDescending(c => c.IsPin)
+                .ThenByDescending(c => c.IsChannel)
+                .ThenByDescending(u => u.messageUnreadedCount > 0)
+                .ToList();
         }
-        if (MissedMessageCount.Count > 0)
+
+        // 2) اعمال MissedMessageCount (با نال‌چک و امن در برابر تکراری‌ها)
+        if (MissedMessageCount != null && MissedMessageCount.Count > 0)
         {
             var groupedMissed = MissedMessageCount
                 .GroupBy(m => m.UserId)
-                .ToDictionary(g => g.Key, g => new 
-                {
-                    Count = g.Count(),
-                    LastMessage = g.OrderByDescending(x => x.SendAt).FirstOrDefault()?.Content,
-                    LastDate=g.OrderByDescending(x => x.SendAt).FirstOrDefault()?.SendAt,
-                    LastId=g.OrderByDescending(x => x.SendAt).FirstOrDefault()?.Id,
-                });
+                .ToDictionary(
+                    g => g.Key,
+                    g => new
+                    {
+                        Count = g.Count(),
+                        Last = g.OrderByDescending(x => x.SendAt).FirstOrDefault()
+                    }
+                );
 
-            var usersDictionary = Users.ToDictionary(u => u.Id);
+            // دیکشنری امن: اگر تکراری باشد، آخرین آیتم روی قبلی overwrite می‌کند
+            var usersDictionary = new Dictionary<Guid, UserDto>();
+            foreach (var u in Users.Where(u => u != null && u.Id != Guid.Empty))
+                usersDictionary[u.Id] = u;
 
             foreach (var (userId, info) in groupedMissed)
             {
-                if (usersDictionary.TryGetValue(userId, out var targetUser))
+                if (usersDictionary.TryGetValue(userId, out var targetUser) && info.Last != null)
                 {
-                    if(info.LastId!=targetUser.LastReceivedMessageId)
+                    // فقط وقتی آی‌دی آخرین پیام عوض شده، شمارش را به‌روزرسانی کن
+                    if (info.Last.Id != targetUser.LastReceivedMessageId)
                         targetUser.messageUnreadedCount = info.Count;
 
+                    // متن و تاریخ آخرین پیام
+                    if (!string.IsNullOrWhiteSpace(info.Last.Content))
+                        targetUser.LastReceivedMessage = info.Last.Content;
 
-                    if (!string.IsNullOrEmpty(info.LastMessage))
-                    {
-                        targetUser.LastReceivedMessage = info.LastMessage;
-                        if (info.LastDate != null)
-                            targetUser.LastReceivedMessageSendDate = info.LastDate.Value.FormatPersianDate().ToPersianNumber();
-                    }
+                    targetUser.LastReceivedMessageSendDate = info.Last.SendAt.FormatPersianDate().ToPersianNumber();
+                    targetUser.LastReceivedMessageId = info.Last.Id;
                 }
             }
 
             await ReeadMissedMessage.InvokeAsync();
             StateHasChanged();
         }
+
+        // 3) پیام تازه‌ی ورودی از هاب/سرور
         if (newIncomingMessage != null)
         {
-
-            var user=   Users.Where(x => x.Id == newIncomingMessage.UserId).FirstOrDefault();
+            var user = Users.FirstOrDefault(x => x.Id == newIncomingMessage.UserId);
             if (user != null)
             {
-                user.LastReceivedMessage = newIncomingMessage.Content.TruncateMessage();
+                user.LastReceivedMessage = (newIncomingMessage.Content ?? string.Empty).TruncateMessage();
                 user.LastReceivedMessageId = newIncomingMessage.Id;
                 user.IsLastReceivedMessageForMe = newIncomingMessage.IsMine;
                 user.LastReceivedMessageSendDate = newIncomingMessage.SendAt.FormatPersianDate().ToPersianNumber();
-
-
-                await  NullIncommengMessage.InvokeAsync();
-                StateHasChanged();
-
             }
+
+            await NullIncommengMessage.InvokeAsync();
+            StateHasChanged();
+        }
+    }
+
+
+    // منبع «چت‌های من»: فیلتر + سرچ جدا (ChatsSearch) — بدون دست‌زدن به AllUsers
+    private IEnumerable<UserDto> GetMyChatsView()
+    {
+        var list = Users
+            .Where(u => u.messageUnreadedCount > 0
+                     || u.LastReceivedMessageId != null
+                     || !string.IsNullOrWhiteSpace(u.LastReceivedMessage));
+
+        if (!string.IsNullOrWhiteSpace(ChatsSearch))
+        {
+            var k = ChatsSearch.Trim();
+            list = list.Where(x => x.Name.Contains(k, StringComparison.OrdinalIgnoreCase)
+                                || (!string.IsNullOrWhiteSpace(x.LastReceivedMessage)
+                                    && x.LastReceivedMessage.Contains(k, StringComparison.OrdinalIgnoreCase)));
         }
 
-
+        return list
+            .OrderByDescending(c => c.IsPin)
+            .ThenByDescending(c => c.messageUnreadedCount > 0)
+            .ThenByDescending(c => c.LastReceivedMessageSendDate) // اگر تاریخ متن فارسیه، بهتره DateTime جدا داشته باشه
+            .ToList();
     }
+    private IEnumerable<UserDto> GetAllUsersView()
+   {
+        var list = Users.AsEnumerable();
+
+        if (!string.IsNullOrWhiteSpace(Search))
+        {
+            var k = Search.Trim();
+            list = list.Where(x =>
+                (!string.IsNullOrWhiteSpace(x.Name) && x.Name.Contains(k, StringComparison.OrdinalIgnoreCase)) ||
+                (!string.IsNullOrWhiteSpace(x.LastReceivedMessage) && x.LastReceivedMessage.Contains(k, StringComparison.OrdinalIgnoreCase))
+            );
+        }
+
+        var mylist= list
+            .OrderByDescending(c => c.IsPin)
+            .ThenByDescending(c => c.messageUnreadedCount > 0)
+            .ThenByDescending(c => c.LastReceivedMessageSendDate)   // اگر متن فارسیه، بهتره DateTime جدا داشته باشه
+            .ThenBy(c => c.Name, StringComparer.OrdinalIgnoreCase)  // مرتب‌سازی پایانی با نام
+           .GroupBy(x=>x.Id)
+           .Select(XAxisLabelPosition=>XAxisLabelPosition.First())
+            .ToList();
+            return mylist;
+    }
+
+
+    private string GetUnreadCap(int count) => count > 99 ? "99+" : count.ToString();
+
+
+    private string RenderNameHighlighted(string text)
+    {
+        var q = _activeTab == PeopleTab.Contacts ? (Search ?? string.Empty) : (ChatsSearch ?? string.Empty);
+        return Highlight(text, q);
+    }
+
+    private string RenderMessageHighlighted(string text)
+    {
+        var q = _activeTab == PeopleTab.Chats ? (ChatsSearch ?? string.Empty) : (Search ?? string.Empty);
+        return Highlight(text ?? string.Empty, q);
+    }
+
+
+    private string Highlight(string source, string query)
+    {
+        if (string.IsNullOrWhiteSpace(source) || string.IsNullOrWhiteSpace(query))
+            return System.Net.WebUtility.HtmlEncode(source);
+
+        var src = source;
+        var q = query.Trim();
+
+        // جستجو بدون حساسیت به حروف
+        var index = src.IndexOf(q, StringComparison.OrdinalIgnoreCase);
+        if (index < 0) return System.Net.WebUtility.HtmlEncode(src);
+
+        // چندین occurrence را هایلایت کنیم
+        var sb = new System.Text.StringBuilder();
+        int last = 0;
+        while (index >= 0)
+        {
+            sb.Append(System.Net.WebUtility.HtmlEncode(src.Substring(last, index - last)));
+            sb.Append("<mark>");
+            sb.Append(System.Net.WebUtility.HtmlEncode(src.Substring(index, q.Length)));
+            sb.Append("</mark>");
+            last = index + q.Length;
+            index = src.IndexOf(q, last, StringComparison.OrdinalIgnoreCase);
+        }
+        if (last < src.Length)
+            sb.Append(System.Net.WebUtility.HtmlEncode(src.Substring(last)));
+
+        return sb.ToString();
+    }
+
     private async Task PinUser(UserDto user)
     {
         var targetUser = AllUsers.FirstOrDefault(c => c.Id == user.Id);
         if (targetUser is null) return;
 
         var newPinStatus = !targetUser.IsPin;
-        var pinnedUsers= AllUsers.Where(u => u.IsPin).Count();
-        if (pinnedUsers >= 3 &&newPinStatus==true)
+        var pinnedUsers = AllUsers.Where(u => u.IsPin).Count();
+        if (pinnedUsers >= 3 && newPinStatus == true)
         {
             snackbar.Clear();
             snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomRight;
@@ -285,22 +457,18 @@
             targetUser.IsPin = newPinStatus;
             AllUsers = AllUsers
                 .OrderByDescending(c => c.IsPin)
-                .ThenByDescending(c =>c.messageUnreadedCount > 0) 
+                .ThenByDescending(c => c.messageUnreadedCount > 0)
                 .ToList();
 
             StateHasChanged();
             snackbar.Clear();
             snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomRight;
-
         }
         else
         {
             snackbar.Clear();
             snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomRight;
             snackbar.Add(result.Message, Severity.Error);
-
+        }
     }
 }
-
-}
-

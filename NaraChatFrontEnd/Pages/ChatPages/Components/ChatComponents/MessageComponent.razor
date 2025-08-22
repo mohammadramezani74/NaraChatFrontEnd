@@ -4,7 +4,8 @@
 @inject ISnackbar snackbar
 @inject IJSRuntime JS
 <MudItem xs="12" Class="w-100">
-    <div class="d-flex w-100 @(message.IsMine ? "justify-start" : "justify-end")">
+   <div class="d-flex w-100 @(message.IsMine ? "justify-start mine-msg" : "justify-end other-msg")">
+
 
         <MudChat ChatPosition="@(message.IsMine?ChatBubblePosition.Start:ChatBubblePosition.End)"  ArrowPosition="ChatArrowPosition.Top">
             <MudStack Row="false" Spacing="0">
@@ -233,6 +234,14 @@
 .myemoji:hover {
     transform: scale(1.3) rotate(10deg);
     filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.4));
+}
+.mine-msg {
+    margin-left: 4px !important;
+    margin-right: 0 !important;
+}
+.other-msg {
+    margin-right: 4px !important;
+    margin-left: 0 !important;
 }
 
 </style>
