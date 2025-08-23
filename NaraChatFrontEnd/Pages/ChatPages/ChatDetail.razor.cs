@@ -77,6 +77,7 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
 
     [Display(Name = "هندل همزمانی")]
     private Guid? PreviousSelectedUserId = null;
+    private Guid? PreviousSelectedChannelId = null;
 
     [Display(Name = "ایونت کم شدن تعداد پیغام ها")]
     [Parameter] public EventCallback<(Guid otherUserId, int MessagesCountSeened)> ReduceMessageSeenedCount { get; set; }
@@ -454,7 +455,7 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
             NeedScrollToBottom();
             await trueScroll.InvokeAsync();
         }
-        if (OtherUser != null && _drafts.TryGetValue(OtherUser.Id, out var draft))
+        if (_drafts.TryGetValue(SelectedChannel.Id, out var draft))
             NewMessage = draft;
     }
 
@@ -874,18 +875,32 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
 
     private async Task HandleUserChangedAsync()
     {
-        if (SelectedChannel != null)
+        if (SelectedChannel != null && SelectedChannel.Id != PreviousSelectedChannelId)
         {
+            if (PreviousSelectedUserId.HasValue)
+                _drafts[PreviousSelectedUserId.Value] = NewMessage ?? string.Empty;
+            if (PreviousSelectedChannelId.HasValue)
+                _drafts[PreviousSelectedChannelId.Value] = NewMessage ?? string.Empty;
+
+            PreviousSelectedChannelId = SelectedChannel.Id;
+            PreviousSelectedUserId = null;
+
+            Loading = true;
+            NewMessage = string.Empty;
+
             await LoadChannelMesages();
-            if (_drafts.TryGetValue(OtherUser.Id, out var draft))
+
+            if (_drafts.TryGetValue(SelectedChannel.Id, out var draft))
                 NewMessage = draft;
+
             Loading = false;
 
             StateHasChanged();
         }
         else if (OtherUser != null && OtherUser.Id != PreviousSelectedUserId && SelectedChannel == null)
         {
-            // ✅ قبل از سوییچ، پیش‌نویس گفتگو قبلی ذخیره می‌شود
+            if (PreviousSelectedChannelId.HasValue)
+                _drafts[PreviousSelectedChannelId.Value] = NewMessage ?? string.Empty;
             if (PreviousSelectedUserId.HasValue)
                 _drafts[PreviousSelectedUserId.Value] = NewMessage ?? string.Empty;
 
@@ -895,7 +910,7 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
             }
 
             PreviousSelectedUserId = OtherUser.Id;
-
+            PreviousSelectedChannelId = null;
             Loading = true;
             NewMessage = string.Empty;
 

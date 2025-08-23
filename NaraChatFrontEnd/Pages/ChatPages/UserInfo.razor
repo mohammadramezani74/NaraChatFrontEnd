@@ -59,8 +59,11 @@
 
 
             <MudText Typo="Typo.h1" Class="text-center" Color="Color.Primary" Style="word-break:break-word; margin-bottom: 16px; margin-top: 9px;">@SelectedChannel.Name</MudText>
+
+                        <MudText Typo="Typo.h1" Class="text-center" Color="Color.Primary" Style="word-break:break-word; margin-bottom: 16px; margin-top: 9px;">@SelectedChannel.UserName</MudText>
             <MudText Typo="Typo.body2" Class="text-center mb-4" Color="Color.Default">
                 سازنده :@SelectedChannel.channel.Creator  </MudText>
+                     
             @if (SelectedChannel.channel.CurrentUserAdmin)
             {
 

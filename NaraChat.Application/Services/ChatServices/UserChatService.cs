@@ -44,7 +44,7 @@ namespace NaraChat.Application.Services.ChatServices
                 var users=response.result.Select(x=>new UserDto(x.Id,x.LastName+" "+x.FirstName,x.Avatar,messageUnreadedCount:x.MessageUnreadedCount,lastseen:x.LastSeen,lastReceivedMessage: x.LastReceivedMessage,
                    lastReceivedMessageId: x.LastReceivedMessageId,isLastReceivedMessageForMe: x.IsLastReceivedMessageForMe,lastReceivedMessageSendDate:x.LastReceivedMessageSendDate,
                    isPinned:x.IsPin,isBlocked:x.IsBlocked,conversationId:x.ConversationId,otherUserBlocked:x.OtherUserBlocked,ischannel: x.IsChannel
-                   ,chanel:x.channel
+                   ,chanel:x.channel,username:x.UserName
                    )).ToList();
                 return users;
             }
