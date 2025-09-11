@@ -82,7 +82,8 @@
                                         <ChannelMessageComponent DeletedMessageevent="DeleteTargetMessage" CurrentUser="CurrentUser" message="message"
                                                                  ReplyMessageEvent="HandleReplyMessage" EditMessageEvent="OnEditMessageHandler"
                                                                  ParentMessage="@HandelParentMessage(message.ParentId)"
-                                                                 SelectedChannel="SelectedChannel"></ChannelMessageComponent>
+                                                                 SelectedChannel="SelectedChannel"
+                                        ></ChannelMessageComponent>
                                
                                                   }
                                 else{
@@ -178,7 +179,7 @@
                             <MudIcon Color="Color.Secondary" Icon="@Icons.Material.Filled.Stop" Title="توقف ضبط صدا"></MudIcon>
                         </MudButton>
                     }
-                        <MudButton @onclick="@uploadDialog" Disabled="@(IsUploading==null)" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AttachFile" Size="Size.Small">
+                            <MudButton @onclick="@uploadChannelDialog" Disabled="@(IsUploading==null)" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AttachFile" Size="Size.Small">
                     </MudButton>
               
                 </MudMenu>
@@ -274,7 +275,8 @@ else
                                                       ReplyMessageEvent="HandleReplyMessage" Conversation="Conversation" EditMessageEvent="OnEditMessageHandler"
                                                       ParentMessage="@HandelParentMessage(message.ParentId)"
                                                       OtherAvatar="@OtherUser.avatar"
-                                                      MessageReactionEvent="SendReactions"></MessageComponent>
+                                                      MessageReactionEvent="SendReactions"
+                                                      JoinChannel="JoinToChannelEvent"></MessageComponent>
                                 }
                                 else{
                                     <FileMessageComponent DeletedMessageevent="DeleteTargetMessage" IsMine="message.IsMine" CurrentUser="CurrentUser" message="message"

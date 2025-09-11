@@ -199,8 +199,8 @@
         IsDarkMode = !IsDarkMode;
         if(!IsDarkMode){
             ThemeChanging = new ThemeChanging("", " color:rgb(255 64 129);", " box-shadow: 0 16px 45px #ecc7ee;");
-            ThemeChanging.backGroundChatStyle = "height: 100%; overflow-y: auto;background-image:url(lib/assets/Images/light.jpg);    background-size: cover;background-repeat:no-repeat;background-position: center; background-attachment: scroll;";
-            ThemeChanging.myColorChat = "rgb(235 198 255 / 56%)";
+            ThemeChanging.backGroundChatStyle = "height: 100%; overflow-y: auto;background-image:url(lib/assets/Images/light.png);    background-size: cover;background-repeat:no-repeat;background-position: center; background-attachment: scroll;";
+            ThemeChanging.myColorChat = "rgb(183 230 239 / 61%)";
             ThemeChanging.OtherColorChat = "rgb(233 236 239 / 86%)";
             ThemeChanging.SeenColor = Color.Secondary;
             ThemeChanging.ClockColor = "#270aff";
@@ -318,7 +318,77 @@
                 {
                     FontFamily = new string[] { "iransans-medium" }
                 },
-            }
+            },
+                    //             LayoutProperties = new LayoutProperties
+                    // {
+                    //     DefaultBorderRadius = "12px"
+                    // },
+
+PaletteLight = new PaletteLight
+{
+    Primary = "#2196F3",           
+    Secondary = "#4FC3F7",        
+    Tertiary = "#00ACC1",         
+
+    Info = "#29B6F6",              
+    Success = "#43A047",           
+    Warning = "#FB8C00",           
+    Error = "#E53935",             
+
+    Background = "#F9FBFD",        
+    Surface = "#FFFFFF",           
+    AppbarBackground = "#F0F7FF",  
+    AppbarText = "#0F172A",        
+
+    DrawerBackground = "#F5FAFF",  
+    DrawerText = "#1E3A5F",        
+    DrawerIcon = "#1565C0",        
+
+    TextPrimary = "#0F172A",       
+    TextSecondary = "#475569",     
+
+    LinesDefault = "#E2E8F0",      
+    LinesInputs = "#CBD5E1",       
+    TableLines = "#E2E8F0",
+    Divider = "#E2E8F0",
+
+    ActionDefault = "#1565C0",     
+    ActionDisabled = "#94A3B8",    
+    ActionDisabledBackground = "#E2E8F0"
+},
+                // --- Dark (آبی/مشکی حرفه‌ای) ---
+                    PaletteDark = new PaletteDark
+                    {
+                        Primary = "#64B5F6",           // Light Blue برای کنتراست عالی روی تیره
+                        Secondary = "#82B1FF",         // Cornflower برای اکستنت
+                        Tertiary = "#8B5CF6",          // Purple accent
+                        Info = "#64B5F6",
+                        Success = "#34D399",           // سبز ملایم و خوانا
+                        Warning = "#FBBF24",
+                        Error = "#EF5350",
+
+                        Background = "#0B1220",        // تقریبا مشکی با ته‌مایه آبی (bank-grade)
+
+                        Surface = "#0F172A",           // کارت‌ها/پنل‌ها (Slate 900~800)
+                        AppbarBackground = "#0B1220",
+                        AppbarText = "#E5E7EB",
+
+                        DrawerBackground = "#0B1220",
+                        DrawerText = "#E2E8F0",
+                        DrawerIcon = "#A7B1C2",
+
+                        TextPrimary = "#E5E7EB",
+                        TextSecondary = "#94A3B8",
+
+                        LinesDefault = "#233044",     
+                        LinesInputs = "#2A3A55",
+                        TableLines = "#233044",
+                        Divider = "#233044",
+
+                        ActionDefault = "#E5E7EB",
+                        ActionDisabled = "#64748B",
+                        ActionDisabledBackground = "#1E293B"
+                    }
         };
         public void Dispose()
         {

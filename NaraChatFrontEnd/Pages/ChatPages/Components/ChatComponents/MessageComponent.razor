@@ -1,15 +1,18 @@
 ﻿@using NaraChatFrontEnd.Pages.ChatPages.Components.DialogComponents
+@using System.Net
+@using System.Text.RegularExpressions
 @inject IDialogService DialogService
 @inject IMessageService _messageservice
 @inject ISnackbar snackbar
 @inject IJSRuntime JS
+@inject NavigationManager mn
 <MudItem xs="12" Class="w-100">
-   <div class="d-flex w-100 @(message.IsMine ? "justify-start mine-msg" : "justify-end other-msg")">
+    <div class="d-flex w-100 @(message.IsMine ? "justify-start mine-msg" : "justify-end other-msg")">
 
 
         <MudChat ChatPosition="@(message.IsMine?ChatBubblePosition.Start:ChatBubblePosition.End)"  ArrowPosition="ChatArrowPosition.Top">
             <MudStack Row="false" Spacing="0">
-              
+
                 <MudChatBubble 
                 Style="@($"{Style()};display: inline-block; max-width: 370px; word-wrap: break-word; border-radius: 12px; padding: 8px;")"
 
@@ -40,7 +43,15 @@
                     }
 
                     <MudText id="@message.Id" Color="Color.Default" >
-                        @((MarkupString)message.Content.Replace("\n", "<br />"))
+                        @if (IsMention(message.Content))
+                        {
+                            <div @onclick="()=>Routingchannel(message.Content)" style="color:cornflowerblue"> @((MarkupString)message.Content.Replace("\n", "<br />"))</div> 
+                        }
+                        else
+                        {
+                            @((MarkupString)message.Content.Replace("\n", "<br />"))
+                        }
+
                         @if (message.Type==MessageType.Location)
                         {
                             <MudPaper Class="pa-2 mt-2" Style="border:1px solid #ccc;border-radius:12px;width:300px;margin:20px;">
@@ -159,9 +170,9 @@
                             <span class="myemoji" >😂</span>
 
                         }
-                          else if (message.Reaction == "cool")
+                        else if (message.Reaction == "cool")
                         {
-                              <span class="myemoji" >😎</span>
+                            <span class="myemoji" >😎</span>
                         }
                         else if (message.Reaction =="Flower")
                         {
@@ -170,7 +181,7 @@
                         }
                         else if (message.Reaction == "ButterFly")
                         {
-                              <span class="myemoji" >🦋</span>
+                            <span class="myemoji" >🦋</span>
                         }
 
                     </div>
@@ -193,9 +204,9 @@
 
 
 
-.mud-stack {
+    .mud-stack {
     gap: 0 !important;
-}
+    }
     .reply-preview {
     border-radius: 8px;
     }
@@ -221,7 +232,7 @@
     padding: 1px 1px;
     align-self: center;
     }
-.myemoji {
+    .myemoji {
     all: unset;
     font-size: 28px;
     display: inline-block;
@@ -230,41 +241,41 @@
     cursor: pointer;
     transition: transform 0.2s ease, filter 0.2s ease;
     filter: drop-shadow(1px 1px 1px rgba(0,0,0,0.2));
-}
-.myemoji:hover {
+    }
+    .myemoji:hover {
     transform: scale(1.3) rotate(10deg);
     filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.4));
-}
-.mine-msg {
+    }
+    .mine-msg {
     margin-left: 4px !important;
     margin-right: 0 !important;
-}
-.other-msg {
+    }
+    .other-msg {
     margin-right: 4px !important;
     margin-left: 0 !important;
-}
+    }
 
 </style>
 <script>
-window.showMiniMap = function (mapId, lat, lng) {
+    window.showMiniMap = function (mapId, lat, lng) {
     var mapElement = document.getElementById(mapId);
     if (!mapElement) return;
 
     var map = L.map(mapId, {
-        zoomControl: true,
-        dragging: false,
-        doubleClickZoom: false,
-        scrollWheelZoom: false,
-        attributionControl: false
+    zoomControl: true,
+    dragging: false,
+    doubleClickZoom: false,
+    scrollWheelZoom: false,
+    attributionControl: false
     }).setView([lat, lng], 14);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
     L.marker([lat, lng]).addTo(map);
     map.on('click', function () {
-        var url = `https://www.google.com/maps?q=${lat},${lng}`;
-        window.open(url, '_blank');
+    var url = `https://www.google.com/maps?q=${lat},${lng}`;
+    window.open(url, '_blank');
     });
-};
+    };
 </script>
 @code {
 
@@ -292,6 +303,8 @@ window.showMiniMap = function (mapId, lat, lng) {
     [Parameter]
     public EventCallback<Guid> DeletedMessageevent { get; set; }
     [Parameter]
+    public EventCallback<string> JoinChannel { get; set; }
+    [Parameter]
     public string? ParentMessage { get; set; } = null;
     private bool showContextMenu = false;
     private Guid? showContextMenuForMessageId = null;
@@ -309,6 +322,11 @@ window.showMiniMap = function (mapId, lat, lng) {
             return myAvatar;
         return OtherAvatar;
     }
+    public async Task Routingchannel(string message) 
+    {
+      await  JoinChannel.InvokeAsync(message);
+
+    }
     public string replyColor() { return message.IsMine ? $"background-color: {ThemeCascading.MyColorReply}" : $"background-color: {ThemeCascading.OtherColorReply}"; }
     public string ClockColor () => $"color: {ThemeCascading.ClockColor};";
     public string Style() { return message.IsMine ? $"min-width: 305px;background-color: {ThemeCascading.myColorChat}" : $"min-width: 50px;background-color: {ThemeCascading.OtherColorChat}"; }
@@ -324,9 +342,9 @@ window.showMiniMap = function (mapId, lat, lng) {
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if(firstRender)
-   if(message.Type==MessageType.Location)
-        await JS.InvokeVoidAsync("showMiniMap", $"map-{message.Id}", message.Latitude, message.Longitude);
-    
+            if(message.Type==MessageType.Location)
+                await JS.InvokeVoidAsync("showMiniMap", $"map-{message.Id}", message.Latitude, message.Longitude);
+
     }
     public async Task copyMessage(ChatMessageDto message)
     {
@@ -365,6 +383,35 @@ window.showMiniMap = function (mapId, lat, lng) {
         {
             await PerformDeleteMessageAsync(MessageId);
         }
+    }
+    private static MarkupString RenderMentions(string? content)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+            return new MarkupString(string.Empty);
+
+
+
+
+        var withLinks = Regex.IsMatch(
+            content,
+            @"@([A-Za-z0-9_]+)"
+        );
+
+        return new MarkupString(  $"<a href='{content}' data-mention-link>{content}</a>");
+    }
+    private bool IsMention(string? content)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+            return false;
+
+
+
+
+        var withLinks = Regex.IsMatch(
+            content,
+            @"@([A-Za-z0-9_]+)"
+        );
+        return withLinks;
     }
     public async Task PerformDeleteMessageAsync(Guid MessageId){
         var otherId= Conversation.users.Where(c => c.Id != CurrentUser.Id).FirstOrDefault()!.Id;

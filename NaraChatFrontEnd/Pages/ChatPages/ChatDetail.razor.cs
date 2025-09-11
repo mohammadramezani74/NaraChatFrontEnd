@@ -11,6 +11,7 @@ using NaraChatFrontEnd.Models.BaseModels;
 using NaraChatFrontEnd.Pages.ChatPages.Components.DialogComponents;
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using static NaraChatFrontEnd.Pages.ChatPages.Components.DialogComponents.UploadDialogComponent;
 
 namespace NaraChatFrontEnd.Pages.ChatPages;
@@ -127,6 +128,7 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
 
     // اگر لازم بود:
     [Parameter] public EventCallback<UserDto?> GoToSettingInMobile { get; set; }
+    [Parameter] public EventCallback<string> joinchannelevent { get; set; }
 
     public int MessageCount { get; set; } = 15;
     public bool IsloadedOldMessages { get; set; } = false;
@@ -144,7 +146,13 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
     private bool isProcessing = false;
 
     #endregion
-
+    //private static MarkupString LinkifyMentions(string content)
+    //{
+    //    if (string.IsNullOrWhiteSpace(content))
+    //        return content;
+    //    var result = Regex.Replace(content, @"@([A-Za-z0-9_]+)", "<a href='/@$1'>@$1</a>");
+    //    return new MarkupString(result);
+    //}
     #region lifecycle
 
     protected override async Task OnInitializedAsync()
@@ -184,8 +192,9 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
         if (firstRender)
         {
             objRef ??= DotNetObjectReference.Create(this);
+           
             await js.InvokeVoidAsync("initScrollListener", _chatContainer, objRef);
-            NeedScrollToBottom(); // بار اول پایین
+            NeedScrollToBottom();
         }
 
         if (_pendingScrollToBottom)
@@ -401,7 +410,16 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
             await UploadFile(uploadResult.File, uploadResult.Caption ?? string.Empty);
         }
     }
+    public async Task uploadChannelDialog()
+    {
+        var dialog = await DialogService.ShowAsync<UploadDialogComponent>();
+        var result = await dialog.Result;
 
+        if (!result.Canceled && result.Data is UploadResult uploadResult)
+        {
+            await UploadChannelFile(uploadResult.File, uploadResult.Caption ?? string.Empty);
+        }
+    }
     public async Task gotoDetailForMobile(UserDto? chosenUser)
     {
         if (GoToSettingInMobile.HasDelegate)
@@ -448,6 +466,8 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
         var messages = await _channelservice.LoadChannelMessages(SelectedChannel!.Id, count);
         if (messages?.Any() == true)
         {
+            foreach (var m in messages)
+                m.Content = m.Content;
             _messages.AddRange(messages);
 
             var messageIds = messages.Where(x => !x.IsSeen).Select(m => m.Id).ToList();
@@ -469,6 +489,8 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
 
         if (newMessages.Any())
         {
+            foreach (var m in newMessages)
+                m.Content =m.Content;
             _messages.AddRange(newMessages);
             _messages.Sort((a, b) => a.SendAt.CompareTo(b.SendAt));
         }
@@ -589,6 +611,8 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
             newMessage.IsMine = true;
             newMessage.SenderName = CurrentUser!.Name;
         }
+        newMessage.Content = newMessage.Content;
+
 
         if (!EditMode)
             _messages.Add(newMessage);
@@ -608,6 +632,7 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
             EditMode = false;
 
             var msg = _messages.Single(x => x.Id == EditedMessage.Id);
+            msg.Content =EditedMessage.Message;
             msg.Content = EditedMessage.Message;
             messagenew = string.Empty;
             msg.isEdited = true;
@@ -650,6 +675,7 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
             UserId = CurrentUser!.Id,
             ParentId = ParentId,
         };
+        newMessage.Content = newMessage.Content;
         _messages.Add(newMessage);
 
         NeedScrollToBottom();
@@ -683,6 +709,7 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
             EditMode = false;
 
             var message = _messages.Single(x => x.Id == EditedMessage.Id);
+            message.Content = EditedMessage.Message;
             message.Content = EditedMessage.Message;
             NewMessage = string.Empty;
             message.isEdited = true;
@@ -720,6 +747,70 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
             );
 
             var result = await messageService.UploadChatFileAsync(uploaddto, _cancellationTokenSource.Token);
+            if (result.Item1)
+            {
+                var me = Conversation!.users.First(c => c.Id == CurrentUser!.Id);
+                var newMessage = new ChatMessageDto
+                {
+                    Id = result.result!.MessageId,
+                    SendAt = DateTime.Now,
+                    SenderName = me!.Name,
+                    IsMine = true,
+                    Content = caption,
+                    Type = (MessageType)result.result.MessageType,
+                    UserId = CurrentUser!.Id,
+                    FileContent = new ChatFilesDto
+                    {
+                        FileId = result.result!.FileId,
+                        FileName = file.Name,
+                        FileSize = file.Size.ToString()
+                    }
+                };
+                _messages.Add(newMessage);
+
+                IsUploading = false;
+
+                NeedScrollToBottom();
+
+                NewMessage = string.Empty;
+                SelectedMessageToReply = null;
+                ReplyMode = false;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            SuccessMessage();
+            IsUploading = false;
+        }
+        catch (Exception)
+        {
+            ErrorMessage("آپلود فایل با خطا مواجه شد لطفا مجدد تلاش فرمایید!");
+            IsUploading = false;
+        }
+    }
+    private async Task UploadChannelFile(IBrowserFile file, string caption)
+    {
+        try
+        {
+            if (file is null) return;
+
+            IsUploading = true;
+            StateHasChanged();
+
+            _cancellationTokenSource = new CancellationTokenSource();
+            var extension = Path.GetExtension(file.Name);
+            var contentType = string.IsNullOrEmpty(file.ContentType) ? "application/octet-stream" : file.ContentType;
+
+            var uploaddto = new UploadFileDto(
+                SelectedChannel!.Id,
+                caption,
+                new StreamContent(file.OpenReadStream(100 * 1024 * 1024, _cancellationTokenSource.Token)),
+                contentType,
+                extension,
+                file.Name
+            );
+
+            var result = await messageService.UploadChannelFileAsync(uploaddto, _cancellationTokenSource.Token);
             if (result.Item1)
             {
                 var me = Conversation!.users.First(c => c.Id == CurrentUser!.Id);
@@ -826,6 +917,7 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
             if (targetMessage != null)
             {
                 targetMessage.Content = NewIncomingEditedMessage.Message;
+                targetMessage.Content = NewIncomingEditedMessage.Message;
                 targetMessage.isEdited = true;
             }
             NewIncomingEditedMessage = null;
@@ -836,11 +928,14 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
     {
         if (NewIncomingMessage != null)
         {
+            var name = CurrentUser.Name;
+            NewIncomingMessage.Content = NewIncomingMessage.Content;
             _messages.Add(NewIncomingMessage);
             await IncommingMessageRecieved.InvokeAsync();
             NewIncomingMessage = null;
 
             NeedScrollToBottom();
+            StateHasChanged();
         }
     }
 
@@ -856,12 +951,18 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
 
             if (newMessages.Count > 0)
             {
+                foreach (var m in newMessages)
+                    m.Content = m.Content;
                 _messages.AddRange(newMessages);
                 await ClearMissedMessageUser.InvokeAsync();
 
                 NeedScrollToBottom();
             }
         }
+    }
+    public async Task JoinToChannelEvent(string UserName)
+    {
+      await  joinchannelevent.InvokeAsync(UserName);
     }
 
     private void HandleSeenMessages()

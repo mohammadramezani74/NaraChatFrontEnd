@@ -53,6 +53,20 @@ function triggerDownload(fileData, fileName) {
     document.body.removeChild(link);
 }
 
+    (function () {
+        document.addEventListener('click', function (e) {
+            0922const a = e.target.closest('a[data-mention-link]');
+            if (!a) return;
+            e.preventDefault();
+            const href = a.getAttribute('href');
+            if (window.Blazor && typeof window.Blazor.navigateTo === 'function') {
+                window.Blazor.navigateTo(href);
+            } else {
+                window.location.href = href;
+            }
+        }, true);
+        })();
+
 
 window.initScrollListener = (element, dotnetHelper) => {
     element.addEventListener("scroll", () => {

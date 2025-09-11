@@ -60,7 +60,10 @@
 
             <MudText Typo="Typo.h1" Class="text-center" Color="Color.Primary" Style="word-break:break-word; margin-bottom: 16px; margin-top: 9px;">@SelectedChannel.Name</MudText>
 
-                        <MudText Typo="Typo.h1" Class="text-center" Color="Color.Primary" Style="word-break:break-word; margin-bottom: 16px; margin-top: 9px;">@SelectedChannel.UserName</MudText>
+                         <MudStack Row="true" Justify="Justify.Center" AlignItems="AlignItems.Center" Class="mb-4">
+                <MudText Typo="Typo.h1" Color="Color.Primary">@($"@{SelectedChannel.UserName}")</MudText>
+                <MudIconButton Icon="@Icons.Material.Filled.ContentCopy" Color="Color.Default" Size="Size.Medium" Class="ml-2" OnClick="CopyUserName" />
+            </MudStack>
             <MudText Typo="Typo.body2" Class="text-center mb-4" Color="Color.Default">
                 سازنده :@SelectedChannel.channel.Creator  </MudText>
                      
@@ -436,6 +439,12 @@
         new ChangeUserChannelPolicyCommand(SelectedChannel.Id,admin.Id,false));
         SelectedChannel.channel.admins.Remove(admin);
         StateHasChanged();
+    }
+        private async Task CopyUserName()
+    {
+        if (SelectedChannel?.UserName == null) return;
+        await js.InvokeVoidAsync("copyToClipboard", $"@{SelectedChannel.UserName}");
+        snackbar.Add("کپی شد", Severity.Success);
     }
 }
 @code {

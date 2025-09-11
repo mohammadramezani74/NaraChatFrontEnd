@@ -22,6 +22,7 @@ namespace NaraChat.Application.Services.ChatServices.Conversation
 
         
             var messages = await _httpClient.GetFromJsonAsync<BaseResponseDto<List<ChatMessageDto>?>>($"/api/v1/message/{ConverSationId}/messages?messageCount={Messagecount}");
+
             if (!messages.isSucceded)
             {
                 return null;
@@ -126,6 +127,36 @@ namespace NaraChat.Application.Services.ChatServices.Conversation
             {
 
                 return (false, "مشکلی در بارگذاری فایل شما به وجود آمده  لطفا مدتی دیگر مجدد تلاش فرمایید!",null);
+            }
+        }
+        public async Task<(bool, string message, UploadFileResult? result)> UploadChannelFileAsync(UploadFileDto uploaddto, CancellationToken cancellationToken = default)
+        {
+            var content = new MultipartFormDataContent();
+            uploaddto.file.Headers.ContentType = new MediaTypeHeaderValue(uploaddto.ContentType);
+
+            content.Add(uploaddto.file, "file", uploaddto.fileName);
+            content.Add(new StringContent(uploaddto.caption ?? ""), "caption");
+            content.Add(new StringContent(uploaddto.ConversationId.ToString()), "channelId");
+            try
+            {
+
+
+                var result = await _httpClient.PostAsync("/api/v1/channel/UploadFile", content, cancellationToken);
+                if (result.IsSuccessStatusCode)
+                {
+                    var resultapi = await result.Content.ReadAsStringAsync();
+                    var FileResult = JsonSerializer.Deserialize<BaseResponseDto<UploadFileResult>>(resultapi, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+                    return (true, "عملیات با موفقیت انجام شد. ", FileResult!.result);
+                }
+                return (false, "مشکلی در بارگذاری فایل شما به وجود آمده ", null);
+            }
+            catch (Exception e)
+            {
+
+                return (false, "مشکلی در بارگذاری فایل شما به وجود آمده  لطفا مدتی دیگر مجدد تلاش فرمایید!", null);
             }
         }
 

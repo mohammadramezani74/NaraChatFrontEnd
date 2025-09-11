@@ -1,13 +1,17 @@
 ﻿@page "/chat"
 @page "/chat/{id:guid}"
+@page "/@{username}"
+@using NaraChat.Application.Services.ChatServices.Channels
 @using NaraChat.Contract.Models.Chat
-
+@using NaraChatFrontEnd.Pages.ChatPages.Components.DialogComponents
 @inject ISnackbar snackbar
 @inject IUserChatService userService
 @inject IJSRuntime js
 @inject IConversationService ConversationService
+@inject IChannelService channelService
 @inject NavigationManager nm
 @inject AuthenticationStateProvider stateprovider
+@inject IDialogService dialogService
 @implements IAsyncDisposable
 
 
@@ -66,7 +70,8 @@
                             FalseScroll="FalsingScrol"
                             trueScroll="trueingScrol"
                             GoToSettingInMobile="GoToSettingInMobile"
-                            SelectedChannel="SelectedChannel" />
+                            SelectedChannel="SelectedChannel"
+                            joinchannelevent="JoinToChannel" />
                         </MudItem>
                     }
                     else if (ThemeChanging.IsShowSetting && !gotoDetailByMobile)
@@ -131,7 +136,8 @@
                         FalseScroll="FalsingScrol"
                         trueScroll="trueingScrol"
                         GoToSettingInMobile="GoToSettingInMobile" 
-                        SelectedChannel="SelectedChannel" />
+                        SelectedChannel="SelectedChannel"
+                        joinchannelevent="JoinToChannel"/>
                     </MudItem>
 
                     @if (ThemeChanging.IsShowSetting)
@@ -178,6 +184,9 @@
     public ThemeChanging ThemeChanging { get; set; }
     [Parameter]
     public Guid id { get; set; }
+    [Parameter]
+    public string? username { get; set; }
+    private string? _pendingUsername;
     public string? myAvatar { get; set; }
     protected override void OnParametersSet()
     {
@@ -185,6 +194,8 @@
             OtherUser = Users.Where(x=>x.Id==id).FirstOrDefault() ;
             StateHasChanged();
         }
+        if(!string.IsNullOrWhiteSpace(username))
+            _pendingUsername = username.TrimStart('@');
     }
     public void FalsingScrol()
     {
@@ -250,7 +261,10 @@
     }
 
 
-
+    public async Task JoinToChannel(string usrename)
+    {
+        await HandleChannelLink(usrename);
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -368,6 +382,11 @@
                     IsMobile = false;
                 }
             }
+            if(!string.IsNullOrEmpty(_pendingUsername))
+            {
+                await HandleChannelLink(_pendingUsername);
+                _pendingUsername = null;
+            }
             LoadingUsers = false;
             await InvokeAsync(StateHasChanged);
         }
@@ -477,8 +496,14 @@
        {
            _newIncomingMessageForUsers = MessageDto;
            var fromusers = Users.FirstOrDefault(x => x.Id == MessageDto.UserId);
-        
-           if (!Users.Any(x => x.Id == MessageDto.UserId))
+           if (fromusers.IsChannel)
+           {
+ 
+               _newIncomingMessage = MessageDto;
+
+               Users.Where(x => x.Id == MessageDto.UserId).First().messageUnreadedCount -= 1;
+           }
+         else  if (!Users.Any(x => x.Id == MessageDto.UserId))
            {
                Users.Insert(0, fromusers!);
                _newIncomingMessage = MessageDto;
@@ -630,13 +655,13 @@
         {
             SelectedChannel = null;
 
-        var userAvatar = Users.Where(c => c.Id == user.Id).Select(x => x.avatar).FirstOrDefault();
-        OtherUser = user;
-        OtherUser.avatar = userAvatar;
-        var targetUser=  Users.Where(u => u.Id == user.Id).FirstOrDefault();
-        if (targetUser!=null){
-            OtherUser.LastSeen = targetUser.LastSeen;
-        } }
+            var userAvatar = Users.Where(c => c.Id == user.Id).Select(x => x.avatar).FirstOrDefault();
+            OtherUser = user;
+            OtherUser.avatar = userAvatar;
+            var targetUser=  Users.Where(u => u.Id == user.Id).FirstOrDefault();
+            if (targetUser!=null){
+                OtherUser.LastSeen = targetUser.LastSeen;
+            } }
         @if(IsMobile){
             gotoDetailByMobile = true;
             ThemeChanging.IsShowSetting = false;
@@ -661,6 +686,38 @@
             currentUser.avatar = user.avatar;
 
         StateHasChanged();
+    }
+    private async Task HandleChannelLink(string userName)
+    {
+        var channel = Users.FirstOrDefault(u => u.UserName?.Equals(userName, StringComparison.OrdinalIgnoreCase) == true);
+        if (channel == null)
+        {
+            var search = await channelService.GetPublicChannels();
+     
+            channel = search.FirstOrDefault(u => u.UserName?.Equals(userName, StringComparison.OrdinalIgnoreCase) == true && u.IsChannel);
+            if (channel == null)
+            {
+                snackbar.Add("کانال یافت نشد ", Severity.Error);
+                return;
+            }
+
+            var parameters = new DialogParameters<DialogTemplate>
+            {
+                { x => x.ContentText, $"آیا می‌خواهید در کانال {channel.Name} عضو شوید؟" },
+                { x => x.ButtonText, "بله" },
+                { x => x.Color, Color.Primary }
+            };
+            var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small };
+            var dialog = await dialogService.ShowAsync<DialogTemplate>("عضویت کانال", parameters, options);
+            var result = await dialog.Result;
+            if (result.Canceled)
+                return;
+
+            await channelService.JoinToPublicChannel(channel.Id);
+            Users.Add(channel);
+        }
+
+        await OnOtherUserSelected(channel);
     }
     private async Task HandleChatDetailsCancel(bool shouldRemoveFromChatsList)
     {

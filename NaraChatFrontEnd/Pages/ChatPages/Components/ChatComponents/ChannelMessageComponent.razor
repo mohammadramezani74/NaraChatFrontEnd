@@ -1,4 +1,5 @@
 ﻿@using NaraChatFrontEnd.Pages.ChatPages.Components.DialogComponents
+@using System.Text.RegularExpressions
 @inject IDialogService DialogService
 @inject IMessageService _messageservice
 @inject ISnackbar snackbar
@@ -9,11 +10,11 @@
         <MudChat ChatPosition="@(message.IsMine ? ChatBubblePosition.End : ChatBubblePosition.Start)" ArrowPosition="ChatArrowPosition.Top">
             <MudStack Row="false" Spacing="0">
 
-                <MudChatBubble Style="@($"{Style()};display:inline-block; max-width:370px; word-wrap:break-word; border-radius:12px; padding:8px;")"
-                               Variant="Variant.Text"
-                      
-                               @onmouseenter="@((args) => HoverStart(args, message))"
-                               @onmouseleave="@(() => HoverStop("bubble"))">
+                <MudChatBubble Style="@($"{Style()};display:inline-block; word-wrap:break-word; border-radius:12px; padding:8px;")"
+                Variant="Variant.Text"
+
+                @onmouseenter="@((args) => HoverStart(args, message))"
+                @onmouseleave="@(() => HoverStop("bubble"))">
 
                     <!-- ✅ نمایش نام فرستنده یا نام چنل -->
                     <p style="text-align:right; color:gray; font-size:10px;">
@@ -35,7 +36,7 @@
 
                     <!-- ✅ متن پیام -->
                     <MudText id="@message.Id" Color="Color.Default">
-                        @((MarkupString)message.Content.Replace("\n", "<br />"))
+                        @((MarkupString)LinkifyMentions(message.Content.Replace("\n", "<br />")))
 
                         @if (message.Type == MessageType.Location)
                         {
@@ -52,12 +53,12 @@
 
                     <!-- ✅ منوی Hover -->
                     <MudPopover Open="@(Hovering && message.Equals(_hoverMessage))"
-                                Class="hoverarea"
-                                AnchorOrigin="Origin.TopLeft"
-                                TransformOrigin="Origin.BottomLeft"
-                                @onscroll="@(() => HoverStop("scroll"))"
-                                @onmouseenter="@(() => _paperHovering = true)"
-                                @onmouseleave="@(() => HoverStop("paper"))">
+                    Class="hoverarea"
+                    AnchorOrigin="Origin.TopLeft"
+                    TransformOrigin="Origin.BottomLeft"
+                    @onscroll="@(() => HoverStop("scroll"))"
+                    @onmouseenter="@(() => _paperHovering = true)"
+                    @onmouseleave="@(() => HoverStop("paper"))">
 
                         <div class="d-flex" style="width:100%;" @onclick:stopPropagation="true" @onclick:preventDefault="true">
                             <MudTooltip Text="رونوشت">
@@ -106,6 +107,13 @@
     private Guid? showContextMenuForMessageId = null;
     private int contextMenuX;
     private int contextMenuY;
+    private static MarkupString LinkifyMentions(string content)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+            return new MarkupString(string.Empty);
+        var result = Regex.Replace(content, @"@([A-Za-z0-9_]+)", "<a href='/@$1'>@$1</a>");
+        return new MarkupString(result);
+    }
 
     public bool isAdmin() =>
          SelectedChannel.IsChannel
@@ -117,9 +125,13 @@
 
     public string ClockColor() => $"color: {ThemeCascading.ClockColor};";
 
-    public string Style() => message.IsMine
-        ? $"min-width:305px; background-color:#BBAAE1"
-        : $"min-width:50px; background-color:#BBAAE1";
+    public string Style() { 
+        if (ThemeCascading.ClockColor == "#270aff")
+        {
+            return $"min-width:305px; background-color:#ffffff"; }
+        return $"min-width:305px; background-color:#0B1220";
+
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
