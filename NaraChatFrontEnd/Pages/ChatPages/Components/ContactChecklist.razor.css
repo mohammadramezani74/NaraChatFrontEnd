@@ -1,0 +1,180 @@
+﻿.contact-checklist {
+    position: relative;
+    z-index: 30;
+    direction: rtl;
+}
+
+    .contact-checklist.pinned {
+        align-self: flex-end;
+        position: sticky;
+        top: 0;
+    }
+
+    .contact-checklist.detached {
+        position: fixed;
+        width: 320px;
+        max-width: 90vw;
+    }
+
+        .contact-checklist.detached .checklist-card {
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.18);
+        }
+
+    .contact-checklist.collapsed {
+        width: auto;
+        height: auto;
+    }
+
+    .contact-checklist .checklist-card {
+        width: 320px;
+        max-height: 70vh;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        border-radius: 16px;
+        border: 1px dashed rgba(0, 0, 0, 0.12);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.9) 100%);
+        backdrop-filter: blur(10px);
+    }
+
+    .contact-checklist .checklist-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .contact-checklist .checklist-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .contact-checklist .drag-handle {
+        cursor: grab;
+    }
+
+    .contact-checklist.detached .drag-handle {
+        cursor: move;
+    }
+
+    .contact-checklist .checklist-actions {
+        display: flex;
+        gap: 6px;
+    }
+
+    .contact-checklist .checklist-filters {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        justify-content: space-between;
+    }
+
+    .contact-checklist .checklist-search {
+        flex: 1;
+    }
+
+    .contact-checklist .checklist-input {
+        width: 100%;
+    }
+
+    .contact-checklist .checklist-items {
+        flex: 1;
+        overflow-y: auto;
+        padding: 4px 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        scrollbar-width: thin;
+    }
+
+    .contact-checklist .checklist-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        border-radius: 12px;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        background-color: rgba(255, 255, 255, 0.8);
+        transition: box-shadow 0.2s ease, transform 0.2s ease;
+    }
+
+        .contact-checklist .checklist-item:hover {
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+            transform: translateY(-1px);
+        }
+
+    .contact-checklist .item-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .contact-checklist .item-text {
+        font-size: 0.95rem;
+        word-break: break-word;
+    }
+
+        .contact-checklist .item-text.done {
+            text-decoration: line-through;
+            color: rgba(0, 0, 0, 0.45);
+        }
+
+    .contact-checklist .item-meta {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+    }
+
+    .contact-checklist .item-edit {
+        width: 100%;
+    }
+
+    .contact-checklist .item-drag {
+        cursor: grab;
+    }
+
+    .contact-checklist .checklist-footer {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        justify-content: space-between;
+        border-top: 1px dashed rgba(0, 0, 0, 0.08);
+        padding-top: 8px;
+    }
+
+@media (max-width: 768px) {
+    .contact-checklist,
+    .contact-checklist.detached {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        width: 100%;
+        max-width: 100%;
+        padding: 12px;
+    }
+    .checklist-fab-wrap {
+        position: relative;
+        display: inline-block;
+    }
+
+    .fab-badge {
+        position: absolute;
+        right: -6px;
+        top: -6px;
+    }
+
+        .contact-checklist .checklist-card {
+            width: 100%;
+            max-height: 60vh;
+            border-radius: 18px 18px 0 0;
+        }
+
+        .contact-checklist.collapsed {
+            padding: 8px;
+            display: flex;
+            justify-content: flex-end;
+        }
+}

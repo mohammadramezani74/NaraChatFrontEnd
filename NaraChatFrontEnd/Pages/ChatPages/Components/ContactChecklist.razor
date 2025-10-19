@@ -1,0 +1,657 @@
+﻿@using System.Globalization
+@using System.Collections.Generic
+@using System.Linq
+@using System.Threading
+@using System.Threading.Tasks
+@using Microsoft.AspNetCore.Components.Web
+@using NaraChat.Application.Services.CheckLists
+@using NaraChat.Contract.Models.Checklist
+@inject IContactChecklistService ChecklistService
+@inject IDialogService DialogService
+@inject IJSRuntime JsRuntime
+@implements IAsyncDisposable
+
+@if (IsVisible)
+{
+    <div class="contact-checklist @(GetContainerClasses())" style="@GetContainerStyle()" id="@_containerId">
+        @if (_uiState.IsCollapsed)
+        {
+            <MudTooltip Text="یادداشت‌ها و کارها">
+                <MudBadge Color="Color.Error" MaxValue="99" Visible="@(_openItemsCount > 0)" Content="@_openItemsCount">
+                    <MudFab Color="Color.Primary" Icon="@Icons.Material.Filled.StickyNote2" Size="Size.Small" OnClick="ToggleCollapse" />
+                </MudBadge>
+            </MudTooltip>
+        }
+        else
+        {
+            <MudPaper Elevation="10" Class="checklist-card">
+                <div class="checklist-header">
+                    <div class="checklist-title">
+                        <MudIconButton Icon="@Icons.Material.Filled.DragIndicator" Size="Size.Small" Disabled="@(!_uiState.IsDetached)" Class="drag-handle" id="@_handleId" />
+                        <MudText Typo="Typo.subtitle1">یادداشت‌ها و کارها برای @ContactName</MudText>
+                    </div>
+                    <div class="checklist-actions">
+                        <MudIconButton Icon="@(_uiState.IsDetached ? Icons.Material.Filled.Anchor : Icons.Material.Filled.OpenInNew)" Size="Size.Small" OnClick="ToggleDetach" Title="@(_uiState.IsDetached ? "سنجاق‌کردن" : "شناور کردن")" />
+                        <MudIconButton Icon="@Icons.Material.Filled.VerticalAlignTop" Size="Size.Small" OnClick="TogglePin" Color="@(_uiState.IsPinned ? Color.Primary : Color.Default)" Title="@(_uiState.IsPinned ? "نمایش در بالا" : "نمایش در حالت معمول")" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Remove" Size="Size.Small" OnClick="ToggleCollapse" Title="بستن" />
+                    </div>
+                </div>
+
+                <MudTabs @bind-ActivePanelIndex="ActiveTabIndex" Rounded="true" DisableRipple="true" Class="checklist-tabs">
+                    <MudTabPanel Text="امروز"></MudTabPanel>
+                    <MudTabPanel Text="هفته"></MudTabPanel>
+                    <MudTabPanel Text="همه"></MudTabPanel>
+                </MudTabs>
+
+                <div class="checklist-filters">
+                    <MudButtonGroup Color="Color.Primary" Size="Size.Small" Exclusive="true" @bind-SelectedValue="CompletionFilter">
+                        <MudToggleIconButton Value="@ChecklistCompletionFilter.All" Icon="@Icons.Material.Filled.DensitySmall" Title="همه" />
+                        <MudToggleIconButton Value="@ChecklistCompletionFilter.Open" Icon="@Icons.Material.Filled.RadioButtonUnchecked" Title="باز" />
+                        <MudToggleIconButton Value="@ChecklistCompletionFilter.Done" Icon="@Icons.Material.Filled.TaskAlt" Title="انجام‌شده" />
+                    </MudButtonGroup>
+                    <div class="checklist-actions-secondary">
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.NoteAdd" OnClick="OpenAddItemDialog">افزودن مورد جدید</MudButton>
+                        <MudTextField @bind-Value="SearchTerm" Placeholder="جستجو" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Dense="true" Immediate="true" Class="checklist-search" />
+                    </div>
+                </div>
+
+                <div class="checklist-items" ondragover="event.preventDefault();" @ondrop="HandleDropOnContainer">
+                    @if (!_filteredItems.Any())
+                    {
+                        <MudText Typo="Typo.caption" Class="text-center text-muted">موردی برای نمایش وجود ندارد.</MudText>
+                    }
+                    else
+                    {
+                        @foreach (var item in _filteredItems)
+                        {
+                            <div class="checklist-item" draggable="true" @ondragstart="() => StartDrag(item)" @ondrop="() => HandleDrop(item)" @ondragover="HandleDragOver" data-item-id="@item.Id">
+                                <MudCheckBox T="bool" Checked="@item.IsDone" CheckedChanged="val => ToggleDone(item, val)" Color="Color.Primary" />
+                                <div class="item-content">
+                                    @if (_editingItemId == item.Id)
+                                    {
+                                        <MudTextField @bind-Value="_editingText" Immediate="true" Margin="Margin.Dense" Class="item-edit" OnBlur="() => CommitEdit(item)" OnKeyDown="args => CommitEditOnEnter(item, args)" />
+                                    }
+                                    else
+                                    {
+                                        <MudText Class="@(item.IsDone ? "item-text done" : "item-text")">@item.Text</MudText>
+                                        <div class="item-meta">
+                                            @if (item.DueDate.HasValue)
+                                            {
+                                                <MudChip T="String" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">تاریخ: @FormatDate(item.DueDate.Value)</MudChip>
+                                            }
+                                            @if (!string.IsNullOrWhiteSpace(item.Tag))
+                                            {
+                                                <MudChip T="String" Size="Size.Small" Color="Color.Secondary" Variant="Variant.Outlined">@item.Tag</MudChip>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                                <MudIconButton Icon="@Icons.Material.Filled.DragIndicator" Class="item-drag" Title="جابجایی" Size="Size.Small" />
+                                <MudMenu Dense="true" Icon="@Icons.Material.Filled.MoreVert">
+                                    <MudMenuItem OnClick="() => BeginEdit(item)">ویرایش متن</MudMenuItem>
+                                    <MudMenuItem OnClick="() => OpenDatePicker(item)">تعیین تاریخ</MudMenuItem>
+                                    <MudMenuItem OnClick="() => AskForTag(item)">برچسب</MudMenuItem>
+                                    <MudMenuItem OnClick="() => ConfirmDelete(item)" Color="Color.Error">حذف</MudMenuItem>
+                                </MudMenu>
+                            </div>
+                        }
+                    }
+                </div>
+
+                <div class="checklist-footer">
+                    <MudText Typo="Typo.caption">@_completedCount / @_totalCount انجام شده</MudText>
+                    <MudButton Variant="Variant.Text" Color="Color.Success" OnClick="ClearDone" Disabled="@(_completedCount == 0)">حذف انجام‌شده‌ها</MudButton>
+                    <MudButton Variant="Variant.Text" Color="Color.Default" OnClick="ToggleCollapse">جمع‌کردن</MudButton>
+                </div>
+            </MudPaper>
+        }
+    </div>
+}
+
+@code {
+    private readonly string _containerId = $"checklist_{Guid.NewGuid():N}";
+    private readonly string _handleId = $"checklist_handle_{Guid.NewGuid():N}";
+    private ContactChecklistData _data = new();
+    private ContactChecklistUiState _uiState = new();
+    private List<ContactChecklistItem> _filteredItems = new();
+    private string _lastContactId = string.Empty;
+    private string _searchTerm = string.Empty;
+    private ChecklistCompletionFilter _completionFilter = ChecklistCompletionFilter.All;
+    private int _activeTabIndex;
+    private Guid? _editingItemId;
+    private string _editingText = string.Empty;
+    private DotNetObjectReference<ContactChecklist>? _dotNetRef;
+    private CancellationTokenSource? _saveDataCts;
+    private CancellationTokenSource? _saveUiCts;
+    private bool _shouldRegisterDrag;
+    private int _openItemsCount;
+    private int _completedCount;
+    private int _totalCount;
+
+    [Parameter] public string AppUserId { get; set; } = string.Empty;
+    [Parameter] public string ContactId { get; set; } = string.Empty;
+    [Parameter] public string ContactName { get; set; } = string.Empty;
+
+    private bool IsVisible => !string.IsNullOrWhiteSpace(AppUserId) && !string.IsNullOrWhiteSpace(ContactId);
+
+    private int ActiveTabIndex
+    {
+        get => _activeTabIndex;
+        set
+        {
+            if (_activeTabIndex != value)
+            {
+                _activeTabIndex = value;
+                UpdateDerivedState();
+            }
+        }
+    }
+
+    private ChecklistCompletionFilter CompletionFilter
+    {
+        get => _completionFilter;
+        set
+        {
+            if (_completionFilter != value)
+            {
+                _completionFilter = value;
+                UpdateDerivedState();
+            }
+        }
+    }
+
+    private string SearchTerm
+    {
+        get => _searchTerm;
+        set
+        {
+            if (_searchTerm != value)
+            {
+                _searchTerm = value;
+                UpdateDerivedState();
+            }
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!IsVisible)
+        {
+            return;
+        }
+
+        if (_lastContactId != ContactId)
+        {
+            _lastContactId = ContactId;
+            await LoadDataAsync();
+        }
+
+        UpdateDerivedState();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_shouldRegisterDrag && _uiState.IsDetached && !_uiState.IsCollapsed)
+        {
+            _dotNetRef ??= DotNetObjectReference.Create(this);
+            await JsRuntime.InvokeVoidAsync("naraChecklist.register", _containerId, _handleId, _dotNetRef);
+            if (_uiState.Left.HasValue && _uiState.Top.HasValue)
+            {
+                await JsRuntime.InvokeVoidAsync("naraChecklist.updatePosition", _containerId, _uiState.Left.Value, _uiState.Top.Value);
+            }
+            _shouldRegisterDrag = false;
+        }
+        else if (!_uiState.IsDetached)
+        {
+            await JsRuntime.InvokeVoidAsync("naraChecklist.dispose", _containerId);
+        }
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _data = await ChecklistService.GetChecklistAsync(AppUserId, ContactId);
+        _uiState = await ChecklistService.GetUiStateAsync(AppUserId, ContactId);
+        NormalizeOrder();
+        UpdateDerivedState();
+        await InvokeAsync(StateHasChanged);
+        _shouldRegisterDrag = _uiState.IsDetached;
+    }
+
+    private void NormalizeOrder()
+    {
+        var ordered = _data.Items
+            .OrderBy(i => i.Order)
+            .ThenBy(i => i.CreatedAt)
+            .ToList();
+
+        for (var index = 0; index < ordered.Count; index++)
+        {
+            ordered[index].Order = index;
+        }
+
+        _data.Items = ordered;
+    }
+
+    private void UpdateDerivedState()
+    {
+        IEnumerable<ContactChecklistItem> query = _data.Items
+            .OrderBy(i => i.Order)
+            .ThenBy(i => i.CreatedAt);
+
+        var now = DateTime.Now;
+        var today = now.Date;
+
+        switch (_activeTabIndex)
+        {
+            case 0:
+                query = query.Where(item =>
+                    item.DueDate.HasValue && item.DueDate.Value.Date == today ||
+                    !item.DueDate.HasValue && item.CreatedAt >= DateTime.UtcNow.AddDays(-1));
+                break;
+            case 1:
+                var weekLimit = today.AddDays(7);
+                query = query.Where(item => item.DueDate.HasValue && item.DueDate.Value.Date >= today && item.DueDate.Value.Date <= weekLimit);
+                break;
+        }
+
+        query = _completionFilter switch
+        {
+            ChecklistCompletionFilter.Open => query.Where(i => !i.IsDone),
+            ChecklistCompletionFilter.Done => query.Where(i => i.IsDone),
+            _ => query
+        };
+
+        if (!string.IsNullOrWhiteSpace(_searchTerm))
+        {
+            query = query.Where(i => i.Text.Contains(_searchTerm, StringComparison.CurrentCultureIgnoreCase) || (!string.IsNullOrWhiteSpace(i.Tag) && i.Tag.Contains(_searchTerm, StringComparison.CurrentCultureIgnoreCase)));
+        }
+
+        _filteredItems = query.ToList();
+        _openItemsCount = _data.Items.Count(i => !i.IsDone);
+        _completedCount = _data.Items.Count(i => i.IsDone);
+        _totalCount = _data.Items.Count;
+    }
+
+    private async Task OpenAddItemDialog()
+    {
+        var options = new DialogOptions
+        {
+            CloseButton = true,
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+        };
+
+        var parameters = new DialogParameters
+        {
+            { nameof(AddChecklistItemDialog.InitialText), string.Empty }
+        };
+
+        var dialog = DialogService.Show<AddChecklistItemDialog>("افزودن مورد جدید", parameters, options);
+        var result = await dialog.Result;
+        if (!result.Canceled && result.Data is string text)
+        {
+            await AddItemAsync(text);
+        }
+    }
+
+    private async Task AddItemAsync(string text)
+    {
+        var trimmed = text.Trim();
+        if (string.IsNullOrWhiteSpace(trimmed))
+        {
+            return;
+        }
+
+        var nextOrder = _data.Items.Any() ? _data.Items.Max(i => i.Order) + 1 : 0;
+        var item = new ContactChecklistItem
+        {
+            Text = trimmed,
+            Order = nextOrder,
+            CreatedAt = DateTime.UtcNow,
+            IsDone = false
+        };
+
+        _data.Items.Add(item);
+        UpdateDerivedState();
+        ScheduleDataSave();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void ToggleDone(ContactChecklistItem item, bool value)
+    {
+        item.IsDone = value;
+        UpdateDerivedState();
+        ScheduleDataSave();
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void BeginEdit(ContactChecklistItem item)
+    {
+        _editingItemId = item.Id;
+        _editingText = item.Text;
+    }
+
+    private void CommitEdit(ContactChecklistItem item)
+    {
+        if (_editingItemId != item.Id)
+        {
+            return;
+        }
+
+        var trimmed = _editingText?.Trim();
+        if (!string.IsNullOrWhiteSpace(trimmed))
+        {
+            item.Text = trimmed;
+            ScheduleDataSave();
+        }
+
+        _editingItemId = null;
+        _editingText = string.Empty;
+        UpdateDerivedState();
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void CommitEditOnEnter(ContactChecklistItem item, KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter")
+        {
+            CommitEdit(item);
+        }
+        else if (args.Key == "Escape")
+        {
+            _editingItemId = null;
+            _editingText = string.Empty;
+        }
+    }
+
+    private async Task OpenDatePicker(ContactChecklistItem item)
+    {
+        var parameters = new DialogParameters
+        {
+            { "Item", item },
+            { "CurrentValue", item.DueDate }
+        };
+
+        var options = new DialogOptions
+        {
+            CloseButton = true,
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+
+        };
+
+        var dialog = DialogService.Show<SetChecklistDateDialog>("تعیین تاریخ", parameters, options);
+        var result = await dialog.Result;
+        if (!result.Canceled && result.Data is DateTime date)
+        {
+            item.DueDate = DateTime.SpecifyKind(date.Date, DateTimeKind.Local);
+            ScheduleDataSave();
+            UpdateDerivedState();
+            await InvokeAsync(StateHasChanged);
+        }
+        else if (!result.Canceled && result.Data is null)
+        {
+            item.DueDate = null;
+            ScheduleDataSave();
+            UpdateDerivedState();
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task AskForTag(ContactChecklistItem item)
+    {
+        var parameters = new DialogParameters
+        {
+            { "Value", item.Tag ?? string.Empty }
+        };
+
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall, FullWidth = true };
+        var dialog = DialogService.Show<SetChecklistTagDialog>("برچسب", parameters, options);
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            if (result.Data is string tag)
+            {
+                item.Tag = string.IsNullOrWhiteSpace(tag) ? null : tag.Trim();
+                ScheduleDataSave();
+                UpdateDerivedState();
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+    }
+
+    private async Task ConfirmDelete(ContactChecklistItem item)
+    {
+        bool? confirm = await DialogService.ShowMessageBox("حذف آیتم", "آیا از حذف این آیتم مطمئن هستید؟", yesText: "حذف", cancelText: "لغو", options: new DialogOptions { CloseButton = true });
+        if (confirm == true)
+        {
+            _data.Items.Remove(item);
+            UpdateDerivedState();
+            ScheduleDataSave();
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void StartDrag(ContactChecklistItem item)
+    {
+        _draggingItemId = item.Id;
+    }
+
+    private void HandleDragOver(DragEventArgs _)
+    {
+        // Required to allow drop
+    }
+
+    private void HandleDrop(ContactChecklistItem target)
+    {
+        if (_draggingItemId == null || _draggingItemId == target.Id)
+        {
+            return;
+        }
+
+        var draggedItem = _data.Items.FirstOrDefault(i => i.Id == _draggingItemId);
+        if (draggedItem is null)
+        {
+            return;
+        }
+
+        var ordered = _data.Items.OrderBy(i => i.Order).ThenBy(i => i.CreatedAt).ToList();
+        ordered.Remove(draggedItem);
+        var targetIndex = ordered.FindIndex(i => i.Id == target.Id);
+        if (targetIndex < 0)
+        {
+            ordered.Add(draggedItem);
+        }
+        else
+        {
+            ordered.Insert(targetIndex, draggedItem);
+        }
+
+        for (var index = 0; index < ordered.Count; index++)
+        {
+            ordered[index].Order = index;
+        }
+
+        _data.Items = ordered;
+        _draggingItemId = null;
+        UpdateDerivedState();
+        ScheduleDataSave();
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void HandleDropOnContainer()
+    {
+        if (_draggingItemId == null)
+        {
+            return;
+        }
+
+        var draggedItem = _data.Items.FirstOrDefault(i => i.Id == _draggingItemId);
+        if (draggedItem is null)
+        {
+            return;
+        }
+
+        var ordered = _data.Items.OrderBy(i => i.Order).ThenBy(i => i.CreatedAt).ToList();
+        ordered.Remove(draggedItem);
+        ordered.Add(draggedItem);
+        for (var index = 0; index < ordered.Count; index++)
+        {
+            ordered[index].Order = index;
+        }
+        _data.Items = ordered;
+        _draggingItemId = null;
+        UpdateDerivedState();
+        ScheduleDataSave();
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ClearDone()
+    {
+        bool? confirm = await DialogService.ShowMessageBox("حذف موارد انجام‌شده", "همه آیتم‌های انجام‌شده حذف شوند؟", yesText: "بله", cancelText: "خیر", options: new DialogOptions { CloseButton = true });
+        if (confirm == true)
+        {
+            _data.Items = _data.Items.Where(i => !i.IsDone).ToList();
+            NormalizeOrder();
+            UpdateDerivedState();
+            ScheduleDataSave();
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void ToggleCollapse()
+    {
+        _uiState.IsCollapsed = !_uiState.IsCollapsed;
+        UpdateDerivedState();
+        ScheduleUiStateSave();
+        if (!_uiState.IsCollapsed)
+        {
+            _shouldRegisterDrag = _uiState.IsDetached;
+        }
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void TogglePin()
+    {
+        _uiState.IsPinned = !_uiState.IsPinned;
+        if (_uiState.IsPinned)
+        {
+            _uiState.IsDetached = false;
+        }
+        ScheduleUiStateSave();
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void ToggleDetach()
+    {
+        _uiState.IsDetached = !_uiState.IsDetached;
+        if (_uiState.IsDetached)
+        {
+            _uiState.IsPinned = false;
+            if (!_uiState.Left.HasValue || !_uiState.Top.HasValue)
+            {
+                _uiState.Left = 24;
+                _uiState.Top = 24;
+            }
+            _shouldRegisterDrag = true;
+        }
+        ScheduleUiStateSave();
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private string GetContainerClasses()
+    {
+        var classes = new List<string>();
+        if (_uiState.IsPinned)
+        {
+            classes.Add("pinned");
+        }
+        if (_uiState.IsDetached)
+        {
+            classes.Add("detached");
+        }
+        if (_uiState.IsCollapsed)
+        {
+            classes.Add("collapsed");
+        }
+        return string.Join(" ", classes);
+    }
+
+    private string GetContainerStyle()
+    {
+        if (_uiState.IsDetached && _uiState.Left.HasValue && _uiState.Top.HasValue)
+        {
+            return $"left:{_uiState.Left.Value}px; top:{_uiState.Top.Value}px;";
+        }
+        return string.Empty;
+    }
+
+    private void ScheduleDataSave()
+    {
+        _saveDataCts?.Cancel();
+        _saveDataCts = new CancellationTokenSource();
+        _ = DebounceSaveDataAsync(_saveDataCts.Token);
+    }
+
+    private async Task DebounceSaveDataAsync(CancellationToken token)
+    {
+        try
+        {
+            await Task.Delay(300, token);
+            await ChecklistService.SaveChecklistAsync(AppUserId, ContactId, _data, token);
+        }
+        catch (TaskCanceledException)
+        {
+        }
+    }
+
+    private void ScheduleUiStateSave()
+    {
+        _saveUiCts?.Cancel();
+        _saveUiCts = new CancellationTokenSource();
+        _ = DebounceSaveUiAsync(_saveUiCts.Token);
+    }
+
+    private async Task DebounceSaveUiAsync(CancellationToken token)
+    {
+        try
+        {
+            await Task.Delay(300, token);
+            await ChecklistService.SaveUiStateAsync(AppUserId, ContactId, _uiState, token);
+        }
+        catch (TaskCanceledException)
+        {
+        }
+    }
+
+    [JSInvokable]
+    public Task OnDragFinished(double left, double top)
+    {
+        _uiState.Left = Math.Max(0, left);
+        _uiState.Top = Math.Max(0, top);
+        ScheduleUiStateSave();
+        return Task.CompletedTask;
+    }
+
+    private string FormatDate(DateTime date)
+    {
+        return date.ToString("yyyy/MM/dd", CultureInfo.CurrentCulture);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _saveDataCts?.Cancel();
+        _saveUiCts?.Cancel();
+        _dotNetRef?.Dispose();
+        await JsRuntime.InvokeVoidAsync("naraChecklist.dispose", _containerId);
+    }
+
+    private Guid? _draggingItemId;
+    enum ChecklistCompletionFilter
+    {
+        All,
+        Open,
+        Done
+    }
+}
+

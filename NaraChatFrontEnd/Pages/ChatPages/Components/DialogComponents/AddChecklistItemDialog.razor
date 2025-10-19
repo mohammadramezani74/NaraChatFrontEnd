@@ -1,0 +1,49 @@
+﻿<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.subtitle1" Class="mb-2">شرح مورد جدید</MudText>
+        <MudTextField @bind-Value="Text"
+                      Lines="4"
+                      Placeholder="یادداشت یا کار خود را بنویسید"
+                      Immediate="true"
+                      FullWidth="true"
+                      AutoFocus="true"
+                      Margin="Margin.Dense"
+                      TextAlign="TextAlign.Right" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Secondary" Variant="Variant.Text" OnClick="Cancel">انصراف</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@IsDisabled" OnClick="Submit">ثبت</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance Dialog { get; set; } = default!;
+
+    [Parameter]
+    public string InitialText { get; set; } = string.Empty;
+
+    private string Text { get; set; } = string.Empty;
+
+    private bool IsDisabled => string.IsNullOrWhiteSpace(Text?.Trim());
+
+    protected override void OnInitialized()
+    {
+        Text = InitialText;
+    }
+
+    private void Submit()
+    {
+        var trimmed = Text?.Trim();
+        if (string.IsNullOrWhiteSpace(trimmed))
+        {
+            return;
+        }
+
+        Dialog.Close(DialogResult.Ok(trimmed));
+    }
+
+    private void Cancel()
+    {
+        Dialog.Cancel();
+    }
+}

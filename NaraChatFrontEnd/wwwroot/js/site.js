@@ -1,7 +1,42 @@
-﻿ window.scrollToBottom = (element) => {
-        element.scrollTop = element.scrollHeight;
-};
+﻿function getScrollContainer(element) {
+    const el = resolveElement(element);
+    if (!el) return null;
+    return el.closest?.("[data-scroll-container]") ?? el;
+}
 
+window.scrollToBottom = (element) => {
+
+    const elem = document.getElementById("mainchat");
+    if (!elem) return;
+
+    const last = elem.lastElementChild;
+    setTimeout(() => {
+        if (last) {
+            try {
+                last.scrollIntoView({ behavior: "smooth", block: "end" });
+            } catch {
+                elem.scrollTop = elem.scrollHeight;
+            }
+        } else {
+            elem.scrollTop = elem.scrollHeight;
+        }
+    }, 50);
+
+  
+
+
+  
+  
+
+};
+function resolveElement(el) {
+    if (!el) return null;
+
+    if (el instanceof Element || el === window || el === document) return el;
+
+    if (el.id) return document.getElementById(el.id);
+    return null;
+}
 function browserNotify(data) {
     if (!("Notification" in window)) {
         alert(data.title);
@@ -32,9 +67,7 @@ function browserNotify(data) {
             }
         });
     }
-
 }
-
 
 window.scrollToElement = (id) => {
     const element = document.getElementById(id);
@@ -42,7 +75,6 @@ window.scrollToElement = (id) => {
         element.scrollIntoView({ behavior: "smooth", block: "center" });
     }
 };
-
 
 function triggerDownload(fileData, fileName) {
     const link = document.createElement("a");
@@ -53,41 +85,62 @@ function triggerDownload(fileData, fileName) {
     document.body.removeChild(link);
 }
 
-    (function () {
-        document.addEventListener('click', function (e) {
-            0922const a = e.target.closest('a[data-mention-link]');
-            if (!a) return;
-            e.preventDefault();
-            const href = a.getAttribute('href');
-            if (window.Blazor && typeof window.Blazor.navigateTo === 'function') {
-                window.Blazor.navigateTo(href);
-            } else {
-                window.location.href = href;
-            }
-        }, true);
-        })();
-
+(function () {
+    document.addEventListener('click', function (e) {
+        const a = e.target.closest('a[data-mention-link]');
+        if (!a) return;
+        e.preventDefault();
+        const href = a.getAttribute('href');
+        if (window.Blazor && typeof window.Blazor.navigateTo === 'function') {
+            window.Blazor.navigateTo(href);
+        } else {
+            window.location.href = href;
+        }
+    }, true);
+})();
 
 window.initScrollListener = (element, dotnetHelper) => {
-    element.addEventListener("scroll", () => {
-        if (element.scrollTop === 0) {
+    const container = getScrollContainer(element);
+    if (!container) return; 
+
+
+    if (container._scrollHandler) {
+        container.removeEventListener("scroll", container._scrollHandler);
+        container._scrollHandler = null;
+    }
+
+    const handler = () => {
+        if (container.scrollTop === 0) {
             dotnetHelper.invokeMethodAsync("LoadMoreMessages");
         }
-    });
+    };
+    container._scrollHandler = handler;
+    container.addEventListener("scroll", handler, { passive: true });
 };
 
+window.disposeScrollListener = (element) => {
+    const container = getScrollContainer(element);
+    if (!container || !container._scrollHandler) return;
+    container.removeEventListener("scroll", container._scrollHandler);
+    container._scrollHandler = null;
+};
+
+
 window.getScrollPosition = (element) => {
-    return element ? element.scrollTop : 0;
+    const container = getScrollContainer(element);
+    return container ? container.scrollTop : 0;
 };
 
 window.setScrollPosition = (element, position) => {
-    if (element) {
-        element.scrollTop = position;
+    const container = getScrollContainer(element);
+    if (container) {
+        container.scrollTop = position;
     }
 };
 
 window.getScrollHeight = (element) => {
-    return element ? element.scrollHeight : 0;
+    const container = getScrollContainer(element);
+    return container ? container.scrollHeight : 0;
 };
 
 window.getWindowSize = () => {
@@ -96,6 +149,7 @@ window.getWindowSize = () => {
         height: window.innerHeight
     };
 };
+
 function copyToClipboard(text) {
     navigator.clipboard.writeText(text).then(function () {
     }).catch(function (err) {

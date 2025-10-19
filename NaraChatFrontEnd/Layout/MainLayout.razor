@@ -83,15 +83,15 @@
                 <MudSpacer />
                 <MudIconButton @onclick="Logout" title="خروج"  Icon="@Icons.Material.Filled.ExitToApp" Color=" Color.Error" />
                 <MudIconButton @onclick="DarkModel" title="@(IsDarkMode?"تم لایت":"تم دارک")" Icon="@(IsDarkMode? @Icons.Material.Filled.LightMode:@Icons.Material.Filled.DarkMode)" Color="@(IsDarkMode?Color.Warning:Color.Default)" />
-                <MudIconButton @onclick="RouteToDownload"  title="اپ اندروید ناراگرام"  Icon="@Icons.Material.Filled.Android" Color=" Color.Tertiary" />
-                @* <MudMenu Disabled="@(CurrentUser==null)" Icon="@Icons.Material.Filled.MoreVert" *@
-                @* AriaLabel="Open user menu"> *@
-                @*     <MudIconButton @onclick="RouteToDownload"  title="اپ اندروید ناراگرام"  Icon="@Icons.Material.Filled.Android" Color=" Color.Tertiary" /> *@
-                @*     <MudIconButton @onclick="CreateChannel"  title="ایجاد کانال"  Icon="@Icons.Material.Filled.WifiChannel" Color=" Color.Info" /> *@
+             
+                <MudMenu Disabled="@(CurrentUser==null)" Icon="@Icons.Material.Filled.MoreVert" 
+                AriaLabel="Open user menu"> 
+                    <MudIconButton @onclick="RouteToDownload"  title="اپ اندروید ناراگرام"  Icon="@Icons.Material.Filled.Android" Color=" Color.Tertiary" /> 
+                   <MudIconButton @onclick="CreateChannel"  title="ایجاد کانال"  Icon="@Icons.Material.Filled.WifiChannel" Color=" Color.Info" /> 
 
 
 
-                @* </MudMenu> *@
+                </MudMenu>
 
 
             </MudAppBar>

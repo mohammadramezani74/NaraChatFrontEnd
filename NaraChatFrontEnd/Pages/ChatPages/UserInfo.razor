@@ -1,6 +1,7 @@
 ﻿@using System.Text.RegularExpressions
 @using NaraChat.Application.Services.ChatServices.Channels
 @using NaraChat.Contract.Models.Chat.Channels
+@using NaraChatFrontEnd.Pages.ChatPages.Components
 @inject IUserChatService userService
 @inject IChannelService _channelService
 @inject AuthenticationStateProvider stateprovider
@@ -163,6 +164,22 @@
         </MudStack>
     }
     else{
+
+        <div class="d-flex justify-content-end w-100 mb-2">
+    <MudIconButton Size="Size.Small"
+                   Color="Color.Primary"
+                   Title="@(_checklistOpen ? "جمع کردن یادداشت‌ها" : "نمایش یادداشت‌ها")"
+                   Icon="@(_checklistOpen ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                   OnClick="ToggleChecklistFromParent" />
+</div>
+              
+<div class="d-flex justify-content-end w-100 mb-2">
+    <ContactChecklist
+        @ref="_checklist"
+        AppUserId="@(CurrentUser?.Id is Guid cu && cu != Guid.Empty ? cu.ToString() : string.Empty)"
+        ContactId="@(TargetUserInfoResponse?.Id is Guid tu && tu != Guid.Empty ? tu.ToString() : string.Empty)"
+        ContactName="@(TargetUserInfoResponse?.Name ?? string.Empty)" />
+</div>
         <MudStack Justify="Justify.Center" Spacing="1" AlignItems="AlignItems.Center" Class="flex-grow-1" Style="overflow:hidden;">
             @if (IsOnline)
             {
@@ -604,6 +621,13 @@
     public string Changephone { get; set; } = string.Empty;
     bool ChangeCityToInput = false;
     public string ChangeCity { get; set; } = string.Empty;
+       private ContactChecklist? _checklist;   // @ref
+    private bool _checklistOpen = true;     // برای آیکن والد
+    private void ToggleChecklistFromParent()
+    {
+        _checklistOpen = !_checklistOpen;
+
+    }
     public async Task SubmitEmail()
     {
         if (string.IsNullOrWhiteSpace(ChangeEmail))

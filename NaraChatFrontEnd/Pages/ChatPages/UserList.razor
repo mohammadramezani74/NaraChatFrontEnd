@@ -7,16 +7,16 @@
     <!-- سوییچ تب‌ها (بدون تاثیر روی اسکرول لیست) -->
     <MudStack Row="true" Class="px-2 pt-2" Style="gap:8px;">
         <MudButton Size="Size.Small"
-                   Variant="@(_activeTab==PeopleTab.Contacts ? Variant.Filled : Variant.Outlined)"
-                   Color="Color.Primary"
-                   OnClick="@(()=>SetTab(PeopleTab.Contacts))">
+        Variant="@(_activeTab==PeopleTab.Contacts ? Variant.Filled : Variant.Outlined)"
+        Color="Color.Primary"
+        OnClick="@(()=>SetTab(PeopleTab.Contacts))">
             مخاطبین
         </MudButton>
 
         <MudButton Size="Size.Small"
-                   Variant="@(_activeTab==PeopleTab.Chats ? Variant.Filled : Variant.Outlined)"
-                   Color="Color.Primary"
-                   OnClick="@(()=>SetTab(PeopleTab.Chats))">
+        Variant="@(_activeTab==PeopleTab.Chats ? Variant.Filled : Variant.Outlined)"
+        Color="Color.Primary"
+        OnClick="@(()=>SetTab(PeopleTab.Chats))">
             چت‌های من
         </MudButton>
     </MudStack>
@@ -35,14 +35,14 @@
                     <ChildContent>
                         <MudPaper Elevation="0" Class="pa-2 d-flex align-center" Style="border-radius: 12px;">
                             <MudTextField @bind-Value="Search"
-                                          Placeholder="جستجو کنید..."
-                                          Variant="Variant.Outlined"
-                                          Immediate="true"
-                                          Adornment="Adornment.End"
-                                          AdornmentIcon="@Icons.Material.Filled.Search"
-                                          AdornmentColor="Color.Primary"
-                                          Class="w-100"
-                                          @oninput="OnSearchInput" />
+                            Placeholder="جستجو کنید..."
+                            Variant="Variant.Outlined"
+                            Immediate="true"
+                            Adornment="Adornment.End"
+                            AdornmentIcon="@Icons.Material.Filled.Search"
+                            AdornmentColor="Color.Primary"
+                            Class="w-100"
+                            @oninput="OnSearchInput" />
                         </MudPaper>
                     </ChildContent>
                 </MudListItem>
@@ -55,26 +55,26 @@
                     <ChildContent>
                         <MudPaper Elevation="0" Class="pa-2 d-flex align-center" Style="border-radius: 12px;">
                             <MudTextField @bind-Value="ChatsSearch"
-                                          Placeholder="جستجو در چت‌ها..."
-                                          Variant="Variant.Outlined"
-                                          Immediate="true"
-                                          Adornment="Adornment.End"
-                                          AdornmentIcon="@Icons.Material.Filled.Search"
-                                          AdornmentColor="Color.Primary"
-                                          Class="w-100"
-                                          @oninput="OnChatsSearchInput" />
+                            Placeholder="جستجو در چت‌ها..."
+                            Variant="Variant.Outlined"
+                            Immediate="true"
+                            Adornment="Adornment.End"
+                            AdornmentIcon="@Icons.Material.Filled.Search"
+                            AdornmentColor="Color.Primary"
+                            Class="w-100"
+                            @oninput="OnChatsSearchInput" />
                         </MudPaper>
                     </ChildContent>
                 </MudListItem>
             }
 
             <!-- فقط همین خط منبع داده را بر اساس تب فعال عوض می‌کند -->
-                <Virtualize items="@GetActiveItems()" Context="user" OverscanCount="2" ItemSize="68">
+            <Virtualize items="@GetActiveItems()" Context="user" OverscanCount="2" ItemSize="68">
                 <ItemContent>
-                                <MudListItem @key="@(user.Id+user.Name)"
-                                 @ondblclick="()=>PinUser(user)" @onclick="()=>HandleUserClick(user)"
-                                 Class=" py-3 px-2"
-                                 Style="@(user.IsSelected?$" height:73px;background-color:{chooseColor()};":"height:73px; ")">
+                    <MudListItem @key="@(user.Id+user.Name)"
+                    @ondblclick="()=>PinUser(user)" @onclick="()=>HandleUserClick(user)"
+                    Class=" py-3 px-2"
+                    Style="@(user.IsSelected?$" height:73px;background-color:{chooseColor()};":"height:73px; ")">
 
                         <AvatarContent>
                             <MudBadge Dot="true" Color="@(user.IsOnline? Color.Success:Color.Default)" Class="mx-6 my-4">
@@ -82,8 +82,8 @@
                                     <MudImage Src="@(user.avatar != null
                                             ? $"data:image/png;base64,{user.avatar}"
                                             : $"lib/assets/Images/{GetImageName(user.IsChannel)}")"
-                                              Class="rounded-circle"
-                                              Style="width:100%; height:100%; object-fit:inherit;" />
+                                    Class="rounded-circle"
+                                    Style="width:100%; height:100%; object-fit:inherit;" />
                                 </MudAvatar>
                             </MudBadge>
                         </AvatarContent>
@@ -148,14 +148,14 @@
 
 <style>
     .channel-shadow {
-        box-shadow: 0 0 10px 4px #594ae2;
+    box-shadow: 0 0 10px 4px #594ae2;
     }
 
     mark {
-        background-color: var(--mud-palette-primary);
-        color: white;
-        padding: 0 2px;
-        border-radius: 3px;
+    background-color: var(--mud-palette-primary);
+    color: white;
+    padding: 0 2px;
+    border-radius: 3px;
     }
 </style>
 
@@ -203,7 +203,7 @@
         _searchTimer = new System.Threading.Timer( _ =>
         {
             InvokeAsync(StateHasChanged);
-  
+
         }, null, 300, System.Threading.Timeout.Infinite);
     }
 
@@ -228,6 +228,7 @@
     public async Task HandleUserClick(UserDto user)
     {
         AllUsers.ToList().ForEach(x => x.IsSelected = false);
+        user.messageUnreadedCount = 0;
         user.IsSelected = true;
         await OnUserSelected.InvokeAsync(user);
         await HandleAnotherUserClick(user);

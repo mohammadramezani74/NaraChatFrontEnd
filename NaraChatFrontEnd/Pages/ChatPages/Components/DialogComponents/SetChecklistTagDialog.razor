@@ -1,0 +1,42 @@
+﻿@using MudBlazor
+
+<MudDialog>
+    <DialogContent >
+        <MudText Typo="Typo.subtitle1" Class="mb-2">برچسب آیتم</MudText>
+        <MudText Typo="Typo.caption" Class="mb-3">برای حذف برچسب، دکمهٔ «حذف» را بزنید.</MudText>
+        <MudTextField @bind-Value="_value" Placeholder="مثلاً: پیگیری" Immediate="true" Margin="Margin.Dense" />
+    </DialogContent>
+    <DialogActions >
+        <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="Clear">حذف</MudButton>
+        <MudSpacer />
+        <MudButton Variant="Variant.Text" OnClick="Cancel">لغو</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Submit">ذخیره</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public string Value { get; set; } = string.Empty;
+
+    private string _value = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        _value = Value;
+    }
+
+    private void Submit()
+    {
+        MudDialog.Close(DialogResult.Ok(_value));
+    }
+
+    private void Clear()
+    {
+        MudDialog.Close(DialogResult.Ok(string.Empty));
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+}

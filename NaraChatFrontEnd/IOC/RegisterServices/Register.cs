@@ -4,6 +4,7 @@ using NaraChat.Application.Services.Auth;
 using NaraChat.Application.Services.ChatServices;
 using NaraChat.Application.Services.ChatServices.Channels;
 using NaraChat.Application.Services.ChatServices.Conversation;
+using NaraChat.Application.Services.CheckLists;
 using NaraChat.Application.Services.LocalStorage;
 using NaraChat.Application.Services.TokenProvider;
 using NaraChat.Application.Settings;
@@ -24,6 +25,7 @@ namespace NaraChatFrontEnd.IOC.RegisterServices
            services.AddScoped<CustomAuthenticationStateProvider>();
             services.AddScoped<AuthenticationStateProvider, CustomAuthenticationStateProvider>();
             services.AddScoped<JwtAuthorizationMessageHandler>();
+            services.AddScoped<IContactChecklistService, ContactChecklistService>();
             services.AddSingleton<VersionCheckService>();
             services.AddHttpClient("apiwithAuth", client =>
             {

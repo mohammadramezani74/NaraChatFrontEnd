@@ -494,16 +494,28 @@
      });
         hubConnection.On<ChatMessageDto>(nameof(IChatHubClient.MessagedReceived), (MessageDto) =>
        {
-           _newIncomingMessageForUsers = MessageDto;
+
            var fromusers = Users.FirstOrDefault(x => x.Id == MessageDto.UserId);
+           if (_selectedUser?.Id != MessageDto.UserId)
+           {
+
+               if (SelectedChannel?.Id != MessageDto.UserId)
+               {
+                   var user=  Users.Where(x => x.Id == MessageDto.UserId).FirstOrDefault();
+                   user.LastReceivedMessage = MessageDto.Content;
+                   StateHasChanged();
+                   return;
+               }
+           }
+           _newIncomingMessageForUsers = MessageDto;
            if (fromusers.IsChannel)
            {
- 
+
                _newIncomingMessage = MessageDto;
 
                Users.Where(x => x.Id == MessageDto.UserId).First().messageUnreadedCount -= 1;
            }
-         else  if (!Users.Any(x => x.Id == MessageDto.UserId))
+           else  if (!Users.Any(x => x.Id == MessageDto.UserId))
            {
                Users.Insert(0, fromusers!);
                _newIncomingMessage = MessageDto;
@@ -562,9 +574,9 @@
       });
         hubConnection.On<Guid>(nameof(IChatHubClient.IncreaseMessageCount), (userId) =>
     {
-
+        var users = Users.First(x => x.Id == userId);
         Users.First(x => x.Id == userId).messageUnreadedCount += 1;
-
+        users.messageUnreadedCount = users.messageUnreadedCount += 1;
         StateHasChanged();
 
     });
@@ -613,12 +625,7 @@
         _newIncomingEditedMessage = message;
         StateHasChanged();
     });
-        hubConnection.On<EditedMessageDto>(nameof(IChatHubClient.EditedMessageReceived), async (message) =>
-     {
 
-         _newIncomingEditedMessage = message;
-         StateHasChanged();
-     });
         hubConnection.On<Guid>(nameof(IChatHubClient.DeletedMessageReceived), async (messageId) =>
      {
 
