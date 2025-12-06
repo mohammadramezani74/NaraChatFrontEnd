@@ -24,16 +24,16 @@
                     @if (SelectedChannel != null)
                 {
                     <MudAvatar Size="Size.Medium" Class="ml-2">
-      
-                                 <MudImage Src="lib/assets/Images/avatar.jpg" Class="rounded-circle" Style="object-fit:cover;"> </MudImage>
+
+                            <MudImage Src="@($"{SiteSettings.ApiUrl}{SelectedChannel.avatar}")" Class="rounded-circle" Style="object-fit:cover;"> </MudImage>
 
                     </MudAvatar>
 
                     <MudStack Row="false">
                             <MudText Typo="Typo.h1" Class="mr-3">@(SelectedChannel?.Name ?? string.Empty)</MudText>
-                      
-                     
-                                <MudText Style="font-size:10px; color:gray;" Class="mr-3"><b> تعداد اعضا 482 نفر</b></MudText>
+
+
+                            <MudText Style="font-size:10px; color:gray;" Class="mr-3"><b> تعداد اعضا @channelcount نفر</b></MudText>
                         
                                
                       
@@ -87,9 +87,9 @@
                                
                                                   }
                                 else{
-                                    <FileMessageComponent DeletedMessageevent="DeleteTargetMessage" IsMine="message.IsMine" CurrentUser="CurrentUser" message="message"
+                                    <ChannelFileMessageComponent DeletedMessageevent="DeleteTargetMessage" IsMine="message.IsMine" CurrentUser="CurrentUser" message="message"
                                                           ReplyMessageEvent="HandleReplyMessage" Conversation="Conversation" EditMessageEvent="OnEditMessageHandler"
-                                                          ParentMessage="@HandelParentMessage(message.ParentId)"></FileMessageComponent>
+                                                          ParentMessage="@HandelParentMessage(message.ParentId)"></ChannelFileMessageComponent>
                                 }
                             </div>
                         </ItemContent>
@@ -206,7 +206,7 @@ else
                     <MudAvatar Size="Size.Medium" Class="ml-2">
                         @if (OtherUser.avatar != null)
                         {
-                            <MudImage Src="@($"data:image/png;base64,{OtherUser.avatar}")" Class="rounded-circle" Style="object-fit:cover;" />
+                                <MudImage Src="@($"{SiteSettings.ApiUrl}{OtherUser.avatar}")" Class="rounded-circle" Style="object-fit:cover;" />
                         }
                         else
                         {

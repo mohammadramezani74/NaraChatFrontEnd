@@ -23,6 +23,7 @@ namespace NaraChat.Contract.Models.Users
         public Guid? LastReceivedMessageId { get; set; }
         public bool IsLastReceivedMessageForMe { get; set; }
         public string? LastReceivedMessageSendDate { get; set; }
+        public DateTime? LastMessageDate { get; set; }
         public bool IsPin { get; set; }
         public bool IsBlocked { get; set; }
         public bool OtherUserBlocked { get; set; }
@@ -36,7 +37,7 @@ namespace NaraChat.Contract.Models.Users
 
         public UserDto(Guid id, string name, string? Avatar = null, bool Isonline = false, int messageUnreadedCount = 0, DateTime? lastseen = null, string? lastReceivedMessage = null,
             Guid? lastReceivedMessageId=null,bool isLastReceivedMessageForMe=false,string? lastReceivedMessageSendDate=null,bool isPinned=false,bool isBlocked=false,
-        Guid? conversationId=null, bool otherUserBlocked = false, bool ischannel=false, ChannelDto?chanel=null,string? username=null)
+        Guid? conversationId=null, bool otherUserBlocked = false, bool ischannel=false, ChannelDto?chanel=null,string? username=null,DateTime?lastmessageDate=null)
         {
             Id = id;
             Name = name;
@@ -55,6 +56,7 @@ namespace NaraChat.Contract.Models.Users
             IsChannel=ischannel;
             channel= chanel;
             UserName = username;
+            LastMessageDate = lastmessageDate;
 
 
         }

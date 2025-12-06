@@ -6,9 +6,9 @@
 @inject IJSRuntime JS
 @inject ITokenService tokenservice
 <MudItem xs="12" Class="w-100">
-    <div class="d-flex w-100 @(message.IsMine ? "justify-start" : "justify-end")">
+    <div class="d-flex w-100 @(!message.IsMine ? "justify-start" : "justify-end")">
 
-        <MudChat ChatPosition="@(message.IsMine?ChatBubblePosition.Start:ChatBubblePosition.End)">
+        <MudChat ChatPosition="@(!message.IsMine?ChatBubblePosition.Start:ChatBubblePosition.End)">
 
 
 
@@ -23,7 +23,7 @@
                 @if (ParentMessage != null && message.ParentId != null)
                 {
                     <MudPaper Class="reply-preview px-2 py-1 mb-1" style="@replyColor()">
-                        @if (IsMine)
+                        @if (!IsMine)
                         {
                             <a href="javascript:void(0)" @onclick="() => ScrollToMessage(message.ParentId!.Value)">
                                 <MudText Class="text-truncate" Style="text-align: right; color:gray;font-size: 10px;    padding-bottom: 6px;">
@@ -80,7 +80,7 @@
 
 
 
-                @if (IsMine)
+                @if (!IsMine)
                 {
                     <MudStack Row="true">
 
@@ -104,7 +104,7 @@
                         <MudText Class="mt-2 " Style="font-size:8px; text-align: right;">ویرایش شده</MudText>
                     }
                 }
-                @if (IsMine)
+                @if (!IsMine)
                 {
                     <MudPopover Open="@(Hovering && message.Equals(_hoverMessage))" Class="hoverarea"
                     AnchorOrigin="Origin.TopLeft"
@@ -261,7 +261,15 @@
     public string? GetAvatar() => CurrentUser.Id == message.UserId ? myAvatar : OtherAvatar;
     public string replyColor() { return message.IsMine ? $"background-color: {ThemeCascading.MyColorReply}" : $"background-color: {ThemeCascading.OtherColorReply}"; }
     public string ClockColor() => $"color: {ThemeCascading.ClockColor};";
-    public string Style() { return message.IsMine ? $"min-width: 305px;background-color: {ThemeCascading.myColorChat}" : $"min-width: 50px;background-color: {ThemeCascading.OtherColorChat}"; }
+    public string Style()
+    {
+        if (ThemeCascading.ClockColor == "#270aff")
+        {
+            return $"min-width:305px; background-color:#ffffff";
+        }
+        return $"min-width:305px; background-color:#0B1220";
+
+    }
     protected override async Task OnInitializedAsync()
     {
         var me = Conversation.users.Where(c => c.Id == CurrentUser.Id).FirstOrDefault();
@@ -289,7 +297,7 @@
 
     private async Task OnRightClick(MouseEventArgs e, ChatMessageDto message)
     {
-        if (IsMine)
+        if (!IsMine)
         {
             showContextMenuForMessageId = message.Id;
             contextMenuX = (int)e.ClientX;
@@ -412,7 +420,7 @@
             FileName = message.fileDownloadName ?? "downloaded_file";
             FileSize = GetFileSize(message.Data);
 
-            await JS.InvokeVoidAsync("triggerDownload2", FileData, FileName);
+            await JS.InvokeVoidAsync("triggerDownload", message.Data, FileName, "application/octet-stream");
         }
         IsLoading = false;
 

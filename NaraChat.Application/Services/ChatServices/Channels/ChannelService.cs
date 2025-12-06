@@ -7,6 +7,8 @@ using NaraChat.Contract.Models.Chat.Conversation;
 using System.Net.Http;
 using NaraChat.Contract.Models.Users;
 using NaraChat.Contract.Models.Users.ServiceViewModels;
+using System.Threading.Channels;
+using System.Net.Http.Headers;
 
 namespace NaraChat.Application.Services.ChatServices.Channels
 {
@@ -197,6 +199,140 @@ namespace NaraChat.Application.Services.ChatServices.Channels
             }
         }
 
+        public async Task<(bool status, string message)> AddNewMemberByAdmin(AddNewMemberCommand command, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var result = await _client.PostAsJsonAsync($"/api/v1/channel/AddNewMember", new { command.ChannelId,command.MemberId });
+                var content = await result.Content.ReadAsStringAsync();
+                var Response = JsonSerializer.Deserialize<BaseResponseDto<string>>(content, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+                if (Response.status == 200)
+                {
+                    return (true, Response.message);
+                }
+                else
+                {
+                    return (false, Response.message);
 
+                }
+            }
+            catch (Exception ex)
+            {
+
+                return (false, "عملیات با خطا مواجه شد!!");
+            }
+        }
+
+        public async Task<List<ChannelMemberViewModel>> GetChannelMembers(Guid channelid, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+
+
+                var queryParams = string.Empty;
+
+                var response = await _client.GetFromJsonAsync<BaseResponseDto<List<ChannelMemberViewModel>>>($"/api/v1/channel/{channelid}/ChannelMembers", new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+                if (response?.isSucceded ?? false)
+                {
+                   
+                    return response.result;
+                }
+                return new List<ChannelMemberViewModel>();
+            }
+            catch (Exception ex)
+            {
+                return new List<ChannelMemberViewModel>();
+
+            }
+        }
+        public async Task<(bool success, string Message)> UploadNewProfileImage(StreamContent stream, string ContentType, string extension,Guid ChannelId, CancellationToken cancellationToken = default)
+        {
+            var content = new MultipartFormDataContent();
+            stream.Headers.ContentType = new MediaTypeHeaderValue(ContentType);
+
+            content.Add(stream, "file", Guid.NewGuid().ToString() + extension);
+            content.Add(new StringContent(ChannelId.ToString()), "channelId");
+            try
+            {
+
+
+                var result = await _client.PostAsync($"/api/v1/channel/SetProfile", content, cancellationToken);
+                if (result.IsSuccessStatusCode)
+                {
+
+                    var avatarPath = JsonSerializer.Deserialize<BaseResponseDto<string>>(await result.Content.ReadAsStringAsync());
+                    return (true, avatarPath.result);
+                }
+                return (false, "مشکلی در تغییر عکس به وجود آمده ");
+            }
+            catch (Exception e)
+            {
+
+                return (false, "مشکلی در تغییر عکس به وجود آمده ");
+            }
+        }
+        public async Task<string?> GetAvatar(Guid UserId, CancellationToken cancellationToken = default)
+        {
+            var response = await _client.GetFromJsonAsync<BaseResponseDto<CurrentUserAvatarResponse>>($"/api/v1/channel/getavatar?id={UserId}");
+            if (response?.isSucceded ?? false)
+            {
+
+                return response.result.picture;
+            }
+            return null;
+        }
+        public async Task<string?> downloadChannelFile(Guid fileid, CancellationToken cancellationToken = default)
+        {
+            var response = await _client.GetFromJsonAsync<BaseResponseDto<string>>($"/api/v1/channel/DownloadChannelQuery?id={fileid}");
+            if (response?.isSucceded ?? false)
+            {
+
+                return response.result;
+            }
+            return null;
+        }
+        public async Task<List<ChannelFileItem>?> getChannelFiles(Guid channelId, CancellationToken cancellationToken = default)
+        {
+            var response = await _client.GetFromJsonAsync<BaseResponseDto<List<ChannelFileItem>>>($"/api/v1/channel/getChannelFiles?id={channelId}");
+            if (response?.isSucceded ?? false)
+            {
+
+                return response.result;
+            }
+            return null;
+        }
+
+        public async Task<(bool status,string message)> RemoveMemberFromChannel(Guid memberid, Guid channelid, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var result = await _client.PostAsJsonAsync($"/api/v1/channel/DeleteMemberFromChannel", new { memberid, channelid });
+                var content = await result.Content.ReadAsStringAsync();
+                var Response = JsonSerializer.Deserialize<BaseResponseDto<string>>(content, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+                if (Response.status == 200)
+                {
+                    return (true, Response.message);
+                }
+                else
+                {
+                    return (false, Response.message);
+
+                }
+            }
+            catch (Exception ex)
+            {
+
+                return (false, "عملیات با خطا مواجه شد!!");
+            }
+        }
     }
 }

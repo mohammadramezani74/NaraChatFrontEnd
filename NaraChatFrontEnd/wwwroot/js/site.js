@@ -75,10 +75,17 @@ window.scrollToElement = (id) => {
         element.scrollIntoView({ behavior: "smooth", block: "center" });
     }
 };
-
-function triggerDownload(fileData, fileName) {
+function triggerDownload2(fileData, fileName) {
     const link = document.createElement("a");
     link.href = fileData;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+function triggerDownload(base64Data, fileName, mimeType = "application/octet-stream") {
+    const link = document.createElement("a");
+    link.href = `data:${mimeType};base64,${base64Data}`;
     link.download = fileName;
     document.body.appendChild(link);
     link.click();
@@ -100,7 +107,7 @@ function triggerDownload(fileData, fileName) {
 })();
 
 window.initScrollListener = (element, dotnetHelper) => {
-    const container = getScrollContainer(element);
+    const container = document.getElementById("mainchat");
     if (!container) return; 
 
 
@@ -111,7 +118,10 @@ window.initScrollListener = (element, dotnetHelper) => {
 
     const handler = () => {
         if (container.scrollTop === 0) {
-            dotnetHelper.invokeMethodAsync("LoadMoreMessages");
+           if(element===1)
+               dotnetHelper.invokeMethodAsync("LoadMoreMessages");
+           else
+               dotnetHelper.invokeMethodAsync("LoadMoreChannelMessages");
         }
     };
     container._scrollHandler = handler;

@@ -33,6 +33,7 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
     [Parameter]  public UserDto? SelectedChannel { get; set; } = null;
 
     private DotNetObjectReference<ChatDetail>? objRef;
+    private DotNetObjectReference<ChatDetail>? objRef2;
 
     public bool IsUploading { get; set; } = false;
     public UserAvatar Avatars { get; set; } = new();
@@ -119,6 +120,7 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
     [Parameter] public EventCallback ClearMissedMessageUser { get; set; }
 
     [Parameter] public List<ChatMessageDto> MissedUserMessage { get; set; }
+    [Parameter] public EventCallback<(Guid OtherId,DateTime now, string Message)> UpdateTimeList { get; set; }
 
     public string? ReactionTitle { get; set; } = null;
 
@@ -148,6 +150,9 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
     private bool _pendingScrollToBottom;
 
     private bool isProcessing = false;
+    [Parameter]
+    public int channelcount { get; set; }
+
 
     #endregion
     //private static MarkupString LinkifyMentions(string content)
@@ -163,11 +168,14 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
     {
         CurrentUser = await ((CustomAuthenticationStateProvider)stateprovider).GetUserInfoAsync();
         objRef ??= DotNetObjectReference.Create(this);
+        objRef2 ??= DotNetObjectReference.Create(this);
         await OnSendMessageSession.InvokeAsync();
+  
     }
 
     protected override async Task OnParametersSetAsync()
     {
+
         if (isProcessing) return;
         isProcessing = true;
 
@@ -194,18 +202,24 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-       
+        objRef ??= DotNetObjectReference.Create(this);
+        objRef2 ??= DotNetObjectReference.Create(this);
+        await js.InvokeVoidAsync("initScrollListener", 1, objRef);
+        if (SelectedChannel != null)
+        {
+            await js.InvokeVoidAsync("initScrollListener", 2, objRef2);
+         
+        }
         if (firstRender)
         {
-            objRef ??= DotNetObjectReference.Create(this);
-            await js.InvokeVoidAsync("initScrollListener", _channelContainer, objRef);
+         
         
            if(SelectedChannel != null)
             {
-                await js.InvokeVoidAsync("initScrollListener", _channelContainer, objRef); 
+                await js.InvokeVoidAsync("initScrollListener", 2, objRef); 
             }
             else
-                await js.InvokeVoidAsync("initScrollListener", _chatContainer, objRef);
+                await js.InvokeVoidAsync("initScrollListener", 1, objRef);
             NeedScrollToBottom();
         }
 
@@ -216,10 +230,10 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
             if (SelectedChannel != null)
             {
  
-                await js.InvokeVoidAsync("scrollToBottom", _channelContainer);
+                await js.InvokeVoidAsync("scrollToBottom", 1);
             }
             else
-                await js.InvokeVoidAsync("scrollToBottom", _chatContainer);
+                await js.InvokeVoidAsync("scrollToBottom", 1);
             await MarkVisibleIncomingAsSeenAsync();
         }
     }
@@ -239,6 +253,8 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
             try { await js.InvokeVoidAsync("disposeScrollListener", _chatContainer); } catch { /* ignore */ }
 
             objRef?.Dispose();
+
+            objRef2?.Dispose();
         }
         catch { /* ignore */ }
     }
@@ -256,11 +272,39 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
         {
             IsloadedOldMessages = true;
 
-            var previousScrollHeight = await js.InvokeAsync<int>("getScrollHeight", _channelContainer);
+            var previousScrollHeight = await js.InvokeAsync<int>("getScrollHeight", _chatContainer);
 
             MessageCount += 15;
 
             await LoadMoreMesages(MessageCount);
+
+            StateHasChanged();
+
+            await Task.Delay(50);
+
+            var newScrollHeight = await js.InvokeAsync<int>("getScrollHeight", _chatContainer);
+            var scrollDiff = newScrollHeight - previousScrollHeight;
+
+            await js.InvokeVoidAsync("setScrollPosition", _chatContainer, scrollDiff);
+        }
+        else
+        {
+            MessageCount = 15;
+        }
+    }
+
+    [JSInvokable]
+    public async Task LoadMoreChannelMessages()
+    {
+        if (_messages.Count >= MessageCount)
+        {
+            IsloadedOldMessages = true;
+
+            var previousScrollHeight = await js.InvokeAsync<int>("getScrollHeight", _chatContainer);
+
+            MessageCount += 15;
+
+            await LoadMoreChannelMesages(MessageCount);
 
             StateHasChanged();
 
@@ -476,7 +520,7 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
         if (OtherUser != null && _drafts.TryGetValue(OtherUser.Id, out var draft))
             NewMessage = draft;
     }
-    public async Task LoadChannelMesages(int count = 30)
+    public async Task LoadChannelMesages(int count = 15)
     {
         _messages.Clear();
 
@@ -511,6 +555,22 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
         {
             foreach (var m in newMessages)
                 m.Content =m.Content;
+            _messages.AddRange(newMessages);
+            _messages.Sort((a, b) => a.SendAt.CompareTo(b.SendAt));
+        }
+    }
+    private async Task LoadMoreChannelMesages(int count = 15)
+    {
+   
+        var messages = await _channelservice.LoadChannelMessages(SelectedChannel.Id, count);
+
+        var known = new HashSet<Guid>(_messages.Select(m => m.Id));
+        var newMessages = messages.Where(m => !known.Contains(m.Id)).ToList();
+
+        if (newMessages.Any())
+        {
+            foreach (var m in newMessages)
+                m.Content = m.Content;
             _messages.AddRange(newMessages);
             _messages.Sort((a, b) => a.SendAt.CompareTo(b.SendAt));
         }
@@ -588,7 +648,7 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
             await changeUserLastMessage.InvokeAsync();
             newMessage.Id = result.MessageId;
 
-            // ✅ بعد از ارسال موفق، پیش‌نویس این گفتگو پاک می‌شود
+        
             if (OtherUser != null) _drafts.Remove(OtherUser.Id);
 
             NeedScrollToBottom();
@@ -596,6 +656,7 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
             NewMessage = string.Empty;
             SelectedMessageToReply = null;
             ReplyMode = false;
+            await UpdateTimeList.InvokeAsync((OtherUser.Id, DateTime.Now,newMessage.Content));
         }
     }
     private async Task SendChannelMessage(ChatMessageDto? Mapmessage = null)
@@ -672,6 +733,7 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
             NewMessage = string.Empty;
             SelectedMessageToReply = null;
             ReplyMode = false;
+            await UpdateTimeList.InvokeAsync((SelectedChannel.Id, DateTime.Now, newMessage.Content));
         }
     }
 
@@ -868,7 +930,7 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
         }
         catch (Exception)
         {
-            ErrorMessage("آپلود فایل با خطا مواجه شد لطفا مجدد تلاش فرمایید!");
+           
             IsUploading = false;
         }
     }

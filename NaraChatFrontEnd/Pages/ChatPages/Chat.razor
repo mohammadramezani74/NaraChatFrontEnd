@@ -67,10 +67,12 @@
                             MissedUserMessage="missedTargetUserMassages"
                             ClearMissedMessageUser="ClearMissedTargetUserMessages"
                             LoadScroll="LoadScroll"
+                            UpdateTimeList="UpdateTimeList"
                             FalseScroll="FalsingScrol"
                             trueScroll="trueingScrol"
                             GoToSettingInMobile="GoToSettingInMobile"
                             SelectedChannel="SelectedChannel"
+                            channelcount="ChannelCount"
                             joinchannelevent="JoinToChannel" />
                         </MudItem>
                     }
@@ -137,7 +139,9 @@
                         trueScroll="trueingScrol"
                         GoToSettingInMobile="GoToSettingInMobile" 
                         SelectedChannel="SelectedChannel"
-                        joinchannelevent="JoinToChannel"/>
+                        channelcount="ChannelCount"
+                        joinchannelevent="JoinToChannel"
+                        UpdateTimeList="UpdateTimeList" />
                     </MudItem>
 
                     @if (ThemeChanging.IsShowSetting)
@@ -252,6 +256,7 @@
     private List<ChatMessageDto> missedTargetUserMassages = new List<ChatMessageDto>();
     public bool LoadScroll { get; set; } = false;
     public UserDto? SelectedChannel = null;
+    public int ChannelCount { get; set; }
 
 
     public async Task HandleBackToUserListMobile(){
@@ -472,17 +477,28 @@
         StateHasChanged();
     });
 
-        hubConnection.On<ICollection<UserDto>>(nameof(IChatHubClient.OnlineUserList), (onlineUsers) =>
+        hubConnection.On<Guid>(nameof(IChatHubClient.OnlineUserList), (channelId) =>
        {
-           foreach (var user in Users)
+           var selectedChannel = Users.Where(x => x.Id == channelId).FirstOrDefault();
+           if (selectedChannel != null)
            {
-               if (onlineUsers.Any(x => x.Id == user.Id))
-               {
-                   user.IsOnline = true;
-               }
+               Users.Remove(selectedChannel);
+               StateHasChanged();
            }
-           StateHasChanged();
+
+
        });
+        hubConnection.On<ICollection<UserDto>>(nameof(IChatHubClient.GetDeletedChannel), (onlineUsers) =>
+    {
+        foreach (var user in Users)
+        {
+            if (onlineUsers.Any(x => x.Id == user.Id))
+            {
+                user.IsOnline = true;
+            }
+        }
+        StateHasChanged();
+    });
         hubConnection.On<BlockDto>(nameof(IChatHubClient.BlockUser), (blockedUser) =>
      {
          var user = Users.Where(u => u.Id == blockedUser.UserId).FirstOrDefault();
@@ -638,6 +654,16 @@
          reaction = messageType;
          StateHasChanged();
      });
+        hubConnection.On<UserDto>(nameof(IChatHubClient.ReceiveNewChannel), async (user) =>
+     {
+
+         if (!Users.Any(x => x.Id == user.Id))
+         {
+             Users.Add(user);
+             StateHasChanged();
+         }
+
+     });
 
 
         return hubConnection;
@@ -657,6 +683,8 @@
         {
             LoadScroll = true;
             SelectedChannel = user;
+            var count = await channelService.GetChannelMembers(SelectedChannel.Id);
+            ChannelCount = count.Count;
         }
         else
         {
@@ -696,11 +724,12 @@
     }
     private async Task HandleChannelLink(string userName)
     {
+        userName = userName.TrimStart('@');
         var channel = Users.FirstOrDefault(u => u.UserName?.Equals(userName, StringComparison.OrdinalIgnoreCase) == true);
         if (channel == null)
         {
             var search = await channelService.GetPublicChannels();
-     
+
             channel = search.FirstOrDefault(u => u.UserName?.Equals(userName, StringComparison.OrdinalIgnoreCase) == true && u.IsChannel);
             if (channel == null)
             {
@@ -794,5 +823,25 @@
         _newIncomingMessageForUsers = message;
         StateHasChanged();
     }
+    public async Task UpdateTimeList((Guid UserId,DateTime now, string Message) data)
+    {
+        var target = Users.Where(x => x.Id == data.UserId).FirstOrDefault();
+        if(target is not null)
+        {
+            target.LastMessageDate = data.now;
+            target.LastReceivedMessageSendDate = CreateDateTime(data.now);
+            if(data.Message.Length>15)
+                target.LastReceivedMessage = data.Message.Substring(0,15)+"...";
+            else
+            {
+                target.LastReceivedMessage = data.Message;
+            }
 
+            StateHasChanged();
+        }
+    }
+    private static string CreateDateTime(DateTime? lastMessageSentAt)
+    {
+        return lastMessageSentAt?.FormatPersianDate().ToPersianNumber() ?? "";
+    }
 }

@@ -1,0 +1,66 @@
+﻿@using MudBlazor
+@using NaraChat.Contract.Models.Chat.Channels
+@using System.Linq
+
+<MudDialog>
+    <DialogContent>
+        <MudAutocomplete T="UserChannelDto"
+                         @bind-Value="SelectedUser"
+                         Label="@DialogLabel"
+                         Dense="true"
+                         Clearable="true"
+                         CoerceText="true"
+                         SearchFunc="SearchUsers"
+                         ToStringFunc="u => u.Name"
+                         Variant="Variant.Outlined"
+                         Class="mb-4" />
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton Color="Color.Primary"
+                   OnClick="Save"
+                   Disabled="@(SelectedUser is null)">افزودن</MudButton>
+        <MudButton Color="Color.Secondary" OnClick="Cancel">انصراف</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public List<UserChannelDto> AvailableUsers { get; set; } = new();
+
+    [Parameter]
+    public string DialogLabel { get; set; } = "انتخاب عضو";
+
+    public UserChannelDto? SelectedUser { get; set; }
+
+    private Task<IEnumerable<UserChannelDto>> SearchUsers(string value, CancellationToken cancellationToken)
+    {
+        IEnumerable<UserChannelDto> users = AvailableUsers ?? Enumerable.Empty<UserChannelDto>();
+
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            users = users.Where(u => u.Name.Contains(value, StringComparison.OrdinalIgnoreCase));
+        }
+
+        return Task.FromResult(users);
+    }
+
+    private void Save()
+    {
+        if (SelectedUser is null)
+        {
+            MudDialog.Close(DialogResult.Cancel());
+            return;
+        }
+
+        MudDialog.Close(DialogResult.Ok(SelectedUser));
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Close(DialogResult.Cancel());
+    }
+}

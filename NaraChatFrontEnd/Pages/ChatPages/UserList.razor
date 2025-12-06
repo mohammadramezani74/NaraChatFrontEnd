@@ -77,28 +77,58 @@
                     Style="@(user.IsSelected?$" height:73px;background-color:{chooseColor()};":"height:73px; ")">
 
                         <AvatarContent>
-                            <MudBadge Dot="true" Color="@(user.IsOnline? Color.Success:Color.Default)" Class="mx-6 my-4">
-                                <MudAvatar Size="Size.Medium" Class="@((user.IsChannel ? "channel-shadow" : ""))">
-                                    <MudImage Src="@(user.avatar != null
-                                            ? $"data:image/png;base64,{user.avatar}"
+                            @if(!user.IsChannel){
+                                <MudBadge Dot="true" Color="@(user.IsOnline? Color.Success:Color.Default)" Class="mx-6 my-4">
+                                    <MudAvatar Size="Size.Medium" Class="@((user.IsChannel ? "channel-shadow" : ""))">
+                                        <MudImage Src="@(user.avatar != null
+                                           ? $"{SiteSettings.ApiUrl}{user.avatar}"
                                             : $"lib/assets/Images/{GetImageName(user.IsChannel)}")"
-                                    Class="rounded-circle"
-                                    Style="width:100%; height:100%; object-fit:inherit;" />
-                                </MudAvatar>
-                            </MudBadge>
+                                        Class="rounded-circle"
+                                        Style="width:100%; height:100%; object-fit:inherit;" />
+                                    </MudAvatar>
+                                </MudBadge>
+                            }
+                            else
+                            {
+                                <div Class="mx-6 my-4">
+                                    <MudAvatar Size="Size.Medium" Class="@((user.IsChannel ? "channel-shadow" : ""))">
+                                        <MudImage Src="@(user.avatar != null
+                                            ? $"{SiteSettings.ApiUrl}{user.avatar}"
+                                            : $"lib/assets/Images/{GetImageName(user.IsChannel)}")"
+                                        Class="rounded-circle"
+                                        Style="width:100%; height:100%; object-fit:inherit;" />
+                                    </MudAvatar>
+                                </div>
+                            }
                         </AvatarContent>
 
                         <ChildContent>
                             <MudStack Row=false>
-                                <MudStack Row="true">
+                                <MudStack Row="true" Style=" display:flex; justify-content:space-between">
                                     @if (user.messageUnreadedCount > 0)
                                     {
-                                        <MudText Style="font-size:12px;">@((MarkupString)RenderNameHighlighted(user.Name))</MudText>
+                                        <MudText Style="font-size:12px;">@((MarkupString)RenderNameHighlighted(user.Name))
+                                            @if (user.IsChannel)
+                                            {
+
+                                                <MudImage Style="height=15px;width:15px; margin-right:5px;" Src="lib/assets/Images/logogo.svg" Alt="کانال" Elevation="25" Class="rounded-lg" />
+                                            }
+
+                                        </MudText>
+
                                         <MudBadge Content="@GetUnreadCap(user.messageUnreadedCount)" Color="Color.Error" Overlap="true" Origin="Origin.TopRight" Class="mx-6 my-4"></MudBadge>
                                     }
                                     else
                                     {
-                                        <MudText Style="font-size:12px;">@((MarkupString)RenderNameHighlighted(user.Name))</MudText>
+                                        <MudText Style="font-size:12px;">@((MarkupString)RenderNameHighlighted(user.Name))
+
+                                            @if (user.IsChannel)
+                                            {
+
+                                                <MudImage Style="height=15px;width:15px; margin-right:5px;" Src="lib/assets/Images/logogo.svg" Alt="کانال" Elevation="25" Class="rounded-lg" />
+                                            }
+
+                                        </MudText>
                                     }
                                     @if (user.IsPin)
                                     {
@@ -281,7 +311,9 @@
                 .GroupBy(u => u.Id)
                 .Select(g => g.First()) // اگر تکراری بود، اولین مورد نگه داشته می‌شود
                 .OrderByDescending(c => c.IsPin)
-                .ThenByDescending(c => c.IsChannel)
+                .ThenByDescending(x=>x.LastMessageDate)
+                .ThenBy(c => c.IsChannel)
+
                 .ThenByDescending(u => u.messageUnreadedCount > 0)
                 .ToList();
         }
@@ -341,16 +373,24 @@
             await NullIncommengMessage.InvokeAsync();
             StateHasChanged();
         }
+        AllUsers = AllUsers.OrderByDescending(x => x.LastMessageDate).ToList();
+        StateHasChanged();
     }
 
 
     // منبع «چت‌های من»: فیلتر + سرچ جدا (ChatsSearch) — بدون دست‌زدن به AllUsers
     private IEnumerable<UserDto> GetMyChatsView()
     {
-        var list = Users
+        IEnumerable<UserDto> list = Users
             .Where(u => u.messageUnreadedCount > 0
                      || u.LastReceivedMessageId != null
-                     || !string.IsNullOrWhiteSpace(u.LastReceivedMessage));
+                     || !string.IsNullOrWhiteSpace(u.LastReceivedMessage)||
+            u.IsChannel).OrderByDescending(x => x.LastMessageDate);
+        var list2 = Users
+       .Where(u => u.messageUnreadedCount > 0
+                || u.LastReceivedMessageId != null
+                || !string.IsNullOrWhiteSpace(u.LastReceivedMessage) ||
+       u.IsChannel).OrderByDescending(x => x.LastMessageDate).ToList();
 
         if (!string.IsNullOrWhiteSpace(ChatsSearch))
         {
@@ -363,7 +403,7 @@
         return list
             .OrderByDescending(c => c.IsPin)
             .ThenByDescending(c => c.messageUnreadedCount > 0)
-            .ThenByDescending(c => c.LastReceivedMessageSendDate) // اگر تاریخ متن فارسیه، بهتره DateTime جدا داشته باشه
+            .ThenByDescending(c => c.LastMessageDate) // اگر تاریخ متن فارسیه، بهتره DateTime جدا داشته باشه
             .ToList();
     }
     private IEnumerable<UserDto> GetAllUsersView()
@@ -382,7 +422,7 @@
         var mylist= list
             .OrderByDescending(c => c.IsPin)
             .ThenByDescending(c => c.messageUnreadedCount > 0)
-            .ThenByDescending(c => c.LastReceivedMessageSendDate)   // اگر متن فارسیه، بهتره DateTime جدا داشته باشه
+            .ThenByDescending(c => c.LastMessageDate)   // اگر متن فارسیه، بهتره DateTime جدا داشته باشه
             .ThenBy(c => c.Name, StringComparer.OrdinalIgnoreCase)  // مرتب‌سازی پایانی با نام
            .GroupBy(x=>x.Id)
            .Select(XAxisLabelPosition=>XAxisLabelPosition.First())
@@ -444,7 +484,7 @@
 
         var newPinStatus = !targetUser.IsPin;
         var pinnedUsers = AllUsers.Where(u => u.IsPin).Count();
-        if (pinnedUsers >= 3 && newPinStatus == true)
+        if (pinnedUsers >= 5 && newPinStatus == true)
         {
             snackbar.Clear();
             snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomRight;
@@ -458,6 +498,7 @@
             targetUser.IsPin = newPinStatus;
             AllUsers = AllUsers
                 .OrderByDescending(c => c.IsPin)
+                .ThenByDescending(x=>x.LastMessageDate)
                 .ThenByDescending(c => c.messageUnreadedCount > 0)
                 .ToList();
 
