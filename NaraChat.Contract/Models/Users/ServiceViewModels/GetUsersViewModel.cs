@@ -8,6 +8,11 @@ using System.Threading.Tasks;
 
 namespace NaraChat.Contract.Models.Users.ServiceViewModels
 {
+    public class IdViewModel
+    {
+        public Guid Id { get; set; }
+        public string? Name { get; set; }
+    }
     public sealed record GetUsersViewModel
     {
         public Guid Id { get; set; }
@@ -16,7 +21,9 @@ namespace NaraChat.Contract.Models.Users.ServiceViewModels
         public DateTime? LastSeen { get; set; }
         public string FirstName { get; set; } = null!;
         public string LastName { get; set; } = null!;
+        public string? Age { get; set; }
         public string Avatar { get; set; }
+        public string? Bio { get; set; }
         public int MessageUnreadedCount { get; set; }
         public string LastReceivedMessage { get; set; }
         public Guid? LastReceivedMessageId { get; set; }
@@ -26,6 +33,8 @@ namespace NaraChat.Contract.Models.Users.ServiceViewModels
         public bool IsBlocked { get; set; }
         public bool  OtherUserBlocked{ get; set; }
         public bool IsChannel { get; set; }
+        public bool IsGroup{ get; set; }
+
         public ChannelDto? channel { get; set; }
         public DateTime? LastMessageDate { get; set; }
     }

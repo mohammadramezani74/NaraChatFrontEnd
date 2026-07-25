@@ -6,10 +6,10 @@
             <MudButton OnClick="ZoomOut">🔍 زوم -</MudButton>
             <MudButton OnClick="Rotate">↻ چرخش</MudButton>
             <MudButton OnClick="Flip">⇆ برگرداندن</MudButton>
-            <MudIconButton  OnClick="Download">+ دانلود</MudIconButton>
+            <MudIconButton OnClick="Download">+ دانلود</MudIconButton>
         </div>
         <div style="max-width: 100%;height:auto; position: relative;">
-            <img id="image" src="@($" data:image /png;base64, {ImageData}")" class="image" style="background-color: white;" />
+            <img id="image" src="@($"{SiteSettings.ApiUrl}{ImageData}")" class="image" style="background-color: white;" />
         </div>
 
         <!-- دکمه‌ها -->
@@ -28,7 +28,7 @@
     private async Task Download()
     {
         var FileData = $"data:application/octet-stream;base64,{ImageData}";
-       var FileName ="downloaded_file.jpg";
+        var FileName = "downloaded_file.jpg";
 
 
         await js.InvokeVoidAsync("triggerDownload2", FileData, FileName);
@@ -40,5 +40,10 @@
         {
             await js.InvokeVoidAsync("cropper.init");
         }
+    }
+    public void Dispose()
+    {
+       
+        js.InvokeVoidAsync("cropper.destroy");
     }
 }

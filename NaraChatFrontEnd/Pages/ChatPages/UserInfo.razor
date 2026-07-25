@@ -3,7 +3,6 @@
 @using NaraChat.Contract.Models.Chat.Channels
 @using NaraChatFrontEnd.Pages.ChatPages.Components
 @using System.Text
-@using NaraChat.Contract.Models.Chat.Channels
 @inject IUserChatService userService
 @inject IChannelService _channelService
 @inject AuthenticationStateProvider stateprovider
@@ -11,488 +10,1204 @@
 @inject ISnackbar snackbar
 @inject IConversationService ConversationService
 @inject IJSRuntime js
-@inject IChannelService _channelService
 @implements IAsyncDisposable
-<MudPaper Elevation="5" Class="pa-6 h-100 d-flex flex-column">
+
+<MudPaper Elevation="0" Class="profile-panel h-100 d-flex flex-column">
+
+    @* ==================== CHANNEL ==================== *@
     @if (SelectedChannel != null)
     {
-        <MudStack Justify="Justify.Center" Spacing="1" AlignItems="AlignItems.Center" Class="flex-grow-1" Style="overflow:hidden;">
+        <div class="profile-scroll">
 
+            <!-- تصویر و هویت -->
+            <div class="hero">
+                <div class="hero-media" @onclick="OpenChannelPictureDialog" title="نمایش تصویر">
+                    <MudImage Src="@($"{SiteSettings.ApiUrl}{SelectedChannel.avatar}")"
+                              ObjectFit="ObjectFit.Cover"
+                              Class="hero-img" />
+                    <span class="hero-scrim"></span>
+                </div>
 
+                <span class="hero-badge is-channel">
+                    <MudIcon Icon="@Icons.Material.Filled.Campaign" Class="badge-icon" /> کانال
+                </span>
 
-            <MudChip T="string"
-            Class="mt-4"
-            Color="Color.Primary"
-            Variant="Variant.Filled"
-            Icon="@Icons.Material.Filled.FiberManualRecord"
-            Style="flex-shrink:0;">
-                کانال  @SelectedChannel.Name
-            </MudChip>
+                <div class="hero-camera">
+                    <MudFileUpload T="IBrowserFile" FilesChanged="UploadChannelFiles" Disabled="@(IsSelectedFile)">
+                        <ActivatorContent>
+                            <MudIconButton Color="Color.Primary"
+                                           Variant="Variant.Filled"
+                                           Size="Size.Small"
+                                           Title="تغییر تصویر کانال"
+                                           Icon="@Icons.Material.Filled.PhotoCamera" />
+                        </ActivatorContent>
+                    </MudFileUpload>
+                </div>
+            </div>
 
+            <div class="identity">
+                <h2 class="identity-name">@SelectedChannel.Name</h2>
 
-            <MudPaper Style="width:100%; margin-top: 73px;   display: flex; height:350px; min-height:200px; position:relative; overflow:hidden; border-radius:16px; border:2px solid #e0e0e0; box-shadow:0 6px 20px rgba(0,0,0,0.15);" Elevation="8">
-                <MudImage Src="@($"{SiteSettings.ApiUrl}{SelectedChannel.avatar}")"
-                Style="width:100%; height:100%; display:block; cursor:pointer;"
-                ObjectFit="ObjectFit.Cover"
-                @onclick="OpenPictureDialog" />
-            </MudPaper>
+                <button type="button" class="username-chip" @onclick="CopyUserName" title="کپی شناسه">
+                    <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Class="chip-icon" />
+                    <span>@($"@{SelectedChannel.UserName}")</span>
+                </button>
+            </div>
 
+            <!-- بیوگرافی -->
+            <section class="section-card">
+                <div class="section-head">
+                    <span class="section-title">درباره کانال</span>
+                    @if (SelectedChannel.channel?.CurrentUserAdmin == true && !ClickOnBioEdited)
+                    {
+                        <MudIconButton OnClick="()=>ClickOnBioEdited=true"
+                                       Size="Size.Small"
+                                       Icon="@Icons.Material.Filled.Edit"
+                                       Title="ویرایش بیوگرافی"
+                                       Class="ghost-btn" />
+                    }
+                </div>
 
-            @if (SelectedChannel!=null)
-            {
-                <MudFileUpload T="IBrowserFile" FilesChanged="UploadChannelFiles" Disabled="@(IsSelectedFile)">
-                    <ActivatorContent>
-                        <MudIconButton Color="Color.Info"
-                        Icon="@Icons.Material.Filled.PhotoCamera">
-                        </MudIconButton>
-                    </ActivatorContent>
-                </MudFileUpload>
-            }           
-
-
-
-            <MudText Typo="Typo.h1" Class="text-center" Color="Color.Primary" Style="word-break:break-word; margin-bottom: 16px; margin-top: 9px;">@SelectedChannel.Name</MudText>
-
-            <MudStack Row="true" Justify="Justify.Center" AlignItems="AlignItems.Center" Class="mb-4">
-                <MudText Typo="Typo.h1" Color="Color.Primary">@($"@{SelectedChannel.UserName}")</MudText>
-                <MudIconButton Icon="@Icons.Material.Filled.ContentCopy" Color="Color.Default" Size="Size.Medium" Class="ml-2" OnClick="CopyUserName" />
-            </MudStack>
-
-            @if (SelectedChannel.channel.CurrentUserAdmin)
-            {
-
-                if (ClickOnBioEdited){
-                    <MudStack Row="true">
-                        <MudTextField @bind-Value="bio" Label="بیوگرافی" Variant="Variant.Text"></MudTextField>
-                        <MudIconButton OnClick="()=>ClickOnBioEdited=false" Size="Size.Small" Icon="@Icons.Material.Filled.Close" Title="ویرایش بیوگرافی" Color="Color.Error" />
-
-                        <MudIconButton OnClick="ChangeBio" Size="Size.Small" Icon="@Icons.Material.Filled.Check" Title="ویرایش بیوگرافی" Color="Color.Tertiary" />
-
-
-                    </MudStack>
+                @if (SelectedChannel.channel?.CurrentUserAdmin == true && ClickOnBioEdited)
+                {
+                    <div class="inline-edit">
+                        <MudTextField @bind-Value="bio"
+                                      Placeholder="متن معرفی کانال"
+                                      Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
+                                      AutoGrow
+                                      MaxLines="4"
+                                      Class="edit-field" />
+                        <MudIconButton OnClick="ChangeBio" Size="Size.Small" Icon="@Icons.Material.Filled.Check" Title="ذخیره" Color="Color.Success" />
+                        <MudIconButton OnClick="()=>ClickOnBioEdited=false" Size="Size.Small" Icon="@Icons.Material.Filled.Close" Title="انصراف" Color="Color.Error" />
+                    </div>
                 }
                 else
                 {
-                    <MudText Typo="Typo.body2" Class="text-center mb-4" Color="ThemeChanging.SeenColor"> <MudIconButton OnClick="()=>ClickOnBioEdited=true" Size="Size.Small" Icon="@Icons.Material.Filled.Edit" Title="ویرایش بیوگرافی" Color="ThemeChanging.SeenColor" /> کانال رسمی ایران نارا </MudText>
-
+                    <p class="body-text @(string.IsNullOrWhiteSpace(SelectedChannel.Bio) ? "is-placeholder" : "")">
+                        @(string.IsNullOrWhiteSpace(SelectedChannel.Bio) ? "توضیحی ثبت نشده است" : SelectedChannel.Bio)
+                    </p>
                 }
+            </section>
 
-            }
-            <hr />
+            <!-- اعضا و فایل‌ها -->
+            <section class="section-card p-0">
+                <MudTabs @bind-ActivePanelIndex="_channelManagementActiveTab"
+                         Class="detail-tabs"
+                         Rounded="false"
+                         ApplyEffectsToContainer="true">
 
-
-            <MudPaper Class="p-4" 
-            Style="width:100%; max-width:500px; border-radius:12px; border:1px solid #e0e0e0;">
-                <MudTabs @bind-ActivePanelIndex="_channelManagementActiveTab" Style="width:100%;" Class="mb-2">
-
-
-                    <MudTabPanel Text="اعضای کانال">
-                        <MudStack Spacing="2">
-                            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
-                                <MudText Typo="Typo.h6" Color="Color.Primary">لیست اعضا <small>(@ChannelMembers.Count.ToPersianNumber2() نفر)</small></MudText>
+                    <MudTabPanel Text="اعضا">
+                        <div class="tab-body">
+                            <div class="section-head">
+                                <span class="section-title">
+                                    اعضای کانال
+                                    <span class="count-pill">@ChannelMembers.Count.ToPersianNumber2()</span>
+                                </span>
                                 @if (CanManageMembers)
                                 {
-                                    <MudIconButton Icon="@Icons.Material.Filled.PersonAdd"
-                                    Color="Color.Primary"
-                                    Variant="Variant.Filled"
-                                    Size="Size.Small"
-                                    Disabled="@(!HasAvailableUsersForChannel())"
-                                    OnClick="OpenAddMemberDialog"
-                                    Title="افزودن عضو" />
+                                    <MudButton StartIcon="@Icons.Material.Filled.PersonAdd"
+                                               Color="Color.Primary"
+                                               Variant="Variant.Text"
+                                               Size="Size.Small"
+                                               Disabled="@(!HasAvailableUsersForChannel())"
+                                               OnClick="OpenAddMemberDialog">
+                                        افزودن عضو
+                                    </MudButton>
                                 }
-                            </MudStack>
+                            </div>
 
-                            <MudStack Style="height:150px; overflow-y:auto; gap:4px; scrollbar-width: none;">
+                            <div class="scroll-list">
                                 @if (ChannelMembers.Any())
                                 {
                                     @foreach (var member in ChannelMembers)
                                     {
-                                        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Style="padding:4px; border-bottom:1px solid #e0e0e0;">
-                                            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.FlexStart" Style="flex-direction:row-reverse;">
-                                                <MudText Style="font-size:12px;">@member.Name</MudText>
-                                                <MudChip T="string"
-                                                Size="Size.Small"
-                                                Color="@(member.IsCreator ? Color.Warning : member.IsAdmin ? Color.Primary : Color.Default)"
-                                                Class="mr-2">
+                                        <div class="member-row">
+                                            <span class="member-initial @(member.IsCreator ? "is-creator" : member.IsAdmin ? "is-admin" : "")">
+                                                @(string.IsNullOrWhiteSpace(member.Name) ? "؟" : member.Name.Trim().Substring(0, 1))
+                                            </span>
+
+                                            <div class="member-main">
+                                                <span class="member-name">@member.Name</span>
+                                                <span class="role-chip @(member.IsCreator ? "role-creator" : member.IsAdmin ? "role-admin" : "role-member")">
                                                     @(member.IsCreator ? "سازنده" : member.IsAdmin ? "ادمین" : "عضو")
-                                                </MudChip>
+                                                </span>
+                                            </div>
+
+                                            <div class="member-actions">
                                                 @if (SelectedChannel.channel.CreatorId == member.Id)
                                                 {
-
                                                 }
-                                                else if(SelectedChannel.channel.CreatorId==CurrentUser.Id && member.IsAdmin)
+                                                else if (SelectedChannel.channel.CreatorId == CurrentUser.Id && member.IsAdmin)
                                                 {
-                                                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                                                    Color="Color.Error"
-                                                    Size="Size.Small"
-                                                    OnClick="()=>RemoveMember(member)"/>
-
-                                                    <MudSpacer></MudSpacer>
-                                                    <MudIconButton Icon="@Icons.Material.Filled.AdminPanelSettings"
-                                                    Color="Color.Warning"
-                                                    OnClick="()=>RemoveAdmin(member)"
-                                                    Size="Size.Small" />
+                                                    <MudIconButton Icon="@Icons.Material.Filled.RemoveModerator"
+                                                                   Color="Color.Warning"
+                                                                   Size="Size.Small"
+                                                                   Title="حذف دسترسی ادمین"
+                                                                   OnClick="()=>RemoveAdmin(member)" />
+                                                    <MudIconButton Icon="@Icons.Material.Filled.PersonRemove"
+                                                                   Color="Color.Error"
+                                                                   Size="Size.Small"
+                                                                   Title="حذف از کانال"
+                                                                   OnClick="()=>RemoveMember(member)" />
                                                 }
-                                                else if(SelectedChannel.channel.CreatorId==CurrentUser.Id && !member.IsAdmin)
+                                                else if (SelectedChannel.channel.CreatorId == CurrentUser.Id && !member.IsAdmin)
                                                 {
-                                                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                                                    Color="Color.Error"
-                                                    Size="Size.Small" 
-                                                    OnClick="()=>RemoveMember(member)"/>
-
-                                                    <MudSpacer></MudSpacer>
                                                     <MudIconButton Icon="@Icons.Material.Filled.AdminPanelSettings"
-                                                    Color="Color.Success"
-                                                    OnClick="()=>PromoteToAdminAsync(member)"
-                                                    Size="Size.Small" />
+                                                                   Color="Color.Success"
+                                                                   Size="Size.Small"
+                                                                   Title="ارتقا به ادمین"
+                                                                   OnClick="()=>PromoteToAdminAsync(member)" />
+                                                    <MudIconButton Icon="@Icons.Material.Filled.PersonRemove"
+                                                                   Color="Color.Error"
+                                                                   Size="Size.Small"
+                                                                   Title="حذف از کانال"
+                                                                   OnClick="()=>RemoveMember(member)" />
                                                 }
                                                 else if (isAdmin() && !member.IsAdmin)
                                                 {
-                                                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
-                                                    Color="Color.Error"
-                                                    Size="Size.Small"
-                                                    OnClick="()=>RemoveMember(member)"/>
-
-                                                    <MudSpacer></MudSpacer>
                                                     <MudIconButton Icon="@Icons.Material.Filled.AdminPanelSettings"
-                                                    Color="Color.Success"
-                                                    OnClick="()=>PromoteToAdminAsync(member)"
-                                                    Size="Size.Small" />
+                                                                   Color="Color.Success"
+                                                                   Size="Size.Small"
+                                                                   Title="ارتقا به ادمین"
+                                                                   OnClick="()=>PromoteToAdminAsync(member)" />
+                                                    <MudIconButton Icon="@Icons.Material.Filled.PersonRemove"
+                                                                   Color="Color.Error"
+                                                                   Size="Size.Small"
+                                                                   Title="حذف از کانال"
+                                                                   OnClick="()=>RemoveMember(member)" />
                                                 }
-
-                                            </MudStack>
-                                        </MudStack>
+                                            </div>
+                                        </div>
                                     }
                                 }
                                 else
                                 {
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="text-center mt-4">هنوز عضوی برای نمایش وجود ندارد.</MudText>
+                                    <div class="mini-empty">
+                                        <MudIcon Icon="@Icons.Material.Outlined.Group" />
+                                        <span>هنوز عضوی اضافه نشده است</span>
+                                    </div>
                                 }
-                            </MudStack>
-                        </MudStack>
+                            </div>
+                        </div>
                     </MudTabPanel>
-<MudTabPanel Text="مدیا و فایل‌ها" OnClick="InitializeChannelAssets">
-    <MudStack Spacing="3" Style="max-height:200px; overflow-y:auto; scrollbar-width: none;">
 
-        <MudStack Spacing="1">
-            <!-- ردیف عنوان + سرچ کم‌جا -->
-            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
-                <MudText Typo="Typo.subtitle2" Color="Color.Primary">فایل‌ها</MudText>
+                    <MudTabPanel Text="فایل‌ها" OnClick="InitializeChannelAssets">
+                        <div class="tab-body">
+                            <div class="section-head">
+                                <span class="section-title">فایل‌های ارسالی</span>
+                                @if (ChannelFileItems.Any())
+                                {
+                                    <MudTextField T="string"
+                                                  Value="_fileSearch"
+                                                  ValueChanged="OnFileSearchChanged"
+                                                  Placeholder="جستجوی فایل"
+                                                  Margin="Margin.Dense"
+                                                  Variant="Variant.Outlined"
+                                                  Adornment="Adornment.Start"
+                                                  AdornmentIcon="@Icons.Material.Filled.Search"
+                                                  Immediate="true"
+                                                  Class="mini-search" />
+                                }
+                            </div>
 
-                @if (ChannelFileItems.Any())
-                {
-               <MudTextField T="string"
-              Value="_fileSearch"
-              ValueChanged="OnFileSearchChanged"
-              Placeholder="جستجوی نام فایل..."
-       
-              Margin="Margin.Dense"
-              Adornment="Adornment.Start"
-              AdornmentIcon="@Icons.Material.Filled.Search"
-              Immediate="true"
-              Style="max-width:180px;" />
-                }
-            </MudStack>
-
-            @if (FilteredChannelFileItems.Any())
-            {
-                <MudList T="ChannelFileItem" Dense="true">
-                    @foreach (var file in FilteredChannelFileItems)
-                    {
-                        <MudListItem T="ChannelFileItem">
-                            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Style="width:100%;">
-                                <MudStack Spacing="0">
-                                    <MudText Typo="Typo.body2">@file.FileName</MudText>
-                                </MudStack>
-                                <MudIconButton Icon="@Icons.Material.Filled.Download"
-                                               Color="Color.Primary"
-                                               Size="Size.Small"
-                                               OnClick="() => DownloadFile(file)"
-                                               Title="دانلود" />
-                            </MudStack>
-                        </MudListItem>
-                    }
-                </MudList>
-            }
-            else
-            {
-                <MudText Typo="Typo.caption" Color="Color.Secondary">فایلی برای دانلود موجود نیست.</MudText>
-            }
-        </MudStack>
-
-    </MudStack>
-</MudTabPanel>
+                            <div class="scroll-list">
+                                @if (FilteredChannelFileItems.Any())
+                                {
+                                    @foreach (var file in FilteredChannelFileItems)
+                                    {
+                                        <div class="file-row">
+                                            <span class="file-icon">
+                                                <MudIcon Icon="@Icons.Material.Filled.InsertDriveFile" />
+                                            </span>
+                                            <div class="file-main">
+                                                <span class="file-name">@file.FileName</span>
+                                                <span class="file-ext">@(System.IO.Path.GetExtension(file.FileName)?.TrimStart('.').ToUpperInvariant())</span>
+                                            </div>
+                                            <MudIconButton Icon="@Icons.Material.Filled.Download"
+                                                           Color="Color.Primary"
+                                                           Size="Size.Small"
+                                                           OnClick="() => DownloadFile(file)"
+                                                           Title="دانلود" />
+                                        </div>
+                                    }
+                                }
+                                else
+                                {
+                                    <div class="mini-empty">
+                                        <MudIcon Icon="@Icons.Material.Outlined.FolderOff" />
+                                        <span>فایلی برای نمایش نیست</span>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </MudTabPanel>
 
                 </MudTabs>
-            </MudPaper>
+            </section>
 
-
-
-
-
-
-            <hr />
-            <br />
-
-            <MudStack  Justify="Justify.FlexStart">
-
-
-
-
-
-
-            </MudStack>
-
-
-            <MudDivider Class="my-4" Style="width:100%;" />
-
-
-        </MudStack>
+        </div>
     }
-    else{
 
-        <div class="d-flex justify-content-end w-100 mb-2">
-            <MudIconButton Size="Size.Small"
-            Color="Color.Primary"
-            Title="@(_checklistOpen ? "جمع کردن یادداشت‌ها" : "نمایش یادداشت‌ها")"
-            Icon="@(_checklistOpen ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
-            OnClick="ToggleChecklistFromParent" />
-        </div>
+    @* ==================== GROUP ==================== *@
+    else if (SelectedGroup != null)
+    {
+        <div class="profile-scroll">
 
-        <div class="d-flex justify-content-end w-100 mb-2">
-            <ContactChecklist
-            @ref="_checklist"
-            AppUserId="@(CurrentUser?.Id is Guid cu && cu != Guid.Empty ? cu.ToString() : string.Empty)"
-            ContactId="@(TargetUserInfoResponse?.Id is Guid tu && tu != Guid.Empty ? tu.ToString() : string.Empty)"
-            ContactName="@(TargetUserInfoResponse?.Name ?? string.Empty)" />
-        </div>
-        <MudStack Justify="Justify.Center" Spacing="1" AlignItems="AlignItems.Center" Class="flex-grow-1" Style="overflow:hidden;">
-            @if (IsOnline)
-            {
+            <div class="hero">
+                <div class="hero-media" @onclick="OpenGroupPictureDialog" title="نمایش تصویر">
+                    <MudImage Src="@($"{SiteSettings.ApiUrl}{SelectedGroup.avatar}")"
+                              ObjectFit="ObjectFit.Cover"
+                              Class="hero-img" />
+                    <span class="hero-scrim"></span>
+                </div>
 
+                <span class="hero-badge is-group">
+                    <MudIcon Icon="@Icons.Material.Filled.Groups" Class="badge-icon" /> گروه
+                </span>
 
-                <MudChip T="string"
-                Class="mt-4"
-                Color="IsBlocked?Color.Error: Color.Success"
-                Variant="Variant.Filled"
-                Icon="@Icons.Material.Filled.FiberManualRecord"
-                Style="flex-shrink:0;">
-                    @(IsBlocked ?"مسدود شده" :"آنلاین")
-                </MudChip>
-            }
-            else
-            {
-                @if (CurrentUser != null)
+                @if (HasAccessToChangePicture())
                 {
-                    @if (CurrentUser.Id == TargetUserInfoResponse.Id)
+                    <div class="hero-camera">
+                        <MudFileUpload T="IBrowserFile" FilesChanged="UploadGroupFiles" Disabled="@(IsSelectedFile)">
+                            <ActivatorContent>
+                                <MudIconButton Color="Color.Primary"
+                                               Variant="Variant.Filled"
+                                               Size="Size.Small"
+                                               Title="تغییر تصویر گروه"
+                                               Icon="@Icons.Material.Filled.PhotoCamera" />
+                            </ActivatorContent>
+                        </MudFileUpload>
+                    </div>
+                }
+            </div>
+
+            <div class="identity">
+                <h2 class="identity-name">@SelectedGroup.Name</h2>
+
+                <button type="button" class="username-chip" @onclick="CopyUserName" title="کپی شناسه">
+                    <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Class="chip-icon" />
+                    <span>@($"@{SelectedGroup.UserName}")</span>
+                </button>
+            </div>
+
+            <section class="section-card">
+                <div class="section-head">
+                    <span class="section-title">درباره گروه</span>
+                    @if (SelectedGroup.channel?.CurrentUserAdmin == true && !ClickOnBioEdited)
                     {
-
-                        <MudChip T="string"
-                        Class="mt-4"
-                        Color="Color.Success"
-                        Variant="Variant.Filled"
-                        Icon="@Icons.Material.Filled.FiberManualRecord"
-                        Style="flex-shrink:0;">
-                            آنلاین
-                        </MudChip>
+                        <MudIconButton OnClick="()=>ClickOnBioEdited=true"
+                                       Size="Size.Small"
+                                       Icon="@Icons.Material.Filled.Edit"
+                                       Title="ویرایش بیوگرافی"
+                                       Class="ghost-btn" />
                     }
-                    else{
-                        <MudChip T="string"
-                        Class="mt-4"
-                        Color="IsBlocked?Color.Error:Color.Default"
-                        Variant="Variant.Filled"
-                        Icon="@Icons.Material.Filled.FiberManualRecord"
-                        Style="flex-shrink:0;">
-                            @(IsBlocked ? "مسدود شده" : "آفلاین")
-                        </MudChip>
-                    }
+                </div>
 
-                }
-
-            }
-
-            <MudPaper Style="width: 100%; height: 250px; position: relative; overflow: hidden;
-                 border-radius: 16px; border: 2px solid #e0e0e0; box-shadow: 0 6px 20px rgba(0,0,0,0.15);"
-            Elevation="8">
-                @if (TargetUserInfoResponse.Avatar != null)
+                @if (SelectedGroup.channel?.CurrentUserAdmin == true && ClickOnBioEdited)
                 {
-                    <MudImage Src="@($"{SiteSettings.ApiUrl}{TargetUserInfoResponse.Avatar}")"
-                    Style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;" 
-                    @onclick="OpenPictureDialog" />
-                }
-                else if (MyAvatar != null && ChosenUser == null)
-                {
-                    <MudImage Src="@($"{SiteSettings.ApiUrl}{MyAvatar}")"
-                    Style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;" 
-                    @onclick="OpenPictureDialog" />
+                    <div class="inline-edit">
+                        <MudTextField @bind-Value="bio"
+                                      Placeholder="متن معرفی گروه"
+                                      Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
+                                      AutoGrow
+                                      MaxLines="4"
+                                      Class="edit-field" />
+                        <MudIconButton OnClick="ChangeGroupBio" Size="Size.Small" Icon="@Icons.Material.Filled.Check" Title="ذخیره" Color="Color.Success" />
+                        <MudIconButton OnClick="()=>ClickOnBioEdited=false" Size="Size.Small" Icon="@Icons.Material.Filled.Close" Title="انصراف" Color="Color.Error" />
+                    </div>
                 }
                 else
                 {
-                    <MudImage Src="lib/assets/Images/avatar.jpg"
-                    Style="width: 100%; height: 100%; object-fit: cover;" />
+                    <p class="body-text @(string.IsNullOrWhiteSpace(SelectedGroup.Bio) ? "is-placeholder" : "")">
+                        @(string.IsNullOrWhiteSpace(SelectedGroup.Bio) ? "توضیحی ثبت نشده است" : SelectedGroup.Bio)
+                    </p>
                 }
-            </MudPaper>
+            </section>
 
+            <section class="section-card p-0">
+                <MudTabs @bind-ActivePanelIndex="_channelManagementActiveTab"
+                         Class="detail-tabs"
+                         Rounded="false"
+                         ApplyEffectsToContainer="true">
+
+                    <MudTabPanel Text="اعضا">
+                        <div class="tab-body">
+                            <div class="section-head">
+                                <span class="section-title">
+                                    اعضای گروه
+                                    <span class="count-pill">@((GroupMembers?.Count ?? 0).ToPersianNumber2())</span>
+                                </span>
+                                @if (CanManageGroupMembers)
+                                {
+                                    <MudButton StartIcon="@Icons.Material.Filled.PersonAdd"
+                                               Color="Color.Primary"
+                                               Variant="Variant.Text"
+                                               Size="Size.Small"
+                                               Disabled="@(!HasAvailableUsersForChannel())"
+                                               OnClick="OpenAddMemberGroupDialog">
+                                        افزودن عضو
+                                    </MudButton>
+                                }
+                            </div>
+
+                            <div class="scroll-list">
+                                @if (GroupMembers != null && GroupMembers.Any())
+                                {
+                                    @foreach (var member in GroupMembers)
+                                    {
+                                        <div class="member-row">
+                                            <span class="member-initial @(member.IsCreator ? "is-creator" : member.IsAdmin ? "is-admin" : "")">
+                                                @(string.IsNullOrWhiteSpace(member.Name) ? "؟" : member.Name.Trim().Substring(0, 1))
+                                            </span>
+
+                                            <div class="member-main">
+                                                <span class="member-name">@member.Name</span>
+                                                <span class="role-chip @(member.IsCreator ? "role-creator" : member.IsAdmin ? "role-admin" : "role-member")">
+                                                    @(member.IsCreator ? "سازنده" : member.IsAdmin ? "ادمین" : "عضو")
+                                                </span>
+                                            </div>
+
+                                            <div class="member-actions">
+                                                @if (SelectedGroup.channel.CreatorId == member.Id)
+                                                {
+                                                }
+                                                else if (SelectedGroup.channel.CreatorId == CurrentUser.Id && member.IsAdmin)
+                                                {
+                                                    <MudIconButton Icon="@Icons.Material.Filled.RemoveModerator"
+                                                                   Color="Color.Warning"
+                                                                   Size="Size.Small"
+                                                                   Title="حذف دسترسی ادمین"
+                                                                   OnClick="()=>RemoveGroupAdmin(member)" />
+                                                    <MudIconButton Icon="@Icons.Material.Filled.PersonRemove"
+                                                                   Color="Color.Error"
+                                                                   Size="Size.Small"
+                                                                   Title="حذف از گروه"
+                                                                   OnClick="()=>RemoveGroupMember(member)" />
+                                                }
+                                                else if (SelectedGroup.channel.CreatorId == CurrentUser.Id && !member.IsAdmin)
+                                                {
+                                                    <MudIconButton Icon="@Icons.Material.Filled.AdminPanelSettings"
+                                                                   Color="Color.Success"
+                                                                   Size="Size.Small"
+                                                                   Title="ارتقا به ادمین"
+                                                                   OnClick="()=>PromoteToAdminGroupAsync(member)" />
+                                                    <MudIconButton Icon="@Icons.Material.Filled.PersonRemove"
+                                                                   Color="Color.Error"
+                                                                   Size="Size.Small"
+                                                                   Title="حذف از گروه"
+                                                                   OnClick="()=>RemoveGroupMember(member)" />
+                                                }
+                                                else if (isAdminGroup() && !member.IsAdmin)
+                                                {
+                                                    <MudIconButton Icon="@Icons.Material.Filled.AdminPanelSettings"
+                                                                   Color="Color.Success"
+                                                                   Size="Size.Small"
+                                                                   Title="ارتقا به ادمین"
+                                                                   OnClick="()=>PromoteToAdminGroupAsync(member)" />
+                                                    <MudIconButton Icon="@Icons.Material.Filled.PersonRemove"
+                                                                   Color="Color.Error"
+                                                                   Size="Size.Small"
+                                                                   Title="حذف از گروه"
+                                                                   OnClick="()=>RemoveGroupMember(member)" />
+                                                }
+                                            </div>
+                                        </div>
+                                    }
+                                }
+                                else
+                                {
+                                    <div class="mini-empty">
+                                        <MudIcon Icon="@Icons.Material.Outlined.Group" />
+                                        <span>هنوز عضوی اضافه نشده است</span>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </MudTabPanel>
+
+                    <MudTabPanel Text="فایل‌ها" OnClick="InitializeGroupAssets">
+                        <div class="tab-body">
+                            <div class="section-head">
+                                <span class="section-title">فایل‌های ارسالی</span>
+                                @if (ChannelFileItems.Any())
+                                {
+                                    <MudTextField T="string"
+                                                  Value="_fileSearch"
+                                                  ValueChanged="OnFileSearchChanged"
+                                                  Placeholder="جستجوی فایل"
+                                                  Margin="Margin.Dense"
+                                                  Variant="Variant.Outlined"
+                                                  Adornment="Adornment.Start"
+                                                  AdornmentIcon="@Icons.Material.Filled.Search"
+                                                  Immediate="true"
+                                                  Class="mini-search" />
+                                }
+                            </div>
+
+                            <div class="scroll-list">
+                                @if (FilteredChannelFileItems.Any())
+                                {
+                                    @foreach (var file in FilteredChannelFileItems)
+                                    {
+                                        <div class="file-row">
+                                            <span class="file-icon">
+                                                <MudIcon Icon="@Icons.Material.Filled.InsertDriveFile" />
+                                            </span>
+                                            <div class="file-main">
+                                                <span class="file-name">@file.FileName</span>
+                                                <span class="file-ext">@(System.IO.Path.GetExtension(file.FileName)?.TrimStart('.').ToUpperInvariant())</span>
+                                            </div>
+                                            <MudIconButton Icon="@Icons.Material.Filled.Download"
+                                                           Color="Color.Primary"
+                                                           Size="Size.Small"
+                                                           OnClick="() => DownloadGroupFile(file)"
+                                                           Title="دانلود" />
+                                        </div>
+                                    }
+                                }
+                                else
+                                {
+                                    <div class="mini-empty">
+                                        <MudIcon Icon="@Icons.Material.Outlined.FolderOff" />
+                                        <span>فایلی برای نمایش نیست</span>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </MudTabPanel>
+
+                </MudTabs>
+            </section>
+
+        </div>
+    }
+
+    @* ==================== USER ==================== *@
+    else
+    {
+        <div class="profile-scroll">
+
+            <div class="hero">
+                <div class="hero-media">
+                    @if (TargetUserInfoResponse.Avatar != null)
+                    {
+                        <MudImage Src="@($"{SiteSettings.ApiUrl}{TargetUserInfoResponse.Avatar}")"
+                                  ObjectFit="ObjectFit.Cover"
+                                  Class="hero-img"
+                                  @onclick="OpenPictureDialog" />
+                    }
+                    else if (MyAvatar != null && ChosenUser == null)
+                    {
+                        <MudImage Src="@($"{SiteSettings.ApiUrl}{MyAvatar}")"
+                                  ObjectFit="ObjectFit.Cover"
+                                  Class="hero-img"
+                                  @onclick="OpenPictureDialog" />
+                    }
+                    else
+                    {
+                        <MudImage Src="lib/assets/Images/avatar.jpg"
+                                  ObjectFit="ObjectFit.Cover"
+                                  Class="hero-img is-static" />
+                    }
+                    <span class="hero-scrim"></span>
+                </div>
+
+                @if (IsOnline)
+                {
+                    <span class="hero-badge @(IsBlocked ? "is-blocked" : "is-online")">
+                        <span class="badge-dot"></span> @(IsBlocked ? "مسدود شده" : "آنلاین")
+                    </span>
+                }
+                else if (CurrentUser != null)
+                {
+                    @if (CurrentUser.Id == TargetUserInfoResponse.Id)
+                    {
+                        <span class="hero-badge is-online">
+                            <span class="badge-dot"></span> آنلاین
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="hero-badge @(IsBlocked ? "is-blocked" : "is-offline")">
+                            <span class="badge-dot"></span> @(IsBlocked ? "مسدود شده" : "آفلاین")
+                        </span>
+                    }
+                }
+
+                @if (CurrentUser != null)
+                {
+                    <div class="hero-camera">
+                        <MudFileUpload T="IBrowserFile" FilesChanged="UploadFiles" Disabled="@(IsSelectedFile)">
+                            <ActivatorContent>
+                                <MudIconButton Color="Color.Primary"
+                                               Variant="Variant.Filled"
+                                               Size="Size.Small"
+                                               Title="تغییر تصویر پروفایل"
+                                               Icon="@Icons.Material.Filled.PhotoCamera" />
+                            </ActivatorContent>
+                        </MudFileUpload>
+                    </div>
+                }
+            </div>
+
+            <div class="identity">
+                <h2 class="identity-name">@TargetUserInfoResponse.Name</h2>
+            </div>
 
             @if (CurrentUser != null)
             {
-                @if (CurrentUser.Id == TargetUserInfoResponse.Id)
-                {
-                    <MudFileUpload T="IBrowserFile" FilesChanged="UploadFiles" Disabled="@(IsSelectedFile)">
-                        <ActivatorContent>
-                            <MudIconButton Color="Color.Info"
-                            Icon="@Icons.Material.Filled.PhotoCamera">
-                            </MudIconButton>
-                        </ActivatorContent>
-                    </MudFileUpload>
-                }           }
-
-
-
-            <MudText Typo="Typo.h1" Class="text-center" Color="Color.Primary" Style="word-break:break-word; margin-bottom: 16px; margin-top: 9px;">@TargetUserInfoResponse.Name</MudText>
-
-            @if (CurrentUser != null)
-
-                @if (CurrentUser.Id == TargetUserInfoResponse.Id){
-                    if (ClickOnBioEdited){
-                        <MudStack Row="true">
-                            <MudTextField @bind-Value="bio" Label="بیوگرافی" Variant="Variant.Text"></MudTextField>
-                            <MudIconButton OnClick="()=>ClickOnBioEdited=false" Size="Size.Small" Icon="@Icons.Material.Filled.Close" Title="ویرایش بیوگرافی" Color="Color.Error" />
-
-                            <MudIconButton OnClick="SubmitBio" Size="Size.Small" Icon="@Icons.Material.Filled.Check" Title="ویرایش بیوگرافی" Color="Color.Tertiary" />
-
-
-                        </MudStack>
-                    }else{
-                        <MudText Typo="Typo.body2" Class="text-center mb-4" Color="ThemeChanging.SeenColor"> <MudIconButton OnClick="()=>ClickOnBioEdited=true" Size="Size.Small" Icon="@Icons.Material.Filled.Edit" Title="ویرایش بیوگرافی" Color="ThemeChanging.SeenColor" /> @TargetUserInfoResponse.bio </MudText>
-
-                    }
-
-                }else{
-                    <MudText Typo="Typo.body2" Class="text-center mb-4" Color="ThemeChanging.SeenColor"> @TargetUserInfoResponse.bio </MudText>
-
-                }
-            <hr />
-            <br />
-
-            <MudStack  Justify="Justify.FlexStart">
-
-                @if (CurrentUser?.Id != TargetUserInfoResponse.Id){
-                    <MudSwitch Color="Color.Error" @bind-Value=@(IsBlocked) Label="مسدود سازی" @onclick="BlockedUser"/>
-
-                }
-                @if (CurrentUser != null)
-                {
-                    @if (CurrentUser.Id == TargetUserInfoResponse.Id)
-                    {
-
-                        if (!ChangeEmailToInput){
-                            <MudText Typo="Typo.body2" Class="d-flex align-center">
-                                <MudIconButton @onclick="()=>ChangeEmailToInput=true" @onmousemove="()=>MouseOnEmail=true" @onmouseout="()=>MouseOnEmail=false" Color="Color.Primary" Icon="@(MouseOnEmail? @Icons.Material.Filled.Edit: @Icons.Material.Filled.Email)" Class="ml-2" />
-                                <span style="font-family:iransans-bold;">@TargetUserInfoResponse.Email</span>
-                            </MudText>
-                        }
-                        else{
-                            <MudStack Row="true">
-                                <MudTextField @bind-Value="ChangeEmail" Label="ایمیل جدید" Variant="Variant.Text"></MudTextField>
-                                <MudIconButton OnClick="()=>ChangeEmailToInput=false" Size="Size.Small" Icon="@Icons.Material.Filled.Close" Color="Color.Error" />
-
-                                <MudIconButton OnClick="SubmitEmail" Size="Size.Small" Icon="@Icons.Material.Filled.Check" Title="ثبت ایمیل جدید" Color="Color.Tertiary" />
-
-
-                            </MudStack>
-                        }
-
-
-                    }
-                    else
-                    {
-
-
-                        <MudText Typo="Typo.body2" Class="d-flex align-center">
-                            <MudIcon Color="Color.Primary" Icon="@Icons.Material.Filled.Email" Class="ml-2" />
-                            <span style="font-family:iransans-bold;">@(string.IsNullOrEmpty(TargetUserInfoResponse.Email) ? "هنوز ایمیلی ثبت نشده!" : TargetUserInfoResponse.Email)</span>
-                        </MudText>
-
-
-                    }
-
-                }
-                @if (CurrentUser != null)
-                {
-                    @* @if (CurrentUser.Id == TargetUserInfoResponse.Id) *@
-                    @* { *@
-
-
-
-                    @*     <MudText Typo="Typo.body2" Class="d-flex align-center"> *@
-                    @*         <MudIconButton @onclick="()=>ChangePhoneToInput=true" Color="Color.Tertiary" Icon="@(MouseOnphone? @Icons.Material.Filled.Edit:@Icons.Material.Filled.Phone)" Class="ml-2" /> *@
-                    @*         <span style="font-family:iransans-bold;">@(string.IsNullOrWhiteSpace(TargetUserInfoResponse.phoneNumber) ? "هنوز شماه همراهی ثبت نکردی!" : TargetUserInfoResponse.phoneNumber.ToPersianNumber())</span> *@
-                    @*     </MudText> *@
-
-                    @* } *@
-                    @* else *@
-                    @* { *@
-
-
-                    @*     <MudText Typo="Typo.body2" Class="d-flex align-center"> *@
-                    @*         <MudIcon Color="Color.Tertiary" Icon="@Icons.Material.Filled.Phone" Class="ml-2" /> *@
-                    @*         <span style="font-family:iransans-bold;">@(string.IsNullOrWhiteSpace(TargetUserInfoResponse.phoneNumber) ? "شماره همراهی وارد نشده است" : TargetUserInfoResponse.phoneNumber.ToPersianNumber())</span> *@
-                    @*     </MudText> *@
-
-
-                    @* } *@
-
-                }
-
-                @if (CurrentUser != null)
-                {
-                    @if (CurrentUser.Id == TargetUserInfoResponse.Id)
-                    {
-
-                        if (!ChangeCityToInput)
+                <section class="section-card">
+                    <div class="section-head">
+                        <span class="section-title">بیوگرافی</span>
+                        @if (CurrentUser.Id == TargetUserInfoResponse.Id && !ClickOnBioEdited)
                         {
-
-
-                            <MudText Typo="Typo.body2" Class="d-flex align-center">
-                                <MudIconButton @onclick="()=>ChangeCityToInput=true" @onmousemove="()=>MouseOnLocation=true" @onmouseout="()=>MouseOnLocation=false" Color="Color.Error" Icon="@(MouseOnLocation? @Icons.Material.Filled.Edit:@Icons.Material.Filled.LocationOn)" Class="ml-2" />
-                                <span style="font-family:iransans-bold;">ایران ,@TargetUserInfoResponse.Address</span>
-                            </MudText>
+                            <MudIconButton OnClick="()=>ClickOnBioEdited=true"
+                                           Size="Size.Small"
+                                           Icon="@Icons.Material.Filled.Edit"
+                                           Title="ویرایش بیوگرافی"
+                                           Class="ghost-btn" />
                         }
-                        else{
-                            <MudStack Row="true">
-                                <MudTextField @bind-Value="ChangeCity" Label="شهر جدید" Variant="Variant.Text"></MudTextField>
-                                <MudIconButton OnClick="()=>ChangeCityToInput=false" Size="Size.Small" Icon="@Icons.Material.Filled.Close" Color="Color.Error" />
+                    </div>
 
-                                <MudIconButton OnClick="SubmitCity" Size="Size.Small" Icon="@Icons.Material.Filled.Check" Title="ثبت شهز جدید" Color="Color.Tertiary" />
-
-
-                            </MudStack>
-                        }
-
-
+                    @if (CurrentUser.Id == TargetUserInfoResponse.Id && ClickOnBioEdited)
+                    {
+                        <div class="inline-edit">
+                            <MudTextField @bind-Value="bio"
+                                          Placeholder="چند خط درباره خودت بنویس"
+                                          Variant="Variant.Outlined"
+                                          Margin="Margin.Dense"
+                                          AutoGrow
+                                          MaxLines="4"
+                                          Class="edit-field" />
+                            <MudIconButton OnClick="SubmitBio" Size="Size.Small" Icon="@Icons.Material.Filled.Check" Title="ذخیره" Color="Color.Success" />
+                            <MudIconButton OnClick="()=>ClickOnBioEdited=false" Size="Size.Small" Icon="@Icons.Material.Filled.Close" Title="انصراف" Color="Color.Error" />
+                        </div>
                     }
                     else
                     {
-                        <MudText Typo="Typo.body2" Class="d-flex align-center">
-                            <MudIcon Color="Color.Error" Icon="@(@Icons.Material.Filled.LocationOn)" Class="ml-2" />
-                            <span style="font-family:iransans-bold;">ایران ,@TargetUserInfoResponse.Address</span>
-                        </MudText>
+                        <p class="body-text @(string.IsNullOrWhiteSpace(TargetUserInfoResponse.bio) ? "is-placeholder" : "")">
+                            @(string.IsNullOrWhiteSpace(TargetUserInfoResponse.bio) ? "بیوگرافی ثبت نشده است" : TargetUserInfoResponse.bio)
+                        </p>
+                    }
+                </section>
 
-                    }           }
+                <section class="section-card">
+                    <div class="section-head">
+                        <span class="section-title">اطلاعات تماس</span>
+                    </div>
 
+                    <!-- ایمیل -->
+                    @if (CurrentUser.Id == TargetUserInfoResponse.Id && ChangeEmailToInput)
+                    {
+                        <div class="inline-edit">
+                            <MudTextField @bind-Value="ChangeEmail"
+                                          Placeholder="ایمیل جدید"
+                                          Variant="Variant.Outlined"
+                                          Margin="Margin.Dense"
+                                          Class="edit-field" />
+                            <MudIconButton OnClick="SubmitEmail" Size="Size.Small" Icon="@Icons.Material.Filled.Check" Title="ثبت ایمیل" Color="Color.Success" />
+                            <MudIconButton OnClick="()=>ChangeEmailToInput=false" Size="Size.Small" Icon="@Icons.Material.Filled.Close" Title="انصراف" Color="Color.Error" />
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="info-row">
+                            <span class="info-icon"><MudIcon Icon="@Icons.Material.Filled.Email" /></span>
+                            <div class="info-body">
+                                <span class="info-label">ایمیل</span>
+                                <span class="info-value @(string.IsNullOrEmpty(TargetUserInfoResponse.Email) ? "is-placeholder" : "")">
+                                    @(string.IsNullOrEmpty(TargetUserInfoResponse.Email) ? "ثبت نشده" : TargetUserInfoResponse.Email)
+                                </span>
+                            </div>
+                            @if (CurrentUser.Id == TargetUserInfoResponse.Id)
+                            {
+                                <MudIconButton @onclick="()=>ChangeEmailToInput=true"
+                                               Size="Size.Small"
+                                               Icon="@Icons.Material.Filled.Edit"
+                                               Title="ویرایش ایمیل"
+                                               Class="ghost-btn" />
+                            }
+                        </div>
+                    }
 
+                    <!-- شهر -->
+                    @if (CurrentUser.Id == TargetUserInfoResponse.Id && ChangeCityToInput)
+                    {
+                        <div class="inline-edit">
+                            <MudTextField @bind-Value="ChangeCity"
+                                          Placeholder="شهر جدید"
+                                          Variant="Variant.Outlined"
+                                          Margin="Margin.Dense"
+                                          Class="edit-field" />
+                            <MudIconButton OnClick="SubmitCity" Size="Size.Small" Icon="@Icons.Material.Filled.Check" Title="ثبت شهر" Color="Color.Success" />
+                            <MudIconButton OnClick="()=>ChangeCityToInput=false" Size="Size.Small" Icon="@Icons.Material.Filled.Close" Title="انصراف" Color="Color.Error" />
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="info-row">
+                            <span class="info-icon"><MudIcon Icon="@Icons.Material.Filled.LocationOn" /></span>
+                            <div class="info-body">
+                                <span class="info-label">محل زندگی</span>
+                                <span class="info-value @(string.IsNullOrWhiteSpace(TargetUserInfoResponse.Address) ? "is-placeholder" : "")">
+                                    @(string.IsNullOrWhiteSpace(TargetUserInfoResponse.Address) ? "ثبت نشده" : $"ایران، {TargetUserInfoResponse.Address}")
+                                </span>
+                            </div>
+                            @if (CurrentUser.Id == TargetUserInfoResponse.Id)
+                            {
+                                <MudIconButton @onclick="()=>ChangeCityToInput=true"
+                                               Size="Size.Small"
+                                               Icon="@Icons.Material.Filled.Edit"
+                                               Title="ویرایش شهر"
+                                               Class="ghost-btn" />
+                            }
+                        </div>
+                    }
+                </section>
+            }
 
-            </MudStack>
+            @if (CurrentUser?.Id != TargetUserInfoResponse.Id)
+            {
+                <section class="section-card danger-card">
+                    <div class="danger-row">
+                        <div class="info-body">
+                            <span class="info-label danger-label">مسدودسازی</span>
+                            <span class="info-hint">با مسدود کردن، دیگر پیامی از این کاربر دریافت نمی‌کنید</span>
+                        </div>
+                        <MudSwitch Color="Color.Error" @bind-Value=@(IsBlocked) @onclick="BlockedUser" />
+                    </div>
+                </section>
+            }
 
+        </div>
+    }
 
-            <MudDivider Class="my-4" Style="width:100%;" />
-
-
-        </MudStack>}
 </MudPaper>
+
+<style>
+    /* ================= پنل ================= */
+    .profile-panel {
+        background: var(--mud-palette-surface);
+        overflow: hidden;
+    }
+
+    .profile-scroll {
+        flex: 1 1 auto;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding: 0 0 24px;
+        scrollbar-width: thin;
+    }
+
+        .profile-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .profile-scroll::-webkit-scrollbar-thumb {
+            background: var(--mud-palette-divider);
+            border-radius: 999px;
+        }
+
+    /* ================= هدر تصویری ================= */
+    .hero {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 1 / 1;
+        max-height: 320px;
+        background: var(--mud-palette-background-gray);
+    }
+
+    .hero-media {
+        position: absolute;
+        inset: 0;
+        cursor: pointer;
+        overflow: hidden;
+    }
+
+    .hero-img {
+        width: 100%;
+        height: 100%;
+        display: block;
+        transition: transform .4s ease;
+    }
+
+    .hero-media:hover .hero-img:not(.is-static) {
+        transform: scale(1.03);
+    }
+
+    .hero-scrim { /* سایه‌ی نرم پایین تصویر تا متن‌ها خوانا بمانند */
+        position: absolute;
+        inset: auto 0 0 0;
+        height: 45%;
+        pointer-events: none;
+        background: linear-gradient(to top, rgba(0,0,0,.45), transparent);
+    }
+
+    .hero-badge {
+        position: absolute;
+        top: 12px;
+        inset-inline-start: 12px;
+        z-index: 2;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 5px 12px;
+        border-radius: 999px;
+        font-size: 11.5px;
+        font-weight: 700;
+        color: #fff;
+        background: rgba(0,0,0,.55);
+        backdrop-filter: blur(6px);
+    }
+
+    .badge-icon {
+        font-size: 15px !important;
+    }
+
+    .badge-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: currentColor;
+    }
+
+    .hero-badge.is-online {
+        background: #16a34a;
+    }
+
+    .hero-badge.is-offline {
+        background: rgba(0,0,0,.55);
+    }
+
+    .hero-badge.is-blocked {
+        background: var(--mud-palette-error);
+    }
+
+    .hero-badge.is-channel {
+        background: #594ae2;
+    }
+
+    .hero-badge.is-group {
+        background: #0f9b7a;
+    }
+
+    .hero-camera {
+        position: absolute;
+        bottom: 12px;
+        inset-inline-end: 12px;
+        z-index: 2;
+    }
+
+        .hero-camera .mud-button-root {
+            box-shadow: 0 3px 12px rgba(0,0,0,.3);
+        }
+
+    /* ================= هویت ================= */
+    .identity {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        padding: 16px 20px 4px;
+        text-align: center;
+    }
+
+    .identity-name {
+        margin: 0;
+        font-size: 19px;
+        font-weight: 700;
+        line-height: 1.6;
+        word-break: break-word;
+        color: var(--mud-palette-text-primary);
+    }
+
+    .username-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 12px;
+        border: 1px solid var(--mud-palette-divider);
+        border-radius: 999px;
+        background: var(--mud-palette-background-gray);
+        color: var(--mud-palette-primary);
+        font-family: inherit;
+        font-size: 12.5px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background .18s ease, border-color .18s ease;
+    }
+
+        .username-chip:hover {
+            border-color: var(--mud-palette-primary);
+            background: var(--mud-palette-action-default-hover);
+        }
+
+    .chip-icon {
+        font-size: 15px !important;
+        opacity: .7;
+    }
+
+    /* ================= کارت بخش‌ها ================= */
+    .section-card {
+        margin: 12px 16px 0;
+        padding: 14px 16px;
+        border-radius: 14px;
+        background: var(--mud-palette-surface);
+        border: 1px solid var(--mud-palette-divider);
+    }
+
+        .section-card.p-0 {
+            padding: 0;
+            overflow: hidden;
+        }
+
+    .section-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        min-height: 32px;
+        margin-bottom: 6px;
+    }
+
+    .section-title {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12.5px;
+        font-weight: 700;
+        color: var(--mud-palette-text-secondary);
+    }
+
+    .count-pill {
+        padding: 1px 8px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--mud-palette-primary);
+        background: var(--mud-palette-background-gray);
+    }
+
+    .body-text {
+        margin: 0;
+        font-size: 13px;
+        line-height: 2;
+        color: var(--mud-palette-text-primary);
+        word-break: break-word;
+    }
+
+    .is-placeholder {
+        color: var(--mud-palette-text-disabled);
+    }
+
+    .ghost-btn {
+        color: var(--mud-palette-text-secondary);
+    }
+
+        .ghost-btn:hover {
+            color: var(--mud-palette-primary);
+        }
+
+    /* ویرایش درجا */
+    .inline-edit {
+        display: flex;
+        align-items: flex-start;
+        gap: 4px;
+        padding: 4px 0;
+    }
+
+    .edit-field {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+        .edit-field .mud-input-slot {
+            font-size: 13px;
+        }
+
+    /* ================= تب‌ها ================= */
+    .detail-tabs .mud-tabs-toolbar {
+        background: var(--mud-palette-background-gray);
+        border-bottom: 1px solid var(--mud-palette-divider);
+    }
+
+    .detail-tabs .mud-tab {
+        font-size: 12.5px;
+        font-weight: 600;
+        min-height: 42px;
+    }
+
+    .tab-body {
+        padding: 12px 14px 14px;
+    }
+
+    .scroll-list {
+        display: flex;
+        flex-direction: column;
+        max-height: 210px;
+        overflow-y: auto;
+        scrollbar-width: none;
+    }
+
+        .scroll-list::-webkit-scrollbar {
+            width: 0;
+        }
+
+    /* ================= ردیف اعضا ================= */
+    .member-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 7px 4px;
+        border-bottom: 1px solid var(--mud-palette-divider);
+    }
+
+        .member-row:last-child {
+            border-bottom: 0;
+        }
+
+    .member-initial {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--mud-palette-text-secondary);
+        background: var(--mud-palette-background-gray);
+        border: 1px solid var(--mud-palette-divider);
+    }
+
+        .member-initial.is-admin {
+            color: var(--mud-palette-primary);
+            border-color: var(--mud-palette-primary);
+        }
+
+        .member-initial.is-creator {
+            color: var(--mud-palette-warning);
+            border-color: var(--mud-palette-warning);
+        }
+
+    .member-main {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .member-name {
+        font-size: 12.5px;
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: var(--mud-palette-text-primary);
+    }
+
+    .role-chip {
+        flex-shrink: 0;
+        padding: 1px 8px;
+        border-radius: 999px;
+        font-size: 10px;
+        font-weight: 700;
+        line-height: 1.7;
+    }
+
+    .role-creator {
+        color: #92400e;
+        background: #fde68a;
+    }
+
+    .role-admin {
+        color: #fff;
+        background: var(--mud-palette-primary);
+    }
+
+    .role-member {
+        color: var(--mud-palette-text-secondary);
+        background: var(--mud-palette-background-gray);
+    }
+
+    .member-actions {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        flex-shrink: 0;
+    }
+
+    /* ================= ردیف فایل ================= */
+    .file-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 7px 4px;
+        border-bottom: 1px solid var(--mud-palette-divider);
+    }
+
+        .file-row:last-child {
+            border-bottom: 0;
+        }
+
+    .file-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        width: 32px;
+        height: 32px;
+        border-radius: 9px;
+        color: var(--mud-palette-primary);
+        background: var(--mud-palette-background-gray);
+    }
+
+    .file-main {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .file-name {
+        font-size: 12.5px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: var(--mud-palette-text-primary);
+    }
+
+    .file-ext {
+        font-size: 10px;
+        letter-spacing: .5px;
+        color: var(--mud-palette-text-secondary);
+    }
+
+    .mini-search {
+        max-width: 170px;
+    }
+
+        .mini-search .mud-input.mud-input-outlined {
+            border-radius: 999px;
+        }
+
+        .mini-search .mud-input-outlined-border {
+            border-radius: 999px !important;
+        }
+
+        .mini-search .mud-input-slot {
+            font-size: 12px;
+        }
+
+    /* ================= ردیف اطلاعات ================= */
+    .info-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 0;
+        border-bottom: 1px solid var(--mud-palette-divider);
+    }
+
+        .info-row:last-child {
+            border-bottom: 0;
+        }
+
+    .info-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        width: 34px;
+        height: 34px;
+        border-radius: 10px;
+        color: var(--mud-palette-primary);
+        background: var(--mud-palette-background-gray);
+    }
+
+    .info-body {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .info-label {
+        font-size: 10.5px;
+        font-weight: 700;
+        color: var(--mud-palette-text-secondary);
+    }
+
+    .info-value {
+        font-size: 13px;
+        word-break: break-all;
+        color: var(--mud-palette-text-primary);
+    }
+
+    .info-hint {
+        font-size: 11px;
+        line-height: 1.8;
+        color: var(--mud-palette-text-secondary);
+    }
+
+    /* ================= بخش مسدودسازی ================= */
+    .danger-card {
+        border-color: var(--mud-palette-error);
+    }
+
+    .danger-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+    }
+
+    .danger-label {
+        color: var(--mud-palette-error);
+    }
+
+    /* ================= حالت خالی کوچک ================= */
+    .mini-empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 28px 12px;
+        font-size: 11.5px;
+        color: var(--mud-palette-text-secondary);
+    }
+
+    /* ================= ریسپانسیو ================= */
+    @@media (max-width: 600px) {
+        .hero {
+            max-height: 260px;
+        }
+
+        .section-card {
+            margin: 10px 12px 0;
+            padding: 12px;
+        }
+
+        .identity-name {
+            font-size: 17px;
+        }
+    }
+
+    @@media (prefers-reduced-motion: reduce) {
+        .hero-img, .username-chip {
+            transition: none;
+        }
+    }
+</style>
+
 @code {
-    private bool Label_Switch3{ get; set; }
+    private bool Label_Switch3 { get; set; }
     private List<UserChannelDto> AllChannelUsers = new();
     private int _channelManagementActiveTab;
     private List<ChannelMemberViewModel> ChannelMembers { get; set; } = new();
@@ -503,16 +1218,16 @@
 
     [Parameter] public List<UserDto> AllUsers { get; set; } = new();
     public bool isAdmin() => SelectedChannel.channel.admins.Any(x => x.Id == CurrentUser.Id);
-
+    public bool isAdminGroup() => SelectedGroup.channel.admins.Any(x => x.Id == CurrentUser.Id);
     private async Task OpenManageAdminsDialog()
     {
         AllChannelUsers = MapUsersToChannelUsers(AllUsers);
         var parameters = new DialogParameters
-        {
-            ["AllUsers"] = AllChannelUsers,
-            ["CurrentAdmins"] = SelectedChannel.channel.admins,
+            {
+                ["AllUsers"] = AllChannelUsers,
+                ["CurrentAdmins"] = SelectedChannel.channel.admins,
 
-        };
+            };
 
         var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
 
@@ -535,8 +1250,27 @@
         await _channelService.PromoteToAdminOrDemoteUser(new ChangeUserChannelPolicyCommand
             (SelectedChannel.Id, member.Id, true));
         var membertarget = ChannelMembers.Where(x => x.Id == member.Id).First();
-        membertarget.IsAdmin=true;
+        membertarget.IsAdmin = true;
         StateHasChanged();
+    }
+    public async Task PromoteToAdminGroupAsync(ChannelMemberViewModel member)
+    {
+        await ConversationService.PromoteToAdminOrDemoteUser(new ChangeUserGroupPolicyCommand
+            (SelectedGroup.Id, member.Id, true));
+        try
+        {
+
+
+            var membertarget = GroupMembers.Where(x => x.Id == member.Id).FirstOrDefault();
+
+            membertarget.IsAdmin = true;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+
+            throw;
+        }
     }
 
     private void EditAdmin(UserChannelDto admin)
@@ -554,10 +1288,10 @@
         }
 
         var parameters = new DialogParameters
-        {
-            ["AvailableUsers"] = availableUsers,
-            ["DialogLabel"] = "افزودن عضو به کانال"
-        };
+            {
+                ["AvailableUsers"] = availableUsers,
+                ["DialogLabel"] = "افزودن عضو به کانال"
+            };
 
         var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
 
@@ -567,20 +1301,59 @@
         if (!result.Canceled && result.Data is UserChannelDto selectedUser)
         {
             await AddMemberToChannelAsync(selectedUser);
-            var userdto=new ChannelMemberViewModel
-            {
-              Id=selectedUser.Id,
-              Name=selectedUser.Name,
-              IsAdmin=false,
+            var userdto = new ChannelMemberViewModel
+                {
+                    Id = selectedUser.Id,
+                    Name = selectedUser.Name,
+                    IsAdmin = false,
 
 
-            };
+                };
             ChannelMembers.Add(userdto);
+        }
+    }
+    private async Task OpenAddMemberGroupDialog()
+    {
+        var availableUsers = MapUsersToChannelUsers(AllUsers.Where(u => !GroupMembers.Any(m => m.Id == u.Id)));
+
+        if (!availableUsers.Any())
+        {
+            snackbar.Add("کاربر جدیدی برای اضافه کردن وجود ندارد.", Severity.Info);
+            return;
+        }
+
+        var parameters = new DialogParameters
+            {
+                ["AvailableUsers"] = availableUsers,
+                ["DialogLabel"] = "افزودن عضو به گروه"
+            };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+
+        var dialog = dialogService.Show<AddChannelMemberDialog>("افزودن عضو", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is UserChannelDto selectedUser)
+        {
+
+            await AddMemberToGroupAsync(selectedUser);
+            var userdto = new ChannelMemberViewModel
+                {
+                    Id = selectedUser.Id,
+                    Name = selectedUser.Name,
+                    IsAdmin = false,
+
+
+                };
+            GroupMembers.Add(userdto);
         }
     }
     private bool CanManageMembers =>
         SelectedChannel?.channel?.CreatorId == CurrentUser?.Id ||
         SelectedChannel?.channel?.CurrentUserAdmin == true;
+    private bool CanManageGroupMembers =>
+        SelectedGroup?.channel?.CreatorId == CurrentUser?.Id ||
+        SelectedGroup?.channel?.CurrentUserAdmin == true;
 
     private bool HasAvailableUsersForChannel()
     {
@@ -608,16 +1381,48 @@
             return;
         }
 
-        ChannelMembers.Add(new ChannelMemberViewModel
-        {
-            Id = user.Id,
-            Name = user.Name,
-            IsManual = true
-        });
+        // ChannelMembers.Add(new ChannelMemberViewModel
+        // {
+        //     Id = user.Id,
+        //     Name = user.Name,
+        //     IsManual = true
+        // });
 
         snackbar.Add($"کاربر {user.Name} به کانال اضافه شد.", Severity.Success);
-        SyncChannelData();
+        // SyncChannelData();
         StateHasChanged();
+    }
+    private async Task AddMemberToGroupAsync(UserChannelDto user)
+    {
+        if (GroupMembers.Any(m => m.Id == user.Id))
+        {
+            snackbar.Add("این کاربر پیش‌تر عضو گروه شده است.", Severity.Warning);
+            return;
+        }
+        var newmember = new AddNewMemberCommand(SelectedGroup.Id, user.Id);
+        var success = await ConversationService.AddNewMemberByAdmin(newmember);
+
+        if (!success.status)
+        {
+            snackbar.Add("در افزودن عضو مشکلی رخ داد.", Severity.Error);
+            return;
+        }
+
+        // ChannelMembers.Add(new ChannelMemberViewModel
+        // {
+        //     Id = user.Id,
+        //     Name = user.Name,
+        //     IsManual = true
+        // });
+
+        snackbar.Add($"کاربر {user.Name} به گروه اضافه شد.", Severity.Success);
+        // SyncChannelData();
+        StateHasChanged();
+    }
+    private bool HasAccessToChangePicture()
+    {
+        return (SelectedGroup.channel.admins.Any(x => x.Id == CurrentUser.Id) ||
+                  SelectedGroup.channel.CreatorId == CurrentUser.Id);
     }
     private async Task<bool> FakeAddMemberService(UserChannelDto user)
     {
@@ -665,11 +1470,11 @@
                     }
 
                     updatedMembers.Add(new ChannelMemberViewModel
-                    {
-                        Id = admin.Id,
-                        Name = admin.Name,
-                        IsAdmin = true
-                    });
+                        {
+                            Id = admin.Id,
+                            Name = admin.Name,
+                            IsAdmin = true
+                        });
                 }
             }
 
@@ -698,7 +1503,14 @@
     }
     private async Task InitializeChannelAssets()
     {
-        var files =await _channelService.getChannelFiles(SelectedChannel.Id);
+        var files = await _channelService.getChannelFiles(SelectedChannel.Id);
+
+        ChannelFileItems = files;
+
+    }
+    private async Task InitializeGroupAssets()
+    {
+        var files = await ConversationService.getGroupFiles(SelectedGroup.Id);
 
         ChannelFileItems = files;
 
@@ -729,14 +1541,33 @@
             return;
         }
 
-        await js.InvokeVoidAsync("triggerDownload", filestring, file.FileName,"application/octet-stream");
+        await js.InvokeVoidAsync("triggerDownload", filestring, file.FileName, "application/octet-stream");
+    }
+    private async Task DownloadGroupFile(ChannelFileItem file)
+    {
+        var filestring = await ConversationService.downloadGroupFile(file.Id);
+        if (string.IsNullOrEmpty(filestring))
+        {
+            snackbar.Add("فایل مورد نظر یافت نشد");
+            return;
+        }
+
+        await js.InvokeVoidAsync("triggerDownload", filestring, file.FileName, "application/octet-stream");
     }
 
     private async Task RemoveAdmin(ChannelMemberViewModel admin)
     {
         var result = await _channelService.PromoteToAdminOrDemoteUser(
-        new ChangeUserChannelPolicyCommand(SelectedChannel.Id,admin.Id,false));
-        var olderadmin=ChannelMembers.Where(x => x.Id == admin.Id).First();
+        new ChangeUserChannelPolicyCommand(SelectedChannel.Id, admin.Id, false));
+        var olderadmin = ChannelMembers.Where(x => x.Id == admin.Id).First();
+        olderadmin.IsAdmin = false;
+        StateHasChanged();
+    }
+    private async Task RemoveGroupAdmin(ChannelMemberViewModel admin)
+    {
+        var result = await ConversationService.PromoteToAdminOrDemoteUser(
+        new ChangeUserGroupPolicyCommand(SelectedGroup.Id, admin.Id, false));
+        var olderadmin = GroupMembers.Where(x => x.Id == admin.Id).First();
         olderadmin.IsAdmin = false;
         StateHasChanged();
     }
@@ -750,7 +1581,21 @@
         }
         else
         {
-                snackbar.Add("حذف کاربر مورد نظر با خطا مواجه شد", Severity.Error);
+            snackbar.Add("حذف کاربر مورد نظر با خطا مواجه شد", Severity.Error);
+        }
+
+    }
+    private async Task RemoveGroupMember(ChannelMemberViewModel model)
+    {
+        var result = await ConversationService.RemoveMemberFromGroup(SelectedGroup.Id, model.Id);
+        if (result.status)
+        {
+            GroupMembers.Remove(model);
+            snackbar.Add("عضو مورد نظر با موفقیت حذف گردید", Severity.Success);
+        }
+        else
+        {
+            snackbar.Add("حذف کاربر مورد نظر با خطا مواجه شد", Severity.Error);
         }
 
     }
@@ -779,7 +1624,7 @@
     public bool MouseOnEmail { get; set; }
     public bool MouseOnphone { get; set; }
     public bool MouseOnLocation { get; set; }
-    public Color BadgeColor{ get; set; }
+    public Color BadgeColor { get; set; }
     public string BadgeTitle { get; set; }
     [Parameter]
     public string? MyAvatar { get; set; }
@@ -791,25 +1636,35 @@
     public EventCallback<UserDto> OnBlockedUser { get; set; }
     [Parameter]
     public UserDto? SelectedChannel { get; set; }
+    [Parameter]
+    public UserDto? SelectedGroup { get; set; }
     private Guid? lastUserId;
+    public List<ChannelMemberViewModel> GroupMembers { get; set; }
 
     protected override async Task OnParametersSetAsync()
     {
-        if (SelectedChannel != null && SelectedChannel.Id!=lastUserId)
+        if (SelectedChannel != null && SelectedChannel.Id != lastUserId)
         {
-               lastUserId = SelectedChannel.Id;
-               SelectedChannel.avatar= $"api/v1/chatfiles/{SelectedChannel.Id}/{true}/getAvatar";
-                 ChannelMembers = await _channelService.GetChannelMembers(SelectedChannel.Id);
+            lastUserId = SelectedChannel.Id;
+            SelectedChannel.avatar = $"api/v1/chatfiles/{SelectedChannel.Id}/{true}/getAvatar";
+            ChannelMembers = await _channelService.GetChannelMembers(SelectedChannel.Id);
 
         }
-        if (ChosenUser is not null && ChosenUser.Id != lastUserId)
+        else if (SelectedGroup != null && SelectedGroup.Id != lastUserId)
+        {
+            lastUserId = SelectedGroup.Id;
+            SelectedGroup.avatar = $"api/v1/chatfiles/{SelectedGroup.Id}/getgroupAvatar";
+            GroupMembers = await ConversationService.GetGroupMembers(SelectedGroup.Id);
+
+        }
+        else if (ChosenUser is not null && ChosenUser.Id != lastUserId)
         {
             IsOnline = ChosenUser.IsOnline;
             TargetUserInfoResponse = await userService.GetUserInfo(ChosenUser.Id);
             TargetUserInfoResponse.Avatar = $"api/v1/chatfiles/{ChosenUser.Id}/{false}/getAvatar";
             lastUserId = ChosenUser.Id;
 
-  TargetUserInfoResponse.Avatar = $"api/v1/chatfiles/{ChosenUser.Id}/{false}/getAvatar";
+            TargetUserInfoResponse.Avatar = $"api/v1/chatfiles/{ChosenUser.Id}/{false}/getAvatar";
             Conversation = await ConversationService.ReadyOrCreateConversationBy(ChosenUser.Id);
             StateHasChanged();
             IsBlocked = ChosenUser.IsBlocked;
@@ -823,15 +1678,22 @@
     protected async override Task OnInitializedAsync()
     {
         CurrentUser = await ((CustomAuthenticationStateProvider)stateprovider).GetUserInfoAsync();
-        if(SelectedChannel!=null){
+        if (SelectedChannel != null)
+        {
             ChannelMembers = await _channelService.GetChannelMembers(SelectedChannel.Id);
             SelectedChannel.avatar = $"api/v1/chatfiles/{SelectedChannel.Id}/{true}/getAvatar";
         }
-        if (ThemeChanging.IsShowSetting && ChosenUser==null)
+        else if (SelectedGroup != null)
+        {
+
+            SelectedGroup.avatar = $"api/v1/chatfiles/{SelectedGroup.Id}/getgroupAvatar";
+            GroupMembers = await ConversationService.GetGroupMembers(SelectedGroup.Id);
+        }
+        else if (ThemeChanging.IsShowSetting && ChosenUser == null)
         {
             TargetUserInfoResponse = await userService.GetUserInfo(CurrentUser.Id);
             ChosenUser = null;
-            MyAvatar =  $"api/v1/chatfiles/{CurrentUser.Id}/{false}/getAvatar";;
+            MyAvatar = $"api/v1/chatfiles/{CurrentUser.Id}/{false}/getAvatar"; ;
             StateHasChanged();
 
         }
@@ -845,7 +1707,8 @@
         var extensiond = Path.GetExtension(file.Name);
         var contentType = file.ContentType;
         var result = await userService.UploadNewProfileImage(new StreamContent(file.OpenReadStream(50000000000)), contentType, extensiond);
-        if(result.success){
+        if (result.success)
+        {
             SuccessMessage();
             TargetUserInfoResponse.Avatar = result.Message;
             CurrentUser.avatar = result.Message;
@@ -855,18 +1718,40 @@
             await js.InvokeVoidAsync("localStorage.removeItem", "userAvatarTime");
 
         }
-        else{
+        else
+        {
             snackbar.Add(result.Message, Severity.Error);
         }
         IsSelectedFile = false;
     }
-       public async Task UploadChannelFiles(IBrowserFile file)
+    public async Task UploadGroupFiles(IBrowserFile file)
     {
         IsSelectedFile = true;
         var extensiond = Path.GetExtension(file.Name);
         var contentType = file.ContentType;
-        var result = await _channelService.UploadNewProfileImage(new StreamContent(file.OpenReadStream(50000000000)), contentType, extensiond,SelectedChannel.Id);
-        if(result.success){
+        var result = await ConversationService.UploadGroupAvatarAsync(new StreamContent(file.OpenReadStream(50000000000)), contentType, extensiond, SelectedGroup.Id);
+        if (result.Item1)
+        {
+            SuccessMessage();
+            SelectedGroup.avatar = result.Message;
+            await OnPictureChanged.InvokeAsync(SelectedGroup);
+            StateHasChanged();
+
+        }
+        else
+        {
+            snackbar.Add(result.Message, Severity.Error);
+        }
+        IsSelectedFile = false;
+    }
+    public async Task UploadChannelFiles(IBrowserFile file)
+    {
+        IsSelectedFile = true;
+        var extensiond = Path.GetExtension(file.Name);
+        var contentType = file.ContentType;
+        var result = await _channelService.UploadNewProfileImage(new StreamContent(file.OpenReadStream(50000000000)), contentType, extensiond, SelectedChannel.Id);
+        if (result.success)
+        {
             SuccessMessage();
             SelectedChannel.avatar = result.Message;
             await OnPictureChanged.InvokeAsync(CurrentUser);
@@ -875,30 +1760,46 @@
             // await js.InvokeVoidAsync("localStorage.removeItem", "userAvatarTime");
 
         }
-        else{
+        else
+        {
             snackbar.Add(result.Message, Severity.Error);
         }
         IsSelectedFile = false;
     }
-    public async Task SubmitBio(){
+    public async Task SubmitBio()
+    {
         var result = await userService.SubmitBio(bio);
-        if(result.success){
+        if (result.success)
+        {
             SuccessMessage();
             TargetUserInfoResponse.bio = result.Message;
             ClickOnBioEdited = false;
         }
     }
-        public async Task ChangeBio(){
-        var result = await _channelService.ChangeDescription(new ChangeBioChannelCommand(SelectedChannel.Id,bio));
-        if(result.issuccess){
+    public async Task ChangeBio()
+    {
+        var result = await _channelService.ChangeDescription(new ChangeBioChannelCommand(SelectedChannel.Id, bio));
+        if (result.issuccess)
+        {
             SuccessMessage();
-         
+
+            ClickOnBioEdited = false;
+        }
+    }
+    public async Task ChangeGroupBio()
+    {
+        var result = await ConversationService.Changebio(new ChangeBioGroupCommand(SelectedGroup.Id, bio));
+        if (result.issuccess)
+        {
+            SelectedGroup.Bio = bio;
+            SuccessMessage();
+
             ClickOnBioEdited = false;
         }
     }
     public async Task BlockedUser()
     {
-        IsBlocked= !IsBlocked;
+        IsBlocked = !IsBlocked;
         ChosenUser.IsBlocked = IsBlocked;
         if (Conversation != null)
         {
@@ -906,16 +1807,18 @@
             await OnBlockedUser.InvokeAsync(ChosenUser);
             StateHasChanged();
         }
-  
+
     }
-    public async ValueTask DisposeAsync(){
+    public async ValueTask DisposeAsync()
+    {
         ChosenUser = null;
         await OnClearChosenUser.InvokeAsync(ChosenUser);
         IsOnline = true;
         GC.Collect();
         StateHasChanged();
     }
-    private void SuccessMessage(){
+    private void SuccessMessage()
+    {
         snackbar.Clear();
         snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomRight;
         snackbar.Add("عملیات با موفقیت انجام شد", Severity.Success);
@@ -936,19 +1839,45 @@
     { "ImageData", TargetUserInfoResponse.Avatar }
 };
 
-            await dialogService.ShowAsync<ImageDialogComponent>("نمایش تصویر", parameters);
+            await dialogService.ShowAsync<ImageUrlComponent>("نمایش تصویر", parameters);
+        }
+    }
+    public async Task OpenChannelPictureDialog()
+    {
+
+        if (SelectedChannel.avatar != null)
+        {
+            var parameters = new DialogParameters
+{
+    { "ImageData", SelectedChannel.avatar }
+};
+
+            await dialogService.ShowAsync<ImageUrlComponent>("نمایش تصویر", parameters);
+        }
+    }
+    public async Task OpenGroupPictureDialog()
+    {
+
+        if (SelectedGroup.avatar != null)
+        {
+            var parameters = new DialogParameters
+{
+    { "ImageData", SelectedGroup.avatar }
+};
+
+            await dialogService.ShowAsync<ImageUrlComponent>("نمایش تصویر", parameters);
         }
     }
 
 }
-@code{
+@code {
     bool ChangeEmailToInput = false;
     public string ChangeEmail { get; set; } = string.Empty;
     bool ChangePhoneToInput = false;
     public string Changephone { get; set; } = string.Empty;
     bool ChangeCityToInput = false;
     public string ChangeCity { get; set; } = string.Empty;
-       private ContactChecklist? _checklist;   // @ref
+    private ContactChecklist? _checklist;   // @ref
     private bool _checklistOpen = true;     // برای آیکن والد
     private void ToggleChecklistFromParent()
     {
@@ -1008,7 +1937,7 @@
             return;
         }
 
- 
+
         var result = await userService.SubmitCity(ChangeCity);
         if (result.success)
         {
@@ -1021,19 +1950,19 @@
 
     private string _fileSearch = string.Empty;
 
-private IEnumerable<ChannelFileItem> FilteredChannelFileItems =>
-    string.IsNullOrWhiteSpace(_fileSearch)
-        ? ChannelFileItems
-        : ChannelFileItems.Where(f =>
-            f.FileName?.Contains(_fileSearch, StringComparison.OrdinalIgnoreCase) == true);
+    private IEnumerable<ChannelFileItem> FilteredChannelFileItems =>
+        string.IsNullOrWhiteSpace(_fileSearch)
+            ? ChannelFileItems
+            : ChannelFileItems.Where(f =>
+                f.FileName?.Contains(_fileSearch, StringComparison.OrdinalIgnoreCase) == true);
 
-private void OnFileSearchChanged(string text)
-{
-  
- 
+    private void OnFileSearchChanged(string text)
+    {
 
-    _fileSearch = text;
-}
+
+
+        _fileSearch = text;
+    }
 
 
 

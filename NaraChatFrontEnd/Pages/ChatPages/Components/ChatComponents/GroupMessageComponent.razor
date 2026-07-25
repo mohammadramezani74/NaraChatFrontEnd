@@ -1,0 +1,707 @@
+﻿@using NaraChat.Contract.Models.Chat.Channels
+@using NaraChatFrontEnd.Pages.ChatPages.Components.DialogComponents
+@using System.Net
+@using System.Text.RegularExpressions
+@inject IDialogService DialogService
+@inject IMessageService _messageservice
+@inject ISnackbar snackbar
+@inject IJSRuntime JS
+@inject IConversationService _groupService
+@inject NavigationManager mn
+<MudItem xs="12" Class="w-100">
+    <div class="d-flex w-100 @(message.IsMine ? "justify-start mine-msg" : "justify-end other-msg")">
+
+
+        <MudChat ChatPosition="@(message.IsMine?ChatBubblePosition.Start:ChatBubblePosition.End)" ArrowPosition="ChatArrowPosition.Top">
+            <MudStack Row="false" Spacing="0">
+
+                <MudChatBubble Style="@($"{Style()};display: inline-block; max-width: 370px; word-wrap: break-word; border-radius: 12px; padding: 8px;")"
+                Variant="Variant.Text" OnClick="@(e => OnRightClick(e, message))"
+                @onmouseenter="@((args) => HoverStart(args, message))"
+                @onmouseleave="@(() => HoverStop("bubble"))">
+                    <p style="text-align: right; color:@(ThemeCascading.SeenColor );font-size: 14px;"><small> @(message.SenderName) </small></p>
+
+                    <!-- ریپلای نمایش -->
+                    @if (ParentMessage != null)
+                    {
+                        <MudPaper Class="reply-preview px-2 py-1 mb-1" style="@($"{replyColor()}; max-width: 100%; box-sizing: border-box;")">
+                            @if (IsMine)
+                            {
+                                <a href="javascript:void(0)" @onclick="() => ScrollToMessage(message.ParentId!.Value)">
+                                    <MudText Class="text-truncate" Style="text-align: right; color:gray;font-size: 10px;    padding-bottom: 6px;">
+                                        test
+                                    </MudText>
+                                </a>
+                            }
+                            else
+                            {
+                                <MudText Class="text-truncate" Style="text-align: right; color:gray;font-size: 10px;    padding-bottom: 6px;">
+                                    @CurrentUser.Name
+                                </MudText>
+                            }
+                            <MudText Class="text-truncate" Style="font-size: 12px;">
+                                @ParentMessage.TruncateMessage()
+                            </MudText>
+                        </MudPaper>
+                    }
+
+                    <MudText id="@message.Id" Color="Color.Default">
+                        @if (IsMention(message.Content))
+                        {
+                            <div @onclick="()=>Routingchannel(message.Content)" style="color:cornflowerblue"> @((MarkupString)message.Content.Replace("\n", "<br />"))</div>
+                        }
+                        else
+                        {
+                            @((MarkupString)message.Content.Replace("\n", "<br />"))
+                        }
+
+                        @if (message.Type == MessageType.Location)
+                        {
+                            <MudPaper Class="pa-2 mt-2" Style="border:1px solid #ccc;border-radius:12px;width:300px;margin:20px;">
+                                <div id="map-@message.Id" style="height:350px;border-radius:12px;"></div>
+                            </MudPaper>
+                        }
+                    </MudText>
+                    @if (IsMine)
+                    {
+                        <MudStack Row="true">
+
+                            @if (message.isEdited)
+                            {
+                                <MudIcon Size="Size.Small" Color="@(message.IsSeen? Color.Warning:Color.Dark)" Icon="@Icons.Material.Filled.CheckCircleOutline"></MudIcon>
+
+                                <MudText Class="mt-2 " Style="font-size:8px;">ویرایش شده</MudText>
+                            }
+                            else
+                            {
+                                <MudIcon Size="Size.Small" Color="@(message.IsSeen? ThemeCascading.SeenColor:Color.Dark)" Icon="@Icons.Material.Filled.CheckCircleOutline"></MudIcon>
+
+                            }
+                        </MudStack>
+                    }
+                    else
+                    {
+                        @if (message.isEdited)
+                        {
+                            <MudText Class="mt-2 " Style="font-size:8px; text-align: right;">ویرایش شده</MudText>
+                        }
+                    }
+                    @if (IsMine)
+                    {
+                        <MudPopover Open="@(Hovering && message.Equals(_hoverMessage))" Class="hoverarea"
+                        AnchorOrigin="Origin.TopLeft"
+                        TransformOrigin="Origin.BottomLeft"
+                        @onscroll="@(() => HoverStop("scroll"))"
+                        @onmouseenter="@(() => _paperHovering = true)"
+                        @onmouseleave="@(() => HoverStop("paper"))">
+                            <div class="d-flex" style="width: 100%;" @onclick:stopPropagation="true" @onclick:preventDefault="true">
+
+                                <MudTooltip Text="رونوشت">
+                                    <span class="emoji" @onclick="()=>copyMessage(message)">📝</span>
+                                </MudTooltip>
+                                <MudTooltip Text="پاسخ">
+                                    <span class="emoji" @onclick="()=>ReplyMessage(message)">↩️</span>
+                                </MudTooltip>
+                                <MudTooltip Text="ویرایش">
+                                    <span class="emoji" @onclick="()=>EditMessage(message.Id,message.Content)">✏️</span>
+                                </MudTooltip>
+                                <MudTooltip Text="حذف">
+                                    <span class="emoji" @onclick="()=>DeleteMessagePopUp(message.Id)">❌</span>
+                                </MudTooltip>
+
+                            </div>
+                        </MudPopover>
+                        <p Style="@ClockColor() font-size:11px;text-align: right; margin-top: 17px;margin-bottom: 0px;">@message.SendAt.ToString(@"HH\:mm")</p>
+
+                    }
+                    else
+                    {
+                        <MudPopover Open="@(Hovering && message.Equals(_hoverMessage))" Class="hoverarea"
+                        AnchorOrigin="Origin.TopLeft"
+                        TransformOrigin="Origin.BottomLeft"
+                        @onscroll="@(() => HoverStop("scroll"))"
+                        @onmouseenter="@(() => _paperHovering = true)"
+                        @onmouseleave="@(() => HoverStop("paper"))">
+                            <div class="d-flex" style="width: 100%;" @onclick:stopPropagation="true" @onclick:preventDefault="true">
+
+
+                                <MudMenu Dense="true" @bind-Open="_menuOpen">
+
+                                    <ActivatorContent>
+                                        <MudTooltip Text="ایموجی">
+                                            <span class="emoji">➕</span>
+                                        </MudTooltip>
+                                    </ActivatorContent>
+
+                                    <ChildContent>
+
+                                        <MudMenuItem OnClick="@(() => MessageAction("liked", message))">
+                                            👍 لایک
+                                        </MudMenuItem>
+
+                                        <MudMenuItem OnClick="@(() => MessageAction("Merci", message))">
+                                            🙏 تشکر
+                                        </MudMenuItem>
+
+                                        <MudMenuItem OnClick="@(() => MessageAction("Loved", message))">
+                                            ❤️ علاقه
+                                        </MudMenuItem>
+
+                                        <MudMenuItem OnClick="@(() => MessageAction("Lough", message))">
+                                            😂 خنده
+                                        </MudMenuItem>
+
+                                        <MudMenuItem OnClick="@(() => MessageAction("Flower", message))">
+                                            🌹 گل
+                                        </MudMenuItem>
+
+                                    </ChildContent>
+
+                                </MudMenu>
+                                <MudTooltip Text="پاسخ ">
+                                    <span class="emoji" @onclick="()=>ReplyMessage(message)">↩️</span>
+                                </MudTooltip>
+                                <MudTooltip Text="رونوشت">
+                                    <span class="emoji" @onclick="()=>copyMessage(message)">📝</span>
+                                </MudTooltip>
+                                @if (AmIAdmin() ||AmICreator())
+                                {
+                                    if (AmICreator())
+                                    {
+                                        if(!message.IsMute){
+                                               <MudTooltip Text="سکوت">
+                                            <span class="emoji" @onclick="@(() => MuteUser(message))">🔇</span>
+                                            </MudTooltip>
+                                        }
+                                        else
+                                        {
+                                            <MudTooltip Text="حذف سکوت">
+                                                <span class="emoji" @onclick="@(() => UnMuteUser(message))">🔊</span>
+                                            </MudTooltip>
+                                        }
+                                        <MudTooltip Text="حذف">
+                                            <span class="emoji" @onclick="()=>DeleteMessagePopUp(message.Id)">❌</span>
+                                        </MudTooltip>
+                                    }
+                                    else
+                                    {
+                                        if (!isSenderCreator(message.UserId) && !isSenderAdmin(message.UserId))
+                                        {
+                                            if (!message.IsMute)
+                                            {
+                                                <MudTooltip Text="سکوت">
+                                                    <span class="emoji" @onclick="@(() => MuteUser(message))">🔇</span>
+                                                </MudTooltip>
+                                            }
+                                            else
+                                            {  <MudTooltip Text="حذف سکوت">
+                                                <span class="emoji" @onclick="@(() => UnMuteUser(message))">🔊</span>
+                                                </MudTooltip>
+                                            }
+                                            <MudTooltip Text="حذف پیام">
+                                                <span class="emoji" @onclick="()=>DeleteMessagePopUp(message.Id)">❌</span>
+                                            </MudTooltip>
+                                        }
+                                    }
+                                }
+                            </div>
+                        </MudPopover>
+                        <p Style="@ClockColor() font-size:11px;text-align: left; margin-top: 17px;margin-bottom: 0px;">@message.SendAt.ToString(@"HH\:mm")</p>
+
+                    }
+
+                </MudChatBubble>
+
+                <MudPaper Class="actionarea mt-0" Elevation="0" Style="margin-top: 0; padding-top: 0;">
+                    <div class="d-flex" style="width: 100%;" @onclick:stopPropagation="true" @onclick:preventDefault="true">
+                        @if (message.Reaction == "Liked")
+                        {
+                            <span class="myemoji">👍</span>
+
+                        }
+                        else if (message.Reaction == "cried")
+                        {
+                            <span class="myemoji">😭</span>
+
+                        }
+                        else if (message.Reaction == "Loved")
+                        {
+                            <div style="opacity: 1;">
+                                <span class="myemoji">❤️</span>
+                            </div>
+
+                        }
+                        else if (message.Reaction == "Merci")
+                        {
+                            <span class="myemoji">🙏</span>
+
+                        }
+                        else if (message.Reaction == "Lough")
+                        {
+                            <span class="myemoji">😂</span>
+
+                        }
+                        else if (message.Reaction == "cool")
+                        {
+                            <span class="myemoji">😎</span>
+                        }
+                        else if (message.Reaction == "Flower")
+                        {
+                            <span class="myemoji">🌹</span>
+
+                        }
+                        else if (message.Reaction == "ButterFly")
+                        {
+                            <span class="myemoji">🦋</span>
+                        }
+
+                    </div>
+                </MudPaper>
+            </MudStack>
+
+
+
+
+
+        </MudChat>
+
+
+    </div>
+</MudItem>
+
+
+
+<style>
+
+
+
+    .mud-stack {
+    gap: 0 !important;
+    }
+
+    .reply-preview {
+    border-radius: 8px;
+    }
+
+    .hoverarea {
+    cursor: pointer !important;
+    background-color: var(--mud-palette-appbar-background);
+    color: var(--mud-palette-appbar-text);
+    transition: opacity 0.9s ease;
+    opacity: 1;
+    }
+
+    .actionarea {
+    background-color: transparent !important;
+    color: var(--mud-palette-appbar-text);
+    }
+
+    .actionarea:focus {
+    opacity: 1 !important;
+    }
+
+    span.emoji {
+    font-size: 22px;
+    padding: 1px 1px;
+    align-self: center;
+    }
+
+    .myemoji {
+    all: unset;
+    font-size: 28px;
+    display: inline-block;
+    font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "EmojiOne Color", sans-serif !important;
+    line-height: 1;
+    cursor: pointer;
+    transition: transform 0.2s ease, filter 0.2s ease;
+    filter: drop-shadow(1px 1px 1px rgba(0,0,0,0.2));
+    }
+
+    .myemoji:hover {
+    transform: scale(1.3) rotate(10deg);
+    filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.4));
+    }
+
+    .mine-msg {
+    margin-left: 4px !important;
+    margin-right: 0 !important;
+    }
+
+    .other-msg {
+    margin-right: 4px !important;
+    margin-left: 0 !important;
+    }
+
+</style>
+<script>
+    window.showMiniMap = function (mapId, lat, lng) {
+    var mapElement = document.getElementById(mapId);
+    if (!mapElement) return;
+
+    var map = L.map(mapId, {
+    zoomControl: true,
+    dragging: false,
+    doubleClickZoom: false,
+    scrollWheelZoom: false,
+    attributionControl: false
+    }).setView([lat, lng], 14);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    L.marker([lat, lng]).addTo(map);
+    map.on('click', function () {
+    var url = `https://www.google.com/maps?q=${lat},${lng}`;
+    window.open(url, '_blank');
+    });
+    };
+</script>
+@code {
+
+
+
+    [CascadingParameter(Name = "Theme")]
+    public ThemeChanging ThemeCascading { get; set; }
+    [Parameter]
+    [EditorRequired]
+    public bool IsMine { get; set; }
+    [Parameter]
+    public ChatMessageDto message { get; set; } = null!;
+    [Parameter]
+    [EditorRequired]
+    public UserDto CurrentUser { get; set; } = null!;
+    [Parameter]
+    [EditorRequired]
+    public PrivateConversationDto Conversation { get; set; } = null!;
+    [Parameter]
+    public List<UserChannelDto> Adminlist { get; set; } = new();
+    [Parameter]
+    public EventCallback<EditedMessageDto> EditMessageEvent { get; set; }
+    [Parameter]
+    public EventCallback<ChatMessageDto> ReplyMessageEvent { get; set; }
+    [Parameter]
+    public EventCallback<MessageReaction> MessageReactionEvent { get; set; }
+    [Parameter]
+    public EventCallback<Guid> DeletedMessageevent { get; set; }
+    [Parameter]
+    public EventCallback<string> JoinChannel { get; set; }
+    [Parameter]
+    public string? ParentMessage { get; set; } = null;
+    private bool showContextMenu = false;
+    private Guid? showContextMenuForMessageId = null;
+    private int contextMenuX;
+    private int contextMenuY;
+    public string? myAvatar { get; set; }
+    [Parameter]
+    public Guid CreateorId { get; set; }
+
+    public string? myName { get; set; }
+    private bool _menuOpen;
+
+    // public string? GetAvatar()
+    // {
+
+    //     if (CurrentUser.Id == message.UserId)
+    //         return myAvatar;
+
+    // }
+    public bool AmICreator() => CreateorId == CurrentUser.Id;
+    public bool AmIAdmin()
+    {
+        return Adminlist.Any(x => x.Id == CurrentUser.Id);
+    }
+    public bool isSenderAdmin(Guid SenderId)
+    {
+        return Adminlist.Any(x => x.Id == SenderId);
+    }
+    public bool isSenderCreator(Guid SenderId)
+    {
+        return CreateorId == SenderId;
+    }
+    public async Task Routingchannel(string message)
+    {
+        await JoinChannel.InvokeAsync(message);
+
+    }
+    public string replyColor() { return message.IsMine ? $"background-color: {ThemeCascading.MyColorReply}" : $"background-color: {ThemeCascading.OtherColorReply}"; }
+    public string ClockColor() => $"color: {ThemeCascading.ClockColor};";
+    public string Style() { return message.IsMine ? $"min-width: 305px;background-color: {ThemeCascading.myColorChat}" : $"min-width: 50px;background-color: {ThemeCascading.OtherColorChat}"; }
+    protected override async Task OnInitializedAsync()
+    {
+        var me = Conversation.users.Where(c => c.Id == CurrentUser.Id).FirstOrDefault();
+        myAvatar = CurrentUser.avatar;
+
+        myName = me?.Name;
+
+    }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+            if (message.Type == MessageType.Location)
+                await JS.InvokeVoidAsync("showMiniMap", $"map-{message.Id}", message.Latitude, message.Longitude);
+
+    }
+    public async Task copyMessage(ChatMessageDto message)
+    {
+        await JS.InvokeVoidAsync("copyToClipboard", message.Content);
+    }
+    private async Task OnRightClick(MouseEventArgs e, ChatMessageDto message)
+    {
+        if (IsMine)
+        {
+            showContextMenuForMessageId = message.Id;
+            contextMenuX = (int)e.ClientX;
+            contextMenuY = (int)e.ClientY;
+            showContextMenu = true;
+            StateHasChanged();
+        }
+    }
+    private async Task EditMessage(Guid MessageId, string Message)
+    {
+        var message = new EditedMessageDto(MessageId, Message);
+        await EditMessageEvent.InvokeAsync(message);
+    }
+    private async Task DeleteMessagePopUp(Guid MessageId)
+    {
+        var parameters = new DialogParameters<DialogTemplate>
+    {
+        { x => x.ContentText, "آیا از حذف این پیام اطمینان دارید؟" },
+        { x => x.ButtonText, "بله" },
+        { x => x.Color, Color.Error }
+    };
+
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Large, };
+
+        var dialog = await DialogService.ShowAsync<DialogTemplate>("حذف پیام", parameters, options);
+        var res = await dialog.Result;
+        if (!res.Canceled)
+        {
+            await PerformDeleteMessageAsync(MessageId);
+        }
+    }
+    private static MarkupString RenderMentions(string? content)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+            return new MarkupString(string.Empty);
+
+
+
+
+        var withLinks = Regex.IsMatch(
+            content,
+            @"@([A-Za-z0-9_]+)"
+        );
+
+        return new MarkupString($"<a href='{content}' data-mention-link>{content}</a>");
+    }
+    private bool IsMention(string? content)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+            return false;
+
+
+
+
+        var withLinks = Regex.IsMatch(
+            content,
+            @"@([A-Za-z0-9_]+)"
+        );
+        return withLinks;
+    }
+    public async Task PerformDeleteMessageAsync(Guid MessageId)
+    {
+      //  var otherId = Conversation.users.Where(c => c.Id != CurrentUser.Id).FirstOrDefault()!.Id;
+        var result = await _messageservice.DeleteMessageAsync(MessageId,Guid.Empty);
+        if (result.Item1)
+        {
+            await DeletedMessageevent.InvokeAsync(MessageId);
+            snackbar.Clear();
+            snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomRight;
+            snackbar.Add($"حذف پیام با موفقیت انجام شد ", Severity.Success, x =>
+            {
+
+            });
+        }
+        else
+        {
+            snackbar.Clear();
+            snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomRight;
+            snackbar.Add($"حذف پیام با خطا مواجه شد ", Severity.Error, x =>
+            {
+
+            });
+        }
+    }
+
+}
+@code {
+    private bool Hovering => _paperHovering || _bubbleHovering;
+    private bool _bubbleHovering;
+    private bool _paperHovering;
+    private ChatMessageDto? _hoverMessage;
+    private void HoverStart(MouseEventArgs args, ChatMessageDto message)
+    {
+        _bubbleHovering = true;
+        _hoverMessage = message;
+    }
+
+    private void HoverStop(string typeOfStop)
+    {
+        try
+        {
+            if (_menuOpen && typeOfStop != "scroll")
+                return;
+            switch (typeOfStop)
+            {
+                case "paper":
+                    _paperHovering = false;
+                    break;
+                case "bubble":
+                    _bubbleHovering = false;
+                    break;
+                case "scroll":
+                    _paperHovering = false;
+                    _bubbleHovering = false;
+                    StateHasChanged();
+                    break;
+                default:
+                    break;
+            }
+        }
+        catch { }
+    }
+}
+@code {
+    [Parameter]
+    public Guid GroupId { get; set; }
+    public async Task ReplyMessage(ChatMessageDto message)
+    {
+        await ReplyMessageEvent.InvokeAsync(message);
+    }
+    private async Task ScrollToMessage(Guid parentId)
+    {
+        await JS.InvokeVoidAsync("scrollToElement", parentId);
+    }
+    public async Task MuteUser(ChatMessageDto messsage)
+    {
+        var result = await _groupService.MuteOrUnMuteUser(GroupId, message.UserId, true);
+        if (result.status)
+        {
+            snackbar.Add($"عملیات با موفقیت انجام شد!", Severity.Success, x =>
+         {
+
+         });
+            message.IsMute = true;
+            StateHasChanged();
+        }
+        else
+        {
+            snackbar.Add(result.message, Severity.Error, x =>
+       {
+
+       });
+        }
+    }
+    public async Task UnMuteUser(ChatMessageDto messsage)
+    {
+        var result = await _groupService.MuteOrUnMuteUser(GroupId, message.UserId, false);
+        if (result.status)
+        {
+            snackbar.Add($"عملیات با موفقیت انجام شد!", Severity.Success, x =>
+         {
+
+         });
+            message.IsMute=false;
+            StateHasChanged();
+        }
+        else
+        {
+            snackbar.Add(result.message, Severity.Error, x =>
+       {
+
+       });
+       
+        }
+    }
+    private async Task MessageAction(string actionType, ChatMessageDto messsage)
+    {
+        if (!string.IsNullOrEmpty(message.Reaction))
+        {
+
+            message.Reaction = null;
+        }
+        else
+        {
+
+
+            switch (actionType)
+            {
+                case "liked":
+
+                    message.Reaction = "Liked";
+                    break;
+
+                case "cried":
+                    message.Reaction = "cried";
+                    break;
+
+                case "Flower":
+                    message.Reaction = "Flower";
+                    break;
+
+                case "Loved":
+                    message.Reaction = "Loved";
+                    break;
+
+                case "Lough":
+                    message.Reaction = "Lough";
+                    break;
+
+                case "Merci":
+                    message.Reaction = "Merci";
+                    break;
+                case "ButterFly":
+                    message.Reaction = "ButterFly";
+                    break;
+                case "cool":
+                    message.Reaction = "cool";
+                    break;
+
+                default:
+                    break;
+            }
+            var Other = Conversation.users.Where(c => c.Id != CurrentUser.Id).FirstOrDefault()!.Id;
+            var reactionInstance = new MessageReaction(message.Id, message.Reaction, Other);
+            var result = await _messageservice.newReactionOnMessage(reactionInstance.Reaction, reactionInstance.MessageId);
+            if (!result.issuccess)
+            {
+                snackbar.Clear();
+                snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomRight;
+                snackbar.Add(result.Message, Severity.Error, x =>
+                {
+
+                });
+                return;
+            }
+            await MessageReactionEvent.InvokeAsync(reactionInstance);
+            StateHasChanged();
+
+
+        }
+    }
+  
+    bool _mapDialogVisible = false;
+    double? _selectedLat;
+    double? _selectedLng;
+
+    public void OpenMap(double lat, double lng)
+    {
+        _selectedLat = lat;
+        _selectedLng = lng;
+        _mapDialogVisible = true;
+
+
+        _ = Task.Delay(200).ContinueWith(async _ =>
+        {
+            await JS.InvokeVoidAsync("showMapWithMarker", lat, lng);
+        });
+    }
+}

@@ -1,7 +1,9 @@
 ﻿@using NaraChat.Application.Services.TokenProvider
+@using NaraChat.Contract.Models.Chat.Channels
 @using NaraChatFrontEnd.Pages.ChatPages.Components.DialogComponents
 @inject IDialogService DialogService
 @inject IMessageService _messageservice
+@inject IConversationService _groupService
 @inject ISnackbar snackbar
 @inject IJSRuntime JS
 @inject ITokenService tokenservice
@@ -138,13 +140,70 @@
                     @onmouseenter="@(() => _paperHovering = true)"
                     @onmouseleave="@(() => HoverStop("paper"))">
                         <div class="d-flex" style="width: 100%;" @onclick:stopPropagation="true" @onclick:preventDefault="true">
-                        
+
+
+                            <MudMenu Dense="true" @bind-Open="_menuOpen">
+
+                                <ActivatorContent>
+                                    <MudTooltip Text="ایموجی">
+                                        <span class="emoji">➕</span>
+                                    </MudTooltip>
+                                </ActivatorContent>
+
+                              
+
+                                 
+
+
+                            </MudMenu>
                             <MudTooltip Text="پاسخ ">
                                 <span class="emoji" @onclick="()=>ReplyMessage(message)">↩️</span>
                             </MudTooltip>
                             <MudTooltip Text="رونوشت">
                                 <span class="emoji" @onclick="()=>copyMessage(message)">📝</span>
                             </MudTooltip>
+                            @if (AmIAdmin() || AmICreator())
+                            {
+                                if (AmICreator())
+                                {
+                                    if (!message.IsMute)
+                                    {
+                                        <MudTooltip Text="سکوت">
+                                            <span class="emoji" @onclick="@(() => MuteUser(message))">🔇</span>
+                                        </MudTooltip>
+                                    }
+                                    else
+                                    {
+                                        <MudTooltip Text="حذف سکوت">
+                                            <span class="emoji" @onclick="@(() => UnMuteUser(message))">🔊</span>
+                                        </MudTooltip>
+                                    }
+                                    <MudTooltip Text="حذف">
+                                        <span class="emoji" @onclick="()=>DeleteMessagePopUp(message.Id)">❌</span>
+                                    </MudTooltip>
+                                }
+                                else
+                                {
+                                    if (!isSenderCreator(message.UserId) && !isSenderAdmin(message.UserId))
+                                    {
+                                        if (!message.IsMute)
+                                        {
+                                            <MudTooltip Text="سکوت">
+                                                <span class="emoji" @onclick="@(() => MuteUser(message))">🔇</span>
+                                            </MudTooltip>
+                                        }
+                                        else
+                                        {
+                                              <MudTooltip Text="حذف سکوت">
+                                                <span class="emoji" @onclick="@(() => UnMuteUser(message))">🔊</span>
+                                            </MudTooltip>
+                                        }
+                                        <MudTooltip Text="حذف پیام">
+                                            <span class="emoji" @onclick="()=>DeleteMessagePopUp(message.Id)">❌</span>
+                                        </MudTooltip>
+                                    }
+                                }
+                            }
                         </div>
                     </MudPopover>
                 }
@@ -227,6 +286,74 @@
     display: none;
     }
 </style>
+@code {
+    private bool _menuOpen;
+    [Parameter]
+    public List<UserChannelDto> Adminlist { get; set; } = new();
+    [Parameter]
+    public Guid GroupId { get; set; }
+    public bool AmICreator() => CreateorId == CurrentUser.Id;
+    public bool AmIAdmin()
+    {
+        return Adminlist.Any(x => x.Id == CurrentUser.Id);
+    }
+    public bool isSenderAdmin(Guid SenderId)
+    {
+        return Adminlist.Any(x => x.Id == SenderId);
+    }
+    public bool isSenderCreator(Guid SenderId)
+    {
+        return CreateorId == SenderId;
+    }
+    [Parameter]
+    public Guid CreateorId { get; set; }
+    public async Task MuteUser(ChatMessageDto messsage)
+    {
+        var result = await _groupService.MuteOrUnMuteUser(GroupId, message.UserId, true);
+        if (result.status)
+        {
+            snackbar.Add($"عملیات با موفقیت انجام شد!", Severity.Success, x =>
+         {
+
+         });
+            message.IsMute = true;
+            StateHasChanged();
+        }
+        else
+        {
+            snackbar.Add(result.message, Severity.Error, x =>
+       {
+
+       });
+        }
+    }
+    private async Task EditMessage(Guid MessageId, string Message)
+    {
+        var message = new EditedMessageDto(MessageId, Message);
+        await EditMessageEvent.InvokeAsync(message);
+    }
+    public async Task UnMuteUser(ChatMessageDto messsage)
+    {
+        var result = await _groupService.MuteOrUnMuteUser(GroupId, message.UserId, false);
+        if (result.status)
+        {
+            snackbar.Add($"عملیات با موفقیت انجام شد!", Severity.Success, x =>
+         {
+
+         });
+            message.IsMute = false;
+            StateHasChanged();
+        }
+        else
+        {
+            snackbar.Add(result.message, Severity.Error, x =>
+       {
+
+       });
+
+        }
+    }
+}
 
 @code {
     [CascadingParameter(Name = "Theme")]
@@ -300,12 +427,7 @@
             StateHasChanged();
         }
     }
-    private async Task EditMessage(Guid MessageId, string Message)
-    {
-        var message = new EditedMessageDto(MessageId, Message);
-        message.OtherId = Conversation.users.Where(c => c.Id != CurrentUser.Id).FirstOrDefault()!.Id;
-        await EditMessageEvent.InvokeAsync(message);
-    }
+
     private async Task DeleteMessagePopUp(Guid MessageId)
     {
         var parameters = new DialogParameters<DialogTemplate>
@@ -326,8 +448,8 @@
     }
     public async Task PerformDeleteMessageAsync(Guid MessageId)
     {
-        var otherId = Conversation.users.Where(c => c.Id != CurrentUser.Id).FirstOrDefault()!.Id;
-        var result = await _messageservice.DeleteMessageAsync(MessageId, otherId);
+ 
+        var result = await _messageservice.DeleteMessageAsync(MessageId, Guid.Empty);
         if (result.Item1)
         {
             await DeletedMessageevent.InvokeAsync(MessageId);

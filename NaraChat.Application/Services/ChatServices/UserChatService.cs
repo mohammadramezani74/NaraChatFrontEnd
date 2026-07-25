@@ -44,7 +44,8 @@ namespace NaraChat.Application.Services.ChatServices
                 var users=response.result.Select(x=>new UserDto(x.Id,x.LastName+" "+x.FirstName,x.Avatar,messageUnreadedCount:x.MessageUnreadedCount,lastseen:x.LastSeen,lastReceivedMessage: x.LastReceivedMessage,
                    lastReceivedMessageId: x.LastReceivedMessageId,isLastReceivedMessageForMe: x.IsLastReceivedMessageForMe,lastReceivedMessageSendDate:x.LastReceivedMessageSendDate,
                    isPinned:x.IsPin,isBlocked:x.IsBlocked,conversationId:x.ConversationId,otherUserBlocked:x.OtherUserBlocked,ischannel: x.IsChannel
-                   ,chanel:x.channel,username:x.UserName,lastmessageDate:x.LastMessageDate
+                   ,chanel:x.channel,isgroup:x.IsGroup,username:x.UserName,lastmessageDate:x.LastMessageDate,
+                   bio:x.Bio,age:x.Age
                    )).ToList();
                 return users;
             }
@@ -57,6 +58,7 @@ namespace NaraChat.Application.Services.ChatServices
             }
 
         }
+        
         public async Task<TargetUserInfoResponse> GetUserInfo(Guid UserId, CancellationToken cancellationToken = default)
         {
             var response = await _httpClient.GetFromJsonAsync<BaseResponseDto<TargetUserInfoResponse>>($"/api/v1/users/GetGetUserBy?id={UserId}");
@@ -198,6 +200,35 @@ namespace NaraChat.Application.Services.ChatServices
                 return (false, "مشکلی در ثبت شهر به وجود آمده لطفا بعدا مراجعه فرمایید!");
             }
 
+        }
+
+        public async Task<IEnumerable<IdViewModel>> GetGroupUsersAsync(string? Search = null, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+
+
+                var queryParams = string.Empty;
+                if (!string.IsNullOrWhiteSpace(Search))
+                {
+                    queryParams += $"?search={Search}";
+                }
+                var response = await _httpClient.GetFromJsonAsync<BaseResponseDto<List<IdViewModel>>>("/api/v1/users/GetUsersForGroup"+queryParams, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+                if (response?.isSucceded ?? false)
+                {
+               
+                    return response.result;
+                }
+                return Enumerable.Empty<IdViewModel>();
+            }
+            catch (Exception ex)
+            {
+                return Enumerable.Empty<IdViewModel>();
+
+            }
         }
     }
 }

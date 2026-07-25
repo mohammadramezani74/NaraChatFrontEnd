@@ -72,6 +72,7 @@
                             trueScroll="trueingScrol"
                             GoToSettingInMobile="GoToSettingInMobile"
                             SelectedChannel="SelectedChannel"
+                            SelectedGroup="SelectedGroup"
                             channelcount="ChannelCount"
                             joinchannelevent="JoinToChannel" />
                         </MudItem>
@@ -91,7 +92,8 @@
                             OnClearChosenUser="OnClearUserSelected"
                             OnBlockedUser="BlockedUser" 
                             AllUsers="Users.ToList()"
-                            SelectedChannel="SelectedChannel" />
+                            SelectedChannel="SelectedChannel" 
+                            SelectedGroup="SelectedGroup"/>
                         </MudItem>
                     }
                 }
@@ -139,6 +141,7 @@
                         trueScroll="trueingScrol"
                         GoToSettingInMobile="GoToSettingInMobile" 
                         SelectedChannel="SelectedChannel"
+                        SelectedGroup="SelectedGroup"
                         channelcount="ChannelCount"
                         joinchannelevent="JoinToChannel"
                         UpdateTimeList="UpdateTimeList" />
@@ -158,6 +161,7 @@
                             OnClearChosenUser="OnClearUserSelected"
                             OnBlockedUser="BlockedUser"
                             SelectedChannel="SelectedChannel"
+                            SelectedGroup="SelectedGroup"
                             AllUsers="Users.ToList()" />
                         </MudItem>
                     }
@@ -256,6 +260,7 @@
     private List<ChatMessageDto> missedTargetUserMassages = new List<ChatMessageDto>();
     public bool LoadScroll { get; set; } = false;
     public UserDto? SelectedChannel = null;
+    public UserDto? SelectedGroup = null;
     public int ChannelCount { get; set; }
 
 
@@ -276,7 +281,7 @@
         try
         {
 
-            _ = RequestNotificationTokenAsync();
+            // _ = RequestNotificationTokenAsync();
 
 
             Logineduser = await ((CustomAuthenticationStateProvider)AuthenticationStateProvider).GetUserInfoAsync();
@@ -508,49 +513,162 @@
          }
          StateHasChanged();
      });
-        hubConnection.On<ChatMessageDto>(nameof(IChatHubClient.MessagedReceived), (MessageDto) =>
+        hubConnection.On<ChatMessageDto>(
+       nameof(IChatHubClient.MessagedReceived),
+       (messageDto) =>
        {
-
-           var fromusers = Users.FirstOrDefault(x => x.Id == MessageDto.UserId);
-           if (_selectedUser?.Id != MessageDto.UserId)
+           try
            {
+               var sender = Users.FirstOrDefault(x => x.Id == messageDto.UserId);
 
-               if (SelectedChannel?.Id != MessageDto.UserId)
+               if (sender == null)
                {
-                   var user=  Users.Where(x => x.Id == MessageDto.UserId).FirstOrDefault();
-                   user.LastReceivedMessage = MessageDto.Content;
+                   LoadScroll = true;
                    StateHasChanged();
                    return;
                }
-           }
-           _newIncomingMessageForUsers = MessageDto;
-           if (fromusers.IsChannel)
-           {
 
-               _newIncomingMessage = MessageDto;
+               var isGroup = SelectedGroup?.IsGroup == true;
+               var isChannel = sender.IsChannel;
 
-               Users.Where(x => x.Id == MessageDto.UserId).First().messageUnreadedCount -= 1;
-           }
-           else  if (!Users.Any(x => x.Id == MessageDto.UserId))
-           {
-               Users.Insert(0, fromusers!);
-               _newIncomingMessage = MessageDto;
-
-               Users.Where(x => x.Id == MessageDto.UserId).First().messageUnreadedCount -= 1;
-           }
-           else
-           {
-               if (OtherUser?.Id == MessageDto.UserId)
+               // =======================
+               // GROUP
+               // =======================
+               if (isGroup)
                {
-                   _newIncomingMessage = MessageDto;
+                   _newIncomingMessage = messageDto;
 
-                   Users.Where(x=>x.Id==MessageDto.UserId).First().messageUnreadedCount -= 1;
+                   if (sender.messageUnreadedCount > 0)
+                       sender.messageUnreadedCount--;
+
+                   if (!string.IsNullOrWhiteSpace(messageDto.Content))
+                   {
+                       var length =
+                           messageDto.Content.Length > 15
+                           ? 15
+                           : messageDto.Content.Length;
+
+                       SelectedGroup.LastReceivedMessage =
+                           messageDto.Content.Substring(0, length);
+
+                       if (messageDto.Content.Length > 15)
+                           SelectedGroup.LastReceivedMessage += "...";
+                   }
+
+                   SelectedGroup.LastReceivedMessageId =
+                       messageDto.Id;
                }
-           }
-           LoadScroll = true;
-           StateHasChanged();
 
+               // =======================
+               // CHANNEL
+               // =======================
+               else if (isChannel)
+               {
+                   if (SelectedChannel?.Id == messageDto.UserId)
+                   {
+                       _newIncomingMessage = messageDto;
+
+                       if (sender.messageUnreadedCount > 0)
+                           sender.messageUnreadedCount--;
+                   }
+                   else
+                   {
+                       sender.LastReceivedMessage =
+                           messageDto.Content;
+                   }
+               }
+
+               // =======================
+               // PRIVATE CHAT
+               // =======================
+               else
+               {
+                   SelectedGroup = null;
+                   
+                   if (OtherUser?.Id == messageDto.UserId)
+                   {
+                       _newIncomingMessage = messageDto;
+
+                       if (sender.messageUnreadedCount > 0)
+                           sender.messageUnreadedCount--;
+                   }
+                   else
+                   {
+                       sender.LastReceivedMessage =
+                           messageDto.Content;
+                   }
+               }
+
+               // اگر وجود نداشت اضافه کن
+               if (!Users.Any(x => x.Id == sender.Id))
+               {
+                   Users.Insert(0, sender);
+               }
+
+               LoadScroll = true;
+
+               InvokeAsync(StateHasChanged);
+           }
+           catch (Exception ex)
+           {
+               Console.WriteLine(ex);
+           }
        });
+       //  hubConnection.On<ChatMessageDto>(nameof(IChatHubClient.MessagedReceived), (MessageDto) =>
+       // {
+
+       //     var fromusers = Users.FirstOrDefault(x => x.Id == MessageDto.UserId);
+       //     var isGroup = SelectedGroup != null ? SelectedGroup.IsGroup : false;
+       //     if (isGroup)
+       //     {
+       //         _newIncomingMessage = MessageDto;
+
+       //         Users.Where(x => x.Id == MessageDto.UserId).First().messageUnreadedCount -= 1;
+       //         var length = MessageDto.Content.Length < 15 ? MessageDto.Content.Length : 15;
+       //         SelectedGroup.LastReceivedMessage = MessageDto.Content.Substring(0, length) + "...";
+       //         SelectedGroup.LastReceivedMessageId = MessageDto.Id;
+       //         StateHasChanged();
+
+       //     }
+       //    else if (_selectedUser?.Id != MessageDto.UserId)
+       //     {
+
+       //         if (SelectedChannel?.Id != MessageDto.UserId)
+       //         {
+       //             var user=  Users.Where(x => x.Id == MessageDto.UserId).FirstOrDefault();
+       //             user.LastReceivedMessage = MessageDto.Content;
+       //             StateHasChanged();
+       //             return;
+       //         }
+       //     }
+       //     // _newIncomingMessageForUsers = MessageDto;
+       //    else if (fromusers.IsChannel)
+       //     {
+
+       //         _newIncomingMessage = MessageDto;
+
+       //         Users.Where(x => x.Id == MessageDto.UserId).First().messageUnreadedCount -= 1;
+       //     }
+       //     else  if (!Users.Any(x => x.Id == MessageDto.UserId))
+       //     {
+       //         Users.Insert(0, fromusers!);
+       //         _newIncomingMessage = MessageDto;
+
+       //         Users.Where(x => x.Id == MessageDto.UserId).First().messageUnreadedCount -= 1;
+       //     }
+       //     else
+       //     {
+       //         if (OtherUser?.Id == MessageDto.UserId)
+       //         {
+       //             _newIncomingMessage = MessageDto;
+
+       //             Users.Where(x=>x.Id==MessageDto.UserId).First().messageUnreadedCount -= 1;
+       //         }
+       //     }
+       //     LoadScroll = true;
+       //     StateHasChanged();
+
+       // });
 
 
         hubConnection.On<Guid>(nameof(IChatHubClient.UserIsOnline), (id) =>
@@ -683,13 +801,25 @@
         {
             LoadScroll = true;
             SelectedChannel = user;
+            _selectedUser = null;
+            OtherUser = null;
             var count = await channelService.GetChannelMembers(SelectedChannel.Id);
             ChannelCount = count.Count;
+        }
+        else if(user.IsGroup)
+        {
+            LoadScroll = true;
+            SelectedGroup = user;
+            SelectedChannel = null;
+            _selectedUser = null;
+            OtherUser = null;
+            // var count = await channelService.GetChannelMembers(SelectedChannel.Id);
+            ChannelCount = 2;
         }
         else
         {
             SelectedChannel = null;
-
+            SelectedGroup = null;
             var userAvatar = Users.Where(c => c.Id == user.Id).Select(x => x.avatar).FirstOrDefault();
             OtherUser = user;
             OtherUser.avatar = userAvatar;

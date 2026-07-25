@@ -12,6 +12,7 @@ namespace NaraChat.Contract.Models.Chat.Conversation
         public Guid UserId { get; set; }
         public string? SenderName { get; set; }
         public string Content { get; set; } = string.Empty;
+        public bool IsMute { get; set; }
         public bool IsMine { get; set; }
         public bool IsSeen { get; set; }
         public bool isEdited { get; set; }
@@ -22,5 +23,11 @@ namespace NaraChat.Contract.Models.Chat.Conversation
         public string? Reaction { get; set; }
         public float? Latitude { get; set; }
         public float? Longitude { get; set; }
-    }
+        public ConversationType ConversationType { get; set; }
+    } public enum ConversationType
+        {
+            Private = 1,
+            Channel = 2,
+            group = 3
+        }
 }

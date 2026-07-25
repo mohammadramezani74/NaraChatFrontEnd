@@ -4,4 +4,8 @@
       Guid ChannelId,
       string bio
       );
+    public sealed record ChangeBioGroupCommand(
+   Guid GroupId,
+   string bio
+   );
 }

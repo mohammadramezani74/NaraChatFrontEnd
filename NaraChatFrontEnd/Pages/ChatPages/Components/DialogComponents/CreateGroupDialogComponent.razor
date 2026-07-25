@@ -1,0 +1,150 @@
+﻿@using MudBlazor
+@using NaraChat.Contract.Models.Chat.Group
+@using NaraChat.Contract.Models.Users.ServiceViewModels
+
+<MudDialog>
+    <DialogContent>
+        <MudPaper Class="pa-4" Style="min-width:600px">
+
+            <MudText Typo="Typo.h6" Class="mb-4">
+                ایجاد گروه
+            </MudText>
+
+            <MudTextField @bind-Value="_title"
+            Label="نام گروه"
+            Required="true"
+            Variant="Variant.Outlined"
+            Class="mb-3" />
+
+            <MudTextField @bind-Value="_description"
+            Label="توضیحات"
+            Lines="3"
+            Variant="Variant.Outlined"
+            Class="mb-3" />
+
+            <MudTextField @bind-Value="_userName"
+            Label="نام کاربری گروه"
+            Placeholder="group_username"
+            Variant="Variant.Outlined"
+            Class="mb-3" />
+
+            <MudSwitch @bind-Value="_isPublic"
+            Color="Color.Primary">
+                گروه عمومی
+            </MudSwitch>
+
+            <MudDivider Class="my-4" />
+
+            <MudText Typo="Typo.subtitle1" Class="mb-2">
+                افزودن اعضا
+            </MudText>
+
+            <MudAutocomplete T="IdViewModel"
+            Label="جستجوی کاربر"
+            Variant="Variant.Outlined"
+            SearchFunc="SearchUsers"
+            MinCharacters="3"
+            ToStringFunc="@(u => u?.Name)"
+            ValueChanged="AddUser"
+            ResetValueOnEmptyText="true"
+            Clearable="true"
+            CoerceText="false"
+            MaxItems="10" />
+
+            <MudChipSet T="UserItem" Class="mt-3">
+                @foreach (var user in _selectedUsers)
+                {
+                    <MudChip T="UserItem"
+                    Closeable="true"
+                    OnClose="@(() => RemoveUser(user))">
+                        @user.Name
+                    </MudChip>
+                }
+            </MudChipSet>
+
+        </MudPaper>
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Cancel">
+            انصراف
+        </MudButton>
+
+        <MudButton Color="Color.Primary"
+        Variant="Variant.Filled"
+        OnClick="Submit">
+            ایجاد گروه
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private string? _title;
+    private string? _description;
+    private string? _userName;
+    private bool _isPublic;
+
+    private readonly List<IdViewModel> _selectedUsers = [];
+
+    // موقت - بعدا از API بگیر
+    private readonly List<IdViewModel> _users = new();
+    [Inject]
+    private IUserChatService UserApi { get; set; } = default!;
+    private async Task<IEnumerable<IdViewModel>> SearchUsers(
+        string? value,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return Enumerable.Empty<IdViewModel>();
+
+        var users = await UserApi.GetGroupUsersAsync(
+            value,
+            cancellationToken);
+
+        return users
+            .Where(x =>
+                _selectedUsers.All(
+                    s => s.Id != x.Id));
+    }
+
+    private void AddUser(IdViewModel? user)
+    {
+        if (user is null)
+            return;
+
+        if (_selectedUsers.All(x => x.Id != user.Id))
+            _selectedUsers.Add(user);
+    }
+
+    private void RemoveUser(IdViewModel user)
+    {
+        _selectedUsers.RemoveAll(x => x.Id == user.Id);
+    }
+
+    private void Submit()
+    {
+        var command = new CreateGroupCommand{
+            Title= _title!,
+        Description= _description,
+        UserName= _userName,
+        Others= _selectedUsers
+            .Select(x => x.Id)
+            .ToList()
+        };
+
+        MudDialog.Close(DialogResult.Ok(command));
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+    public sealed record UserItem(
+        Guid Id,
+        string DisplayName);
+}

@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 using MudBlazor;
 using NaraChat.Application.Services;
+using NaraChat.Application.Services.ChatServices.Conversation;
 using NaraChat.Contract.Models.Chat.Conversation;
 using NaraChat.Contract.Models.Users;
 using NaraChat.Contract.Utilities.FilesExtensions;
@@ -31,6 +32,7 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
     private ElementReference _chatScrollHost;
     private bool _boundToChannel;
     [Parameter]  public UserDto? SelectedChannel { get; set; } = null;
+    [Parameter] public UserDto? SelectedGroup { get; set; } = null;
 
     private DotNetObjectReference<ChatDetail>? objRef;
     private DotNetObjectReference<ChatDetail>? objRef2;
@@ -84,6 +86,7 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
     [Display(Name = "هندل همزمانی")]
     private Guid? PreviousSelectedUserId = null;
     private Guid? PreviousSelectedChannelId = null;
+    private Guid? PreviousSelectedGroupId = null;
 
     [Display(Name = "ایونت کم شدن تعداد پیغام ها")]
     [Parameter] public EventCallback<(Guid otherUserId, int MessagesCountSeened)> ReduceMessageSeenedCount { get; set; }
@@ -473,6 +476,16 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
             await UploadFile(uploadResult.File, uploadResult.Caption ?? string.Empty);
         }
     }
+    public async Task uploadFileDialog()
+    {
+        var dialog = await DialogService.ShowAsync<UploadDialogComponent>();
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is UploadResult uploadResult)
+        {
+            await UploadGroupFile(uploadResult.File, uploadResult.Caption ?? string.Empty);
+        }
+    }
     public async Task uploadChannelDialog()
     {
         var dialog = await DialogService.ShowAsync<UploadDialogComponent>();
@@ -516,7 +529,7 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
             await trueScroll.InvokeAsync();
         }
 
-        // ✅ بازیابی پیش‌نویس برای این گفتگو
+
         if (OtherUser != null && _drafts.TryGetValue(OtherUser.Id, out var draft))
             NewMessage = draft;
     }
@@ -542,11 +555,62 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
         if (_drafts.TryGetValue(SelectedChannel.Id, out var draft))
             NewMessage = draft;
     }
+    public async Task LoadGroupMesages(int count = 15)
+    {
+        _messages.Clear();
+
+
+
+        var messages = await chatService.LoadGroupMessages(SelectedGroup!.Id, count);
+        if (messages?.Any() == true)
+        {
+            try
+            {
+
+ 
+            foreach (var m in messages) { 
+                m.Content = m.Content;}
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("OK Ok  Ok "+ex.Message);
+                throw ex;
+            }
+            _messages.AddRange(messages);
+
+            var messageIds = messages.Where(x => !x.IsSeen).Select(m => m.Id).ToList();
+
+
+            await trueScroll.InvokeAsync();
+            NeedScrollToBottom();
+        }
+        if (_drafts.TryGetValue(SelectedGroup.Id, out var draft))
+            NewMessage = draft;
+        Loading = false;
+    }
 
     private async Task LoadMoreMesages(int count = 15)
     {
-        Conversation ??= await chatService.ReadyOrCreateConversationBy(OtherUser!.Id);
-        var messages = await messageService.LoadMessages(Conversation!.id, count);
+        if (SelectedGroup != null)
+        {
+            List<ChatMessageDto>? messages = await chatService.LoadGroupMessages(SelectedGroup!.Id, count);
+
+            var known = new HashSet<Guid>(_messages.Select(m => m.Id));
+            var newMessages = messages.Where(m => !known.Contains(m.Id)).ToList();
+
+            if (newMessages.Any())
+            {
+                foreach (var m in newMessages)
+                    m.Content = m.Content;
+                _messages.AddRange(newMessages);
+                _messages.Sort((a, b) => a.SendAt.CompareTo(b.SendAt));
+              
+            }
+          
+        }
+        else { 
+            Conversation ??= await chatService.ReadyOrCreateConversationBy(OtherUser!.Id);
+        List<ChatMessageDto>? messages = await messageService.LoadMessages(Conversation!.id, count);
 
         var known = new HashSet<Guid>(_messages.Select(m => m.Id));
         var newMessages = messages.Where(m => !known.Contains(m.Id)).ToList();
@@ -555,6 +619,22 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
         {
             foreach (var m in newMessages)
                 m.Content =m.Content;
+            _messages.AddRange(newMessages);
+            _messages.Sort((a, b) => a.SendAt.CompareTo(b.SendAt));
+        }}
+    }
+    private async Task LoadMoreGroupMesages(int count = 15)
+    {
+        var messages = await chatService.LoadGroupMessages(SelectedGroup!.Id, count);
+
+
+        var known = new HashSet<Guid>(_messages.Select(m => m.Id));
+        var newMessages = messages.Where(m => !known.Contains(m.Id)).ToList();
+
+        if (newMessages.Any())
+        {
+            foreach (var m in newMessages)
+                m.Content = m.Content;
             _messages.AddRange(newMessages);
             _messages.Sort((a, b) => a.SendAt.CompareTo(b.SendAt));
         }
@@ -621,7 +701,7 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
         if (!EditMode)
             _messages.Add(newMessage);
 
-        await messageInput.FocusAsync();
+        await messageInput.FocusAsync(); NewMessage = string.Empty;
         StateHasChanged();
 
         await OnSendMessageSession.InvokeAsync();
@@ -694,7 +774,8 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
         }
         newMessage.Content = newMessage.Content;
 
-
+        NewMessage=string.Empty;
+     
         if (!EditMode)
             _messages.Add(newMessage);
 
@@ -734,6 +815,88 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
             SelectedMessageToReply = null;
             ReplyMode = false;
             await UpdateTimeList.InvokeAsync((SelectedChannel.Id, DateTime.Now, newMessage.Content));
+        }
+    }
+    private async Task SendGroupMessage(ChatMessageDto? Mapmessage = null)
+    {
+        if (string.IsNullOrWhiteSpace(NewMessage) && Mapmessage == null)
+        {
+            ErrorMessage("ارسال مسیج با مشکل مواجه شد");
+            return;
+        }
+
+        var messagenew = NewMessage;
+        Guid? ParentId = null;
+        if (ReplyMode)
+            ParentId = SelectedMessageToReply!.Id;
+
+        var newMessage = Mapmessage ?? new ChatMessageDto
+        {
+            Id = Guid.Empty,
+            SendAt = DateTime.Now,
+            SenderName = CurrentUser!.Name,
+            IsMine = true,
+            Content = messagenew,
+            Type = 0,
+            UserId = CurrentUser!.Id,
+            ParentId = ParentId,
+        };
+
+        if (Mapmessage != null)
+        {
+            newMessage.ParentId = ParentId;
+            newMessage.UserId = CurrentUser!.Id;
+            newMessage.IsMine = true;
+            newMessage.SenderName = CurrentUser!.Name;
+        }
+        newMessage.Content = newMessage.Content;
+
+        NewMessage = string.Empty;
+
+        if (!EditMode)
+            _messages.Add(newMessage);
+
+        await messageInput.FocusAsync();
+        StateHasChanged();
+
+        await OnSendMessageSession.InvokeAsync();
+
+        if (EditMode)
+        {
+            EditedMessage!.Message = messagenew;
+            var response = await messageService.EditMessageAsync(EditedMessage!);
+            if (response.Item1) SuccessMessage();
+            else ErrorMessage(response.message);
+
+            EditMode = false;
+
+            var msg = _messages.Single(x => x.Id == EditedMessage.Id);
+            msg.Content = EditedMessage.Message;
+            msg.Content = EditedMessage.Message;
+            messagenew = string.Empty;
+            msg.isEdited = true;
+            return;
+        }
+
+        var result = await chatService.SendMessageForGroupAsync(SelectedGroup.Id, newMessage.Content, ParentId);
+        if (result.Item1)
+        {
+            await changeUserLastMessage.InvokeAsync();
+            newMessage.Id = result.MessageId;
+
+            if (SelectedChannel != null) _drafts.Remove(SelectedGroup.Id);
+
+            NeedScrollToBottom();
+
+            NewMessage = string.Empty;
+            SelectedMessageToReply = null;
+            ReplyMode = false;
+            await UpdateTimeList.InvokeAsync((SelectedGroup.Id, DateTime.Now, newMessage.Content));
+        }
+        else
+        {
+            _messages.Remove(newMessage);
+            snackbar.Add(result.message,Severity.Error);
         }
     }
 
@@ -832,6 +995,70 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
             if (result.Item1)
             {
                 var me = Conversation!.users.First(c => c.Id == CurrentUser!.Id);
+                var newMessage = new ChatMessageDto
+                {
+                    Id = result.result!.MessageId,
+                    SendAt = DateTime.Now,
+                    SenderName = me!.Name,
+                    IsMine = true,
+                    Content = caption,
+                    Type = (MessageType)result.result.MessageType,
+                    UserId = CurrentUser!.Id,
+                    FileContent = new ChatFilesDto
+                    {
+                        FileId = result.result!.FileId,
+                        FileName = file.Name,
+                        FileSize = file.Size.ToString()
+                    }
+                };
+                _messages.Add(newMessage);
+
+                IsUploading = false;
+
+                NeedScrollToBottom();
+
+                NewMessage = string.Empty;
+                SelectedMessageToReply = null;
+                ReplyMode = false;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            SuccessMessage();
+            IsUploading = false;
+        }
+        catch (Exception)
+        {
+            ErrorMessage("آپلود فایل با خطا مواجه شد لطفا مجدد تلاش فرمایید!");
+            IsUploading = false;
+        }
+    }
+    private async Task UploadGroupFile(IBrowserFile file, string caption)
+    {
+        try
+        {
+            if (file is null) return;
+
+            IsUploading = true;
+            StateHasChanged();
+
+            _cancellationTokenSource = new CancellationTokenSource();
+            var extension = Path.GetExtension(file.Name);
+            var contentType = string.IsNullOrEmpty(file.ContentType) ? "application/octet-stream" : file.ContentType;
+
+            var uploaddto = new UploadFileDto(
+                SelectedGroup!.Id,
+                caption,
+                new StreamContent(file.OpenReadStream(100 * 1024 * 1024, _cancellationTokenSource.Token)),
+                contentType,
+                extension,
+                file.Name
+            );
+
+            var result = await chatService.UploadGroupFileAsync(uploaddto, _cancellationTokenSource.Token);
+            if (result.Item1)
+            {
+                var me =CurrentUser;
                 var newMessage = new ChatMessageDto
                 {
                     Id = result.result!.MessageId,
@@ -1012,6 +1239,7 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
         {
             var name = CurrentUser.Name;
             NewIncomingMessage.Content = NewIncomingMessage.Content;
+         if(_messages.Any(x=>x.ConversationType==NewIncomingMessage.ConversationType))
             _messages.Add(NewIncomingMessage);
             await IncommingMessageRecieved.InvokeAsync();
             NewIncomingMessage = null;
@@ -1064,9 +1292,12 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
                 _drafts[PreviousSelectedUserId.Value] = NewMessage ?? string.Empty;
             if (PreviousSelectedChannelId.HasValue)
                 _drafts[PreviousSelectedChannelId.Value] = NewMessage ?? string.Empty;
+            if (PreviousSelectedGroupId.HasValue)
+                _drafts[PreviousSelectedGroupId.Value] = NewMessage ?? string.Empty;
 
             PreviousSelectedChannelId = SelectedChannel.Id;
             PreviousSelectedUserId = null;
+            PreviousSelectedGroupId = null;
 
             Loading = true;
             NewMessage = string.Empty;
@@ -1080,12 +1311,40 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
 
             StateHasChanged();
         }
+        else if(SelectedGroup!=null && SelectedGroup.Id != PreviousSelectedGroupId)
+        {
+            if (PreviousSelectedUserId.HasValue)
+                _drafts[PreviousSelectedUserId.Value] = NewMessage ?? string.Empty;
+            if (PreviousSelectedChannelId.HasValue)
+                _drafts[PreviousSelectedChannelId.Value] = NewMessage ?? string.Empty;
+            if(PreviousSelectedGroupId.HasValue)
+                _drafts[PreviousSelectedGroupId.Value] = NewMessage ?? string.Empty;
+
+
+            PreviousSelectedGroupId = SelectedGroup.Id;
+            PreviousSelectedUserId = null;
+            PreviousSelectedChannelId= null;
+
+            Loading = true;
+            NewMessage = string.Empty;
+
+            await LoadGroupMesages();
+
+            if (_drafts.TryGetValue(SelectedGroup.Id, out var draft))
+                NewMessage = draft;
+
+            Loading = false;
+
+            StateHasChanged();
+        }
         else if (OtherUser != null && OtherUser.Id != PreviousSelectedUserId && SelectedChannel == null)
         {
             if (PreviousSelectedChannelId.HasValue)
                 _drafts[PreviousSelectedChannelId.Value] = NewMessage ?? string.Empty;
             if (PreviousSelectedUserId.HasValue)
                 _drafts[PreviousSelectedUserId.Value] = NewMessage ?? string.Empty;
+            if (PreviousSelectedGroupId.HasValue)
+                _drafts[PreviousSelectedGroupId.Value] = NewMessage ?? string.Empty;
 
             if (CurrentUser == null)
             {
@@ -1094,12 +1353,13 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
 
             PreviousSelectedUserId = OtherUser.Id;
             PreviousSelectedChannelId = null;
+            PreviousSelectedGroupId = null;
             Loading = true;
             NewMessage = string.Empty;
 
-                await LoadMesages();
+            await LoadMesages();
 
-            // ✅ بعد از لود، اگر برای کاربر فعلی پیش‌نویس داریم، برگردان
+
             if (_drafts.TryGetValue(OtherUser.Id, out var draft))
                 NewMessage = draft;
 

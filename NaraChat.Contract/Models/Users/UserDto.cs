@@ -13,9 +13,11 @@ namespace NaraChat.Contract.Models.Users
     {
         public Guid Id { get; set; }
         public string Name { get; set; }
+        public string Age { get; set; }
         public string? UserName { get; set; }
         public DateTime? LastSeen { get; set; }
         public string? avatar { get; set; }
+        public string? Bio { get; set; }
         public bool IsOnline { get; set; }
         public bool IsSelected { get; set; }
         public int messageUnreadedCount { get; set; }
@@ -29,6 +31,7 @@ namespace NaraChat.Contract.Models.Users
         public bool OtherUserBlocked { get; set; }
         public Guid? ConversationId { get; set; }
         public bool IsChannel { get; set; }
+        public bool IsGroup { get; set; }
         public ChannelDto? channel { get; set; }
         public UserDto()
         {
@@ -37,7 +40,7 @@ namespace NaraChat.Contract.Models.Users
 
         public UserDto(Guid id, string name, string? Avatar = null, bool Isonline = false, int messageUnreadedCount = 0, DateTime? lastseen = null, string? lastReceivedMessage = null,
             Guid? lastReceivedMessageId=null,bool isLastReceivedMessageForMe=false,string? lastReceivedMessageSendDate=null,bool isPinned=false,bool isBlocked=false,
-        Guid? conversationId=null, bool otherUserBlocked = false, bool ischannel=false, ChannelDto?chanel=null,string? username=null,DateTime?lastmessageDate=null)
+        Guid? conversationId=null, bool otherUserBlocked = false, bool ischannel=false,bool isgroup=false, ChannelDto?chanel=null,string? username=null,DateTime?lastmessageDate=null,string? bio=null,string? age=null)
         {
             Id = id;
             Name = name;
@@ -57,6 +60,9 @@ namespace NaraChat.Contract.Models.Users
             channel= chanel;
             UserName = username;
             LastMessageDate = lastmessageDate;
+            IsGroup=isgroup;
+            Bio = bio;
+            Age = age;
 
 
         }

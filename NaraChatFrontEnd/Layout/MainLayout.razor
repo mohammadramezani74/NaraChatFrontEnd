@@ -5,6 +5,7 @@
 @using NaraChat.Application.Services.LocalStorage
 @using NaraChat.Contract.Models.BaseResponse
 @using NaraChat.Contract.Models.Chat.Channels
+@using NaraChat.Contract.Models.Chat.Group
 @using NaraChatFrontEnd.Models.BaseModels
 @using System.Security.Claims
 @using NaraChatFrontEnd.Pages.ChatPages
@@ -16,6 +17,7 @@
 @inject AuthenticationStateProvider stateprovider
 @inject IAuthService auth
 @inject IUserChatService userservice
+@inject IConversationService ConversationService
 @inject IJSRuntime js
 @inject ILocalStorageService localStorage
 @inject VersionCheckService VersionChecker
@@ -86,8 +88,9 @@
 
                 <MudMenu Disabled="@(CurrentUser==null)" Icon="@Icons.Material.Filled.MoreVert" 
                 AriaLabel="Open user menu"> 
-                    <MudIconButton @onclick="RouteToDownload"  title="اپ اندروید ناراگرام"  Icon="@Icons.Material.Filled.Android" Color=" Color.Tertiary" /> 
-                    <MudIconButton @onclick="CreateChannel"  title="ایجاد کانال"  Icon="@Icons.Material.Filled.AddComment" Color=" Color.Info" /> 
+                    @* <MudIconButton @onclick="RouteToDownload"  title="اپ اندروید ناراگرام"  Icon="@Icons.Material.Filled.Android" Color=" Color.Tertiary" />  *@
+                     <MudIconButton @onclick="CreateChannel"  title="ایجاد کانال"  Icon="@Icons.Material.Filled.AddComment" Color=" Color.Info" />  
+                    <MudIconButton @onclick="CreateGroup"  title="ایجاد گروه"  Icon="@Icons.Material.Filled.Group" Color=" Color.Secondary" /> 
 
 
 
@@ -287,6 +290,34 @@
                 snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomRight;
 
                 snackbar.Add(response.message, Severity.Error);
+            }
+        }
+    }
+        public async Task CreateGroup()
+    {
+        var dialog = await DialogService.ShowAsync<CreateGroupDialogComponent>("ایجاد گروه جدید");
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is CreateGroupCommand command)
+        {
+
+            var response=  await ConversationService.CreateGroupConversation(command.Others,
+            command.Title,
+            command.UserName,command.Description);
+            if (response.IsSuccess)
+            {
+                snackbar.Clear();
+                snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomRight;
+                nm.Refresh(true);
+                snackbar.Add("ساخت گروه با موفقیت انجام شد.", Severity.Success);
+
+            }
+            else
+            {
+                   snackbar.Clear();
+                snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomRight;
+
+                snackbar.Add("ساخت گروه با خطا مواجه شد", Severity.Error);
             }
         }
     }

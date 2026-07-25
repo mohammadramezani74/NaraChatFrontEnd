@@ -5,21 +5,21 @@
 <MudDialog>
     <DialogContent>
         <MudAutocomplete T="UserChannelDto"
-                         @bind-Value="SelectedUser"
-                         Label="@DialogLabel"
-                         Dense="true"
-                         Clearable="true"
-                         CoerceText="true"
-                         SearchFunc="SearchUsers"
-                         ToStringFunc="u => u.Name"
-                         Variant="Variant.Outlined"
-                         Class="mb-4" />
+        @bind-Value="SelectedUser"
+        Label="@DialogLabel"
+        Dense="true"
+        Clearable="true"
+        CoerceText="true"
+        SearchFunc="SearchUsers"
+        ToStringFunc="u => u.Name"
+        Variant="Variant.Outlined"
+        Class="mb-4" />
     </DialogContent>
 
     <DialogActions>
         <MudButton Color="Color.Primary"
-                   OnClick="Save"
-                   Disabled="@(SelectedUser is null)">افزودن</MudButton>
+        OnClick="Save"
+        Disabled="@(SelectedUser is null)">افزودن</MudButton>
         <MudButton Color="Color.Secondary" OnClick="Cancel">انصراف</MudButton>
     </DialogActions>
 </MudDialog>
@@ -38,6 +38,7 @@
 
     private Task<IEnumerable<UserChannelDto>> SearchUsers(string value, CancellationToken cancellationToken)
     {
+        AvailableUsers = AvailableUsers.GroupBy(XAxisLabelPosition => XAxisLabelPosition.Id).Select(XAxisLabelPosition => XAxisLabelPosition.First()).ToList();
         IEnumerable<UserChannelDto> users = AvailableUsers ?? Enumerable.Empty<UserChannelDto>();
 
         if (!string.IsNullOrWhiteSpace(value))

@@ -2,190 +2,499 @@
 @inject IConversationService conversationService;
 @inject ISnackbar snackbar
 
-<MudPaper Class="h-100 w-100 d-flex flex-column">
+<MudPaper Class="people-panel h-100 w-100 d-flex flex-column" Elevation="0">
 
-    <!-- سوییچ تب‌ها (بدون تاثیر روی اسکرول لیست) -->
-    <MudStack Row="true" Class="px-2 pt-2" Style="gap:8px;">
-        <MudButton Size="Size.Small"
-        Variant="@(_activeTab==PeopleTab.Contacts ? Variant.Filled : Variant.Outlined)"
-        Color="Color.Primary"
-        OnClick="@(()=>SetTab(PeopleTab.Contacts))">
-            مخاطبین
-        </MudButton>
+    <!-- هدر ثابت: سوییچ تب‌ها + جستجو -->
+    <div class="people-header">
 
-        <MudButton Size="Size.Small"
-        Variant="@(_activeTab==PeopleTab.Chats ? Variant.Filled : Variant.Outlined)"
-        Color="Color.Primary"
-        OnClick="@(()=>SetTab(PeopleTab.Chats))">
-            چت‌های من
-        </MudButton>
-    </MudStack>
+        <div class="segmented" role="tablist">
+            <button type="button"
+                    role="tab"
+                    class="seg-btn @(_activeTab==PeopleTab.Contacts ? "is-active" : "")"
+                    @onclick="@(()=>SetTab(PeopleTab.Contacts))">
+                مخاطبین
+            </button>
+            <button type="button"
+                    role="tab"
+                    class="seg-btn @(_activeTab==PeopleTab.Chats ? "is-active" : "")"
+                    @onclick="@(()=>SetTab(PeopleTab.Chats))">
+                چت‌های من
+            </button>
+        </div>
 
-    <MudList T="string" Class="overflow-y-auto flex-grow-1" Style="max-height:100%;">
-        @if (Loading)
+        @if (_activeTab == PeopleTab.Contacts)
         {
-            <MudProgressCircular />
+            <MudTextField @bind-Value="Search"
+                          Placeholder="جستجوی مخاطب"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          Immediate="true"
+                          Adornment="Adornment.End"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          AdornmentColor="Color.Primary"
+                          Class="search-field w-100"
+                          @oninput="OnSearchInput" />
         }
         else
         {
-            @* سرچ فقط در تب مخاطبین *@
-            @if (_activeTab == PeopleTab.Contacts)
-            {
-                <MudListItem Class="py-3 px-2" Style="height:68px; margin-top: 10px;">
-                    <ChildContent>
-                        <MudPaper Elevation="0" Class="pa-2 d-flex align-center" Style="border-radius: 12px;">
-                            <MudTextField @bind-Value="Search"
-                            Placeholder="جستجو کنید..."
-                            Variant="Variant.Outlined"
-                            Immediate="true"
-                            Adornment="Adornment.End"
-                            AdornmentIcon="@Icons.Material.Filled.Search"
-                            AdornmentColor="Color.Primary"
-                            Class="w-100"
-                            @oninput="OnSearchInput" />
-                        </MudPaper>
-                    </ChildContent>
-                </MudListItem>
-            }
+            <MudTextField @bind-Value="ChatsSearch"
+                          Placeholder="جستجو در چت‌ها"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          Immediate="true"
+                          Adornment="Adornment.End"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          AdornmentColor="Color.Primary"
+                          Class="search-field w-100"
+                          @oninput="OnChatsSearchInput" />
+        }
+    </div>
 
-            @* سرچِ تب چت‌های من (بدون تغییر استایل/کلاس، عین بالا فقط با متغیر جدا) *@
-            @if (_activeTab == PeopleTab.Chats)
+    <!-- لیست -->
+    <div class="people-list flex-grow-1">
+        @if (Loading)
+        {
+            @for (int i = 0; i < 8; i++)
             {
-                <MudListItem Class="py-3 px-2" Style="height:68px; margin-top: 10px;">
-                    <ChildContent>
-                        <MudPaper Elevation="0" Class="pa-2 d-flex align-center" Style="border-radius: 12px;">
-                            <MudTextField @bind-Value="ChatsSearch"
-                            Placeholder="جستجو در چت‌ها..."
-                            Variant="Variant.Outlined"
-                            Immediate="true"
-                            Adornment="Adornment.End"
-                            AdornmentIcon="@Icons.Material.Filled.Search"
-                            AdornmentColor="Color.Primary"
-                            Class="w-100"
-                            @oninput="OnChatsSearchInput" />
-                        </MudPaper>
-                    </ChildContent>
-                </MudListItem>
+                <div class="chat-row is-skeleton">
+                    <div class="row-avatar">
+                        <MudSkeleton SkeletonType="SkeletonType.Circle" Width="44px" Height="44px" Animation="Animation.Wave" />
+                    </div>
+                    <div class="row-body">
+                        <MudSkeleton Width="45%" Height="12px" Animation="Animation.Wave" />
+                        <MudSkeleton Width="70%" Height="10px" Animation="Animation.Wave" />
+                    </div>
+                </div>
             }
-
-            <!-- فقط همین خط منبع داده را بر اساس تب فعال عوض می‌کند -->
-            <Virtualize items="@GetActiveItems()" Context="user" OverscanCount="2" ItemSize="68">
+        }
+        else
+        {
+            <Virtualize Items="@GetActiveItems()" Context="user" OverscanCount="4" ItemSize="72">
                 <ItemContent>
-                    <MudListItem @key="@(user.Id+user.Name)"
-                    @ondblclick="()=>PinUser(user)" @onclick="()=>HandleUserClick(user)"
-                    Class=" py-3 px-2"
-                    Style="@(user.IsSelected?$" height:73px;background-color:{chooseColor()};":"height:73px; ")">
+                    <div @key="@(user.Id+user.Name)"
+                         class="chat-row @(user.IsSelected ? "is-selected" : "") @(user.messageUnreadedCount > 0 ? "is-unread" : "")"
+                         style="@(user.IsSelected ? $"background-color:{chooseColor()};" : "")"
+                         title="برای سنجاق‌کردن دوبار کلیک کنید"
+                         @onclick="()=>HandleUserClick(user)"
+                         @ondblclick="()=>PinUser(user)">
 
-                        <AvatarContent>
-                            @if(!user.IsChannel){
-                                <MudBadge Dot="true" Color="@(user.IsOnline? Color.Success:Color.Default)" Class="mx-6 my-4">
-                                    <MudAvatar Size="Size.Medium" Class="@((user.IsChannel ? "channel-shadow" : ""))">
-                                        <MudImage Src="@(user.avatar != null
-                                           ? $"{SiteSettings.ApiUrl}{user.avatar}"
-                                            : $"lib/assets/Images/{GetImageName(user.IsChannel)}")"
-                                        Class="rounded-circle"
-                                        Style="width:100%; height:100%; object-fit:inherit;" />
-                                    </MudAvatar>
-                                </MudBadge>
-                            }
-                            else
+                        <div class="row-avatar">
+                            <MudAvatar Size="Size.Medium"
+                                       Class="@(user.IsChannel ? "channel-shadow" : user.IsGroup ? "group-shadow" : "")">
+                                @if (user.IsGroup)
+                                {
+                                    <MudImage Src="@(user.avatar != null
+                                                   ? $"{SiteSettings.ApiUrl}{user.avatar}"
+                                                   : "lib/assets/Images/group2.svg")"
+                                              Class="rounded-circle"
+                                              Style="width:100%; height:100%; object-fit:cover;" />
+                                }
+                                else
+                                {
+                                    <MudImage Src="@(user.avatar != null
+                                                   ? $"{SiteSettings.ApiUrl}{user.avatar}"
+                                                   : $"lib/assets/Images/{GetImageName(user.IsChannel)}")"
+                                              Class="rounded-circle"
+                                              Style="width:100%; height:100%; object-fit:cover;" />
+                                }
+                            </MudAvatar>
+
+                            @if (user.IsOnline)
                             {
-                                <div Class="mx-6 my-4">
-                                    <MudAvatar Size="Size.Medium" Class="@((user.IsChannel ? "channel-shadow" : ""))">
-                                        <MudImage Src="@(user.avatar != null
-                                            ? $"{SiteSettings.ApiUrl}{user.avatar}"
-                                            : $"lib/assets/Images/{GetImageName(user.IsChannel)}")"
-                                        Class="rounded-circle"
-                                        Style="width:100%; height:100%; object-fit:inherit;" />
-                                    </MudAvatar>
-                                </div>
+                                <span class="presence-dot"></span>
                             }
-                        </AvatarContent>
+                        </div>
 
-                        <ChildContent>
-                            <MudStack Row=false>
-                                <MudStack Row="true" Style=" display:flex; justify-content:space-between">
-                                    @if (user.messageUnreadedCount > 0)
+                        <div class="row-body">
+
+                            <div class="row-line">
+                                <div class="row-name">
+                                    <span class="name-text">@((MarkupString)RenderNameHighlighted(user.Name))</span>
+
+                                    @if (user.IsChannel)
                                     {
-                                        <MudText Style="font-size:12px;">@((MarkupString)RenderNameHighlighted(user.Name))
-                                            @if (user.IsChannel)
-                                            {
-
-                                                <MudImage Style="height=15px;width:15px; margin-right:5px;" Src="lib/assets/Images/logogo.svg" Alt="کانال" Elevation="25" Class="rounded-lg" />
-                                            }
-
-                                        </MudText>
-
-                                        <MudBadge Content="@GetUnreadCap(user.messageUnreadedCount)" Color="Color.Error" Overlap="true" Origin="Origin.TopRight" Class="mx-6 my-4"></MudBadge>
+                                        <MudImage Src="lib/assets/Images/logogo.svg" Alt="کانال" Class="type-badge" />
                                     }
-                                    else
+                                    else if (user.IsGroup)
                                     {
-                                        <MudText Style="font-size:12px;">@((MarkupString)RenderNameHighlighted(user.Name))
-
-                                            @if (user.IsChannel)
-                                            {
-
-                                                <MudImage Style="height=15px;width:15px; margin-right:5px;" Src="lib/assets/Images/logogo.svg" Alt="کانال" Elevation="25" Class="rounded-lg" />
-                                            }
-
-                                        </MudText>
+                                        <MudImage Src="lib/assets/Images/group.svg" Alt="گروه" Class="type-badge" />
                                     }
+
                                     @if (user.IsPin)
                                     {
-                                        <MudIcon Icon="@Icons.Material.Filled.PushPin" Color="Color.Error" Class="ms-1" Style="font-size:16px;" />
+                                        <MudIcon Icon="@Icons.Material.Filled.PushPin" Class="pin-icon" />
                                     }
-                                </MudStack>
-                                <MudStack Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Row="true">
-                                    <p style="@GetLastMessageStyle(user)">@((MarkupString)RenderMessageHighlighted(user.LastReceivedMessage))</p>
-                                    <p style="font-size:9px;color:silver">@user.LastReceivedMessageSendDate</p>
-                                </MudStack>
-                            </MudStack>
-                        </ChildContent>
+                                </div>
 
-                    </MudListItem>
+                                <span class="row-time">@user.LastReceivedMessageSendDate</span>
+                            </div>
+
+                            <div class="row-line">
+                                <p class="row-message" style="@GetLastMessageStyle(user)">
+                                    @((MarkupString)RenderMessageHighlighted(user.LastReceivedMessage))
+                                </p>
+
+                                @if (user.messageUnreadedCount > 0)
+                                {
+                                    <span class="unread-pill">@GetUnreadCap(user.messageUnreadedCount)</span>
+                                }
+                            </div>
+
+                        </div>
+                    </div>
                 </ItemContent>
 
                 <Placeholder>
-                    @for (int i = 0; i < 10; i++)
+                    @for (int i = 0; i < 8; i++)
                     {
-                        <MudListItem Class="py-3 px-2" Style="height:73px;">
-                            <AvatarContent>
-                                <MudSkeleton Width="40px" Height="40px" Animation="Animation.Pulse" Class="mx-6 my-4 rounded-circle" />
-                            </AvatarContent>
-                            <ChildContent>
-                                <MudStack Row="false" Class="w-full">
-                                    <MudSkeleton Width="50%" Height="15px" Animation="Animation.Pulse" />
-                                    <MudStack Row="true" Justify="Justify.SpaceBetween" Class="w-full">
-                                        <MudSkeleton Width="30%" Height="10px" Animation="Animation.Pulse" />
-                                        <MudSkeleton Width="20%" Height="10px" Animation="Animation.Pulse" />
-                                    </MudStack>
-                                </MudStack>
-                            </ChildContent>
-                        </MudListItem>
+                        <div class="chat-row is-skeleton">
+                            <div class="row-avatar">
+                                <MudSkeleton SkeletonType="SkeletonType.Circle" Width="44px" Height="44px" Animation="Animation.Wave" />
+                            </div>
+                            <div class="row-body">
+                                <MudSkeleton Width="45%" Height="12px" Animation="Animation.Wave" />
+                                <MudSkeleton Width="70%" Height="10px" Animation="Animation.Wave" />
+                            </div>
+                        </div>
                     }
                 </Placeholder>
+
                 <EmptyContent>
-                    <MudPaper Class="d-flex flex-column align-center justify-center p-6 my-4" Style="min-height:150px; background-color:#f9f9f9;">
-                        <MudIcon Icon="@Icons.Material.Filled.PersonOff" Size="Size.Large" Color="Color.Dark" />
-                        <MudText Typo="Typo.h6" Class="mt-2">هیچ کاربری برای نمایش وجود ندارد</MudText>
-                        <MudText Typo="Typo.body2" Color="Color.Secondary">لیست کاربران فعلاً خالی است</MudText>
-                    </MudPaper>
+                    <div class="empty-state">
+                        <div class="empty-icon">
+                            <MudIcon Icon="@(_activeTab == PeopleTab.Chats ? Icons.Material.Outlined.ChatBubbleOutline : Icons.Material.Outlined.PersonSearch)"
+                                     Size="Size.Large" />
+                        </div>
+                        <span class="empty-title">
+                            @(_activeTab == PeopleTab.Chats ? "هنوز گفتگویی ندارید" : "مخاطبی پیدا نشد")
+                        </span>
+                        <span class="empty-text">
+                            @(_activeTab == PeopleTab.Chats
+                                ? "از تب مخاطبین یک نفر را انتخاب کنید و گفتگو را شروع کنید"
+                                : "نام دیگری را جستجو کنید")
+                        </span>
+                    </div>
                 </EmptyContent>
             </Virtualize>
         }
-    </MudList>
+    </div>
 </MudPaper>
 
 <style>
-    .channel-shadow {
-    box-shadow: 0 0 10px 4px #594ae2;
+    /* ---------- پنل ---------- */
+    .people-panel {
+        background: var(--mud-palette-surface);
+        overflow: hidden;
     }
 
+    /* ---------- هدر ثابت ---------- */
+    .people-header {
+        position: sticky;
+        top: 0;
+        z-index: 3;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding: 12px 12px 10px;
+        background: var(--mud-palette-surface);
+        border-bottom: 1px solid var(--mud-palette-divider);
+        flex-shrink: 0;
+    }
+
+    /* سوییچ تب‌ها */
+    .segmented {
+        display: flex;
+        gap: 2px;
+        padding: 3px;
+        border-radius: 999px;
+        background: var(--mud-palette-background-gray);
+        border: 1px solid var(--mud-palette-divider);
+    }
+
+    .seg-btn {
+        flex: 1 1 0;
+        border: 0;
+        outline: 0;
+        cursor: pointer;
+        padding: 7px 10px;
+        border-radius: 999px;
+        background: transparent;
+        font-family: inherit;
+        font-size: 12.5px;
+        font-weight: 600;
+        color: var(--mud-palette-text-secondary);
+        transition: background .18s ease, color .18s ease;
+    }
+
+        .seg-btn:hover {
+            color: var(--mud-palette-text-primary);
+        }
+
+        .seg-btn.is-active {
+            background: var(--mud-palette-surface);
+            color: var(--mud-palette-primary);
+            box-shadow: 0 1px 4px rgba(0,0,0,.12);
+        }
+
+        .seg-btn:focus-visible {
+            box-shadow: 0 0 0 2px var(--mud-palette-primary);
+        }
+
+    /* جستجو */
+    .search-field .mud-input.mud-input-outlined {
+        border-radius: 999px;
+        background: var(--mud-palette-background-gray);
+    }
+
+    .search-field .mud-input-outlined-border {
+        border-radius: 999px !important;
+        border-color: var(--mud-palette-divider);
+    }
+
+    .search-field .mud-input-slot {
+        font-size: 13px;
+    }
+
+    /* ---------- لیست ---------- */
+    .people-list {
+        overflow-y: auto;
+        overflow-x: hidden;
+        scrollbar-width: thin;
+    }
+
+        .people-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .people-list::-webkit-scrollbar-thumb {
+            background: var(--mud-palette-divider);
+            border-radius: 999px;
+        }
+
+    /* ---------- سطر گفتگو ---------- */
+    .chat-row {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        height: 72px;
+        padding: 0 12px;
+        cursor: pointer;
+        user-select: none;
+        transition: background-color .15s ease;
+    }
+
+        .chat-row::after { /* خط جداکننده، هم‌تراز با متن */
+            content: "";
+            position: absolute;
+            bottom: 0;
+            inset-inline-start: 66px;
+            inset-inline-end: 12px;
+            height: 1px;
+            background: var(--mud-palette-divider);
+        }
+
+        .chat-row:last-child::after {
+            display: none;
+        }
+
+        .chat-row:hover {
+            background-color: var(--mud-palette-action-default-hover);
+        }
+
+        .chat-row.is-selected::before { /* نوار رنگی سطر فعال */
+            content: "";
+            position: absolute;
+            inset-block: 0;
+            inset-inline-start: 0;
+            width: 3px;
+            background: var(--mud-palette-primary);
+        }
+
+        .chat-row.is-skeleton {
+            cursor: default;
+        }
+
+    /* آواتار */
+    .row-avatar {
+        position: relative;
+        flex-shrink: 0;
+        line-height: 0;
+    }
+
+    .presence-dot {
+        position: absolute;
+        bottom: 1px;
+        inset-inline-end: 1px;
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+        background: #22c55e;
+        border: 2px solid var(--mud-palette-surface);
+    }
+
+    /* حلقه‌ی تفکیک کانال و گروه (به‌جای هاله‌ی پررنگ قبلی) */
+    .channel-shadow {
+        box-shadow: 0 0 0 2px var(--mud-palette-surface), 0 0 0 4px #594ae2;
+    }
+
+    .group-shadow {
+        box-shadow: 0 0 0 2px var(--mud-palette-surface), 0 0 0 4px #38bd95;
+    }
+
+    /* بدنه‌ی سطر */
+    .row-body {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .row-line {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        min-width: 0;
+    }
+
+    .row-name {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        min-width: 0;
+    }
+
+    .name-text {
+        font-size: 13.5px;
+        font-weight: 600;
+        line-height: 1.5;
+        color: var(--mud-palette-text-primary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .is-unread .name-text {
+        font-weight: 700;
+    }
+
+    .type-badge {
+        width: 14px;
+        height: 14px;
+        flex-shrink: 0;
+        opacity: .85;
+    }
+
+    .pin-icon {
+        font-size: 14px !important;
+        flex-shrink: 0;
+        color: var(--mud-palette-text-secondary);
+    }
+
+    .row-time {
+        flex-shrink: 0;
+        font-size: 10px;
+        color: var(--mud-palette-text-secondary);
+        white-space: nowrap;
+    }
+
+    .row-message {
+        margin: 0;
+        min-width: 0;
+        flex: 1 1 auto;
+        font-size: 11.5px;
+        line-height: 1.6;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .is-unread .row-message {
+        font-weight: 600;
+    }
+
+    .unread-pill {
+        flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 19px;
+        height: 19px;
+        padding: 0 6px;
+        border-radius: 999px;
+        background: var(--mud-palette-error);
+        color: #fff;
+        font-size: 10px;
+        font-weight: 700;
+        line-height: 1;
+    }
+
+    /* هایلایت نتیجه‌ی جستجو */
     mark {
-    background-color: var(--mud-palette-primary);
-    color: white;
-    padding: 0 2px;
-    border-radius: 3px;
+        background-color: var(--mud-palette-primary);
+        color: #fff;
+        padding: 0 2px;
+        border-radius: 3px;
+    }
+
+    /* ---------- حالت خالی ---------- */
+    .empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 48px 24px;
+        text-align: center;
+    }
+
+    .empty-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 56px;
+        height: 56px;
+        margin-bottom: 6px;
+        border-radius: 50%;
+        background: var(--mud-palette-background-gray);
+        color: var(--mud-palette-text-secondary);
+    }
+
+    .empty-title {
+        font-size: 13.5px;
+        font-weight: 700;
+        color: var(--mud-palette-text-primary);
+    }
+
+    .empty-text {
+        font-size: 11.5px;
+        line-height: 1.9;
+        max-width: 240px;
+        color: var(--mud-palette-text-secondary);
+    }
+
+    /* ---------- ریسپانسیو و دسترسی‌پذیری ---------- */
+    @@media (max-width: 600px) {
+        .people-header {
+            padding: 10px 10px 8px;
+        }
+
+        .chat-row {
+            padding: 0 10px;
+        }
+
+            .chat-row::after {
+                inset-inline-start: 62px;
+                inset-inline-end: 10px;
+            }
+    }
+
+    @@media (prefers-reduced-motion: reduce) {
+        .chat-row, .seg-btn {
+            transition: none;
+        }
     }
 </style>
 
@@ -230,7 +539,7 @@
     {
         Search = e?.Value?.ToString() ?? string.Empty;
         _searchTimer?.Dispose();
-        _searchTimer = new System.Threading.Timer( _ =>
+        _searchTimer = new System.Threading.Timer(_ =>
         {
             InvokeAsync(StateHasChanged);
 
@@ -311,7 +620,7 @@
                 .GroupBy(u => u.Id)
                 .Select(g => g.First()) // اگر تکراری بود، اولین مورد نگه داشته می‌شود
                 .OrderByDescending(c => c.IsPin)
-                .ThenByDescending(x=>x.LastMessageDate)
+                .ThenByDescending(x => x.LastMessageDate)
                 .ThenBy(c => c.IsChannel)
 
                 .ThenByDescending(u => u.messageUnreadedCount > 0)
@@ -384,13 +693,13 @@
         IEnumerable<UserDto> list = Users
             .Where(u => u.messageUnreadedCount > 0
                      || u.LastReceivedMessageId != null
-                     || !string.IsNullOrWhiteSpace(u.LastReceivedMessage)||
-            u.IsChannel).OrderByDescending(x => x.LastMessageDate);
+                     || !string.IsNullOrWhiteSpace(u.LastReceivedMessage) ||
+            u.IsChannel || u.IsGroup).OrderByDescending(x => x.LastMessageDate);
         var list2 = Users
        .Where(u => u.messageUnreadedCount > 0
                 || u.LastReceivedMessageId != null
                 || !string.IsNullOrWhiteSpace(u.LastReceivedMessage) ||
-       u.IsChannel).OrderByDescending(x => x.LastMessageDate).ToList();
+       u.IsChannel || u.IsGroup).OrderByDescending(x => x.LastMessageDate).ToList();
 
         if (!string.IsNullOrWhiteSpace(ChatsSearch))
         {
@@ -400,14 +709,15 @@
                                     && x.LastReceivedMessage.Contains(k, StringComparison.OrdinalIgnoreCase)));
         }
 
-        return list
+        list = list
             .OrderByDescending(c => c.IsPin)
             .ThenByDescending(c => c.messageUnreadedCount > 0)
             .ThenByDescending(c => c.LastMessageDate) // اگر تاریخ متن فارسیه، بهتره DateTime جدا داشته باشه
             .ToList();
+        return list.GroupBy(x => x.Id).Select(x => x.First()).ToList();
     }
     private IEnumerable<UserDto> GetAllUsersView()
-   {
+    {
         var list = Users.AsEnumerable();
 
         if (!string.IsNullOrWhiteSpace(Search))
@@ -419,15 +729,15 @@
             );
         }
 
-        var mylist= list
+        var mylist = list
             .OrderByDescending(c => c.IsPin)
             .ThenByDescending(c => c.messageUnreadedCount > 0)
             .ThenByDescending(c => c.LastMessageDate)   // اگر متن فارسیه، بهتره DateTime جدا داشته باشه
             .ThenBy(c => c.Name, StringComparer.OrdinalIgnoreCase)  // مرتب‌سازی پایانی با نام
-           .GroupBy(x=>x.Id)
-           .Select(XAxisLabelPosition=>XAxisLabelPosition.First())
+           .GroupBy(x => x.Id)
+           .Select(XAxisLabelPosition => XAxisLabelPosition.First())
             .ToList();
-            return mylist;
+        return mylist.GroupBy(x => x.Id).Select(x => x.First()).ToList();
     }
 
 
@@ -498,7 +808,7 @@
             targetUser.IsPin = newPinStatus;
             AllUsers = AllUsers
                 .OrderByDescending(c => c.IsPin)
-                .ThenByDescending(x=>x.LastMessageDate)
+                .ThenByDescending(x => x.LastMessageDate)
                 .ThenByDescending(c => c.messageUnreadedCount > 0)
                 .ToList();
 
