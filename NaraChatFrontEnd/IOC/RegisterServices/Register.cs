@@ -7,6 +7,7 @@ using NaraChat.Application.Services.ChatServices.Conversation;
 using NaraChat.Application.Services.CheckLists;
 using NaraChat.Application.Services.LocalStorage;
 using NaraChat.Application.Services.TokenProvider;
+using NaraChat.Application.Services.Upload;
 using NaraChat.Application.Settings;
 using NaraChatFrontEnd.Layout;
 
@@ -53,7 +54,7 @@ namespace NaraChatFrontEnd.IOC.RegisterServices
                 return new MessageService(httpClient);
             });
 
-
+            services.AddScoped<IBrowserUploader, BrowserUploader>();
             return services;
         }
     }

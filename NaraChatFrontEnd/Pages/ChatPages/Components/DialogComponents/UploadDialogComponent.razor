@@ -1,155 +1,215 @@
-﻿<MudDialog>
+﻿@using NaraChat.Application.Services.Upload
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject IBrowserUploader Uploader
+
+<MudDialog>
     <DialogContent>
         <MudStack Style="width: 100%">
+
             <MudItem>
                 @if (!string.IsNullOrEmpty(_fileError))
                 {
-                    <MudText Color="Color.Error" Typo="Typo.caption">
-                        @_fileError
-                    </MudText>
+                    <MudText Color="Color.Error" Typo="Typo.caption">@_fileError</MudText>
                 }
             </MudItem>
-            <MudForm Model="@_model"
-            @bind-IsValid="_isValid"
-            @bind-IsTouched="_isTouched" >
-                <MudItem xs="12">
-                    <MudFileUpload T="IReadOnlyList<IBrowserFile>"
-                    @ref="@_fileUpload"
-                    @bind-Files="_model.Files"
-                    For="@(() => _model.Files)"
-                    AppendMultipleFiles
-                    Hidden="@false"
-                    InputClass="absolute mud-width-full mud-height-full overflow-hidden z-10"
-                    InputStyle="opacity:0"
-                    ErrorText="@string.Empty"
-                    tabindex="-1"
-                    @ondrop="@ClearDragClass"
-                    @ondragenter="@SetDragClass"
-                    @ondragleave="@ClearDragClass"
-                    @ondragend="@ClearDragClass">
-                        <ActivatorContent>
-                            <MudPaper Height="300px"
-                            Outlined="true"
-                            Class="@_dragClass">
-                                <MudText Typo="Typo.h6">
-                                    فایل مورد نظر را در این منطقه قرار دهید.
-                                </MudText>
-                                @foreach (var file in _model.Files?.Select(file => file.Name) ?? Enumerable.Empty<string>())
-                                {
-                                    <MudChip T="string" Color="Color.Dark" Text="@file" />
-                                }
-                            </MudPaper>
-                        </ActivatorContent>
 
-                    </MudFileUpload>
+            <MudForm Model="@_model" @bind-IsValid="_isValid" @bind-IsTouched="_isTouched">
+                <MudItem xs="12">
+
+                    @* درگ‌اند‌دراپ روی همین div سوار می‌شود *@
+                    <div id="nara-upload-host" style="position: relative;">
+                        <MudFileUpload T="IReadOnlyList<IBrowserFile>"
+                                       @ref="@_fileUpload"
+                                       @bind-Files="_model.Files"
+                                       For="@(() => _model.Files)"
+                                       AppendMultipleFiles
+                                       Hidden="@false"
+                                       InputClass="absolute mud-width-full mud-height-full overflow-hidden z-10"
+                                       InputStyle="opacity:0"
+                                       ErrorText="@string.Empty"
+                                       tabindex="-1">
+                            <ActivatorContent>
+                                <MudPaper Height="300px" Outlined="true" Class="@DefaultDragClass">
+                                    <MudText Typo="Typo.h6">
+                                        فایل مورد نظر را در این منطقه رها کنید یا کلیک کنید.
+                                    </MudText>
+
+                                    @if (_selectedName is not null)
+                                    {
+                                        <MudChip T="string" Color="Color.Success" Text="@_selectedName" />
+                                    }
+                                    else
+                                    {
+                                        @foreach (var file in _model.Files?.Select(f => f.Name)
+                                       ?? Enumerable.Empty<string>())
+                                        {
+                                            <MudChip T="string" Color="Color.Dark" Text="@file" />
+                                        }
+                                    }
+                                </MudPaper>
+                            </ActivatorContent>
+                        </MudFileUpload>
+                    </div>
+
                     <MudItem xs="12">
-                        <MudTextField @bind-Value="caption" Style="margin-top: 5px;" @ref="multilineReference" T="string" Placeholder="توضیحات کپشن" Lines="3" Variant="Variant.Outlined" Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Api" OnAdornmentClick="@(() => multilineReference.SelectAsync())" />
+                        <MudTextField @bind-Value="caption"
+                                      Style="margin-top: 5px;"
+                                      @ref="multilineReference"
+                                      T="string"
+                                      Placeholder="توضیحات کپشن"
+                                      Lines="3"
+                                      Variant="Variant.Outlined" />
                     </MudItem>
-                    <MudToolBar Gutters="@false"
-                    Class="relative d-flex justify-end gap-4">
+
+                    <MudToolBar Gutters="@false" Class="relative d-flex justify-end gap-4">
                         <MudButton Color="Color.Primary"
-                        OnClick="@OpenFilePickerAsync"
-                        Variant="Variant.Filled">
+                                   OnClick="@OpenFilePickerAsync"
+                                   Variant="Variant.Filled">
                             جستجو در فایل ها
                         </MudButton>
+
                         <MudButton Color="Color.Primary"
-                        Disabled="@(!_isValid || !_isTouched || _model.Files is null || !_model.Files.Any())"
-                        OnClick="@Upload"
-                        Variant="Variant.Filled">
+                                   Disabled="@(!HasFile)"
+                                   OnClick="@Upload"
+                                   Variant="Variant.Filled">
                             بارگذاری فایل
                         </MudButton>
+
                         <MudButton Color="Color.Error"
-                        Disabled="@(_model.Files is null || !_model.Files.Any())"
-                        OnClick="@ClearAsync"
-                        Variant="Variant.Filled">
+                                   Disabled="@(!HasFile)"
+                                   OnClick="@ClearAsync"
+                                   Variant="Variant.Filled">
                             پاکسازی لیست
                         </MudButton>
                     </MudToolBar>
-                </MudItem>
-                <MudItem>
-                    @if (_fileUpload?.ValidationErrors.Any() ?? false)
-                    {
-                        <MudText Color="Color.Error"
-                        Typo="@Typo.caption">
-                            @_fileUpload?.ValidationErrors[0]
-                        </MudText>
-                    }
-                </MudItem>
 
+                </MudItem>
             </MudForm>
         </MudStack>
     </DialogContent>
 </MudDialog>
 
 @code {
+#nullable enable
+
     [CascadingParameter]
-    private IMudDialogInstance MudDialog { get; set; }
-    private void Cancel() => MudDialog.Cancel();
-}
-@code {
-    #nullable enable
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
     public class Model
     {
         public IReadOnlyList<IBrowserFile>? Files { get; set; } = new List<IBrowserFile>();
     }
-    protected override void OnInitialized()
-    { 
 
+    public class UploadResult
+    {
+        public BrowserFileHandle Handle { get; set; } = default!;
+        public string? Caption { get; set; }
     }
-    private Model _model = new();
 
+    private const string DefaultDragClass =
+        "relative rounded-lg border-2 border-dashed pa-4 mt-4 mud-width-full mud-height-full";
+
+    private Model _model = new();
     private MudFileUpload<IReadOnlyList<IBrowserFile>>? _fileUpload;
+    private MudTextField<string>? multilineReference;
+
     private string caption { get; set; } = string.Empty;
     private bool _isValid;
     private bool _isTouched;
-    private const string FileContent = "this is content";
-    private const string DefaultDragClass = "relative rounded-lg border-2 border-dashed pa-4 mt-4 mud-width-full mud-height-full";
-    private string _dragClass = DefaultDragClass;
     private string _fileError = string.Empty;
-    private MudTextField<string> multilineReference;
 
+    // وقتی فایل با drag & drop می‌آید، MudBlazor از آن خبر ندارد،
+    // پس handle و نامش را جدا نگه می‌داریم.
+    private BrowserFileHandle? _droppedHandle;
+    private string? _selectedName;
 
-    private void Upload()
+    private DotNetObjectReference<UploadDialogComponent>? _selfRef;
+
+    private bool HasFile =>
+        _droppedHandle is not null || (_model.Files is not null && _model.Files.Any());
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        _selfRef = DotNetObjectReference.Create(this);
+        await Uploader.InitDropZoneAsync("nara-upload-host", _selfRef);
+    }
+
+    [JSInvokable]
+    public Task OnFileDropped(BrowserFileHandle handle)
+    {
+        _droppedHandle = handle;
+        _selectedName = handle.Name;
+        _fileError = string.Empty;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private async Task Upload()
     {
         _fileError = string.Empty;
 
-        if (_model.Files == null || !_model.Files.Any())
-        {
-            _fileError = "هیچ فایلی انتخاب نشده است.";
-            _isValid = false;
-            return;
-        }
+        // اولویت با فایلی است که رها شده
+        var handle = _droppedHandle;
 
-        if (_model.Files.Count > 1)
+        if (handle is null)
         {
-            _fileError = "لطفا فقط یک فایل انتخاب کنید.";
-            _isValid = false;
-            return;
-        }
-
-        var result = new UploadResult
+            if (_model.Files is null || !_model.Files.Any())
             {
-                File = _model.Files.First(),
+                _fileError = "هیچ فایلی انتخاب نشده است.";
+                return;
+            }
+
+            if (_model.Files.Count > 1)
+            {
+                _fileError = "لطفا فقط یک فایل انتخاب کنید.";
+                return;
+            }
+
+            handle = await Uploader.CaptureAsync("nara-upload-host");
+        }
+
+        if (handle is null)
+        {
+            _fileError = "فایل انتخاب‌شده قابل خواندن نیست. دوباره انتخابش کنید.";
+            return;
+        }
+
+        MudDialog.Close(DialogResult.Ok(new UploadResult
+            {
+                Handle = handle,
                 Caption = caption
-            };
-
-        MudDialog.Close(DialogResult.Ok(result));
+            }));
     }
-
-    private void SetDragClass()
-        => _dragClass = $"{DefaultDragClass} mud-border-primary";
-
-    private void ClearDragClass()
-        => _dragClass = DefaultDragClass;
 
     private Task OpenFilePickerAsync()
         => _fileUpload?.OpenFilePickerAsync() ?? Task.CompletedTask;
 
-    private Task ClearAsync()
-        => _fileUpload?.ClearAsync() ?? Task.CompletedTask;
+    private async Task ClearAsync()
+    {
+        if (_droppedHandle is not null)
+        {
+            await Uploader.ReleaseAsync(_droppedHandle.Handle);
+            _droppedHandle = null;
+        }
 
-    public class UploadResult{
-        public IBrowserFile File { get; set; }
-        public string? Caption { get; set; }
+        _selectedName = null;
+        _fileError = string.Empty;
+
+        if (_fileUpload is not null)
+            await _fileUpload.ClearAsync();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await Uploader.DisposeDropZoneAsync("nara-upload-host");
+        }
+        catch (JSDisconnectedException) { }
+
+        _selfRef?.Dispose();
     }
 }

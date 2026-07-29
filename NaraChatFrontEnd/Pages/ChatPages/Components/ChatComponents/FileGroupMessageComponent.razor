@@ -1,4 +1,5 @@
 ﻿@using NaraChat.Application.Services.TokenProvider
+@using NaraChat.Application.Services.Upload
 @using NaraChat.Contract.Models.Chat.Channels
 @using NaraChatFrontEnd.Pages.ChatPages.Components.DialogComponents
 @inject IDialogService DialogService
@@ -50,9 +51,34 @@
 
 
                     <div style="display: flex; align-items: center; gap: 10px; max-width: 300px; margin: auto; padding: 10px;">
-                        @if (IsLoading){
-                            <MudProgressCircular Color="ThemeCascading.SeenColor==Color.Secondary?Color.Primary:ThemeCascading.SeenColor" Size="Size.Large" Indeterminate="true" />
-                        }else{
+                        @if (IsLoading)
+                        {
+                            @if (_downloadPercent == 0 && string.IsNullOrEmpty(_downloadSizeText))
+                            {
+                                <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+                                    <MudProgressCircular Size="Size.Small" Indeterminate />
+                                    <MudText Typo="Typo.caption">در حال آماده‌سازی فایل روی سرور…</MudText>
+                                </MudStack>
+                            }
+                            else
+                            {
+                                <MudStack Row AlignItems="AlignItems.Center" Spacing="2" Class="mt-1">
+                                    @if (_downloadPercent < 0)
+                                    {
+                                        <MudProgressLinear Color="Color.Primary" Indeterminate Style="width: 110px;" />
+                                    }
+                                    else
+                                    {
+                                        <MudProgressLinear Color="Color.Primary" Value="@_downloadPercent" Style="width: 110px;" />
+                                        <MudText Typo="Typo.caption">@(_downloadPercent)٪</MudText>
+                                    }
+                                    <MudText Typo="Typo.caption">@_downloadSizeText</MudText>
+                                    <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" OnClick="CancelDownload" />
+                                </MudStack>
+                            }
+                        }
+                        else
+                        {
                             <MudFab @onclick="async () => await LoadFile(message.FileContent!.FileId)" Color="ThemeCascading.SeenColor==Color.Secondary?Color.Primary:ThemeCascading.SeenColor" StartIcon="@Icons.Material.Filled.Download" />
 
                         }
@@ -526,20 +552,56 @@
     {
         await JS.InvokeVoidAsync("scrollToElement", parentId);
     }
-    public async Task LoadFile(Guid imageId)
+    [Inject] private IBrowserUploader Uploader { get; set; } = default!;
+
+    private int _downloadPercent;
+    private string _downloadSizeText = string.Empty;
+    private string? _activeDownloadId;
+
+    public async Task LoadFile(Guid fileId)
     {
         IsLoading = true;
-        var message = await _messageservice.GetImageById(imageId);
-        if (message != null)
+        _downloadPercent = 0;
+        _downloadSizeText = string.Empty;
+        _activeDownloadId = fileId.ToString();
+        StateHasChanged();
+
+        try
         {
-            FileData = $"data:application/octet-stream;base64,{message.Data}";
-            FileName = message.fileDownloadName ?? "downloaded_file";
-            FileSize = GetFileSize(message.Data);
-
-            await JS.InvokeVoidAsync("triggerDownload2", FileData, FileName);
+            await Uploader.DownloadAsync(
+                $"api/v1/chatfiles/{fileId}/files?raw=true",
+                message.FileContent?.FileName ?? "downloaded_file",   // ← اسم واقعی
+                _activeDownloadId,
+                (percent, loaded, total) =>
+                {
+                    _downloadPercent = percent;
+                    _downloadSizeText = percent < 0
+                        ? $"{FormatBytes(loaded)} دانلود شد"
+                        : $"{FormatBytes(loaded)} از {FormatBytes(total)}";
+                    InvokeAsync(StateHasChanged);
+                });
         }
-        IsLoading = false;
+        finally
+        {
+            _activeDownloadId = null;
+            IsLoading = false;
+            StateHasChanged();
+        }
+    }
 
+    private async Task CancelDownload()
+    {
+        if (_activeDownloadId is not null)
+            await Uploader.AbortDownloadAsync(_activeDownloadId);
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        string[] units = { "بایت", "کیلوبایت", "مگابایت", "گیگابایت" };
+        double value = bytes;
+        var unit = 0;
+        while (value >= 1024 && unit < units.Length - 1) { value /= 1024; unit++; }
+        return $"{value:0.#} {units[unit]}";
     }
     private string GetFileSize(string base64String)
     {

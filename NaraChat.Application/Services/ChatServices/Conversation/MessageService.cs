@@ -15,27 +15,76 @@ namespace NaraChat.Application.Services.ChatServices.Conversation
     {
         private readonly HttpClient _httpClient = httpClient;
 
-        public async Task<List<ChatMessageDto>?> LoadMessages(Guid ConverSationId,int Messagecount=50, CancellationToken cancellationToken = default)
+        public async Task<SearchPageDto?> SearchMessages(
+    Guid? conversationId,
+    Guid? channelId,
+    string term,
+    DateTime? before = null,
+    int take = 20,
+    CancellationToken cancellationToken = default)
         {
             try
             {
+                var url = $"/api/v1/message/search?q={Uri.EscapeDataString(term)}&take={take}";
 
-        
-            var messages = await _httpClient.GetFromJsonAsync<BaseResponseDto<List<ChatMessageDto>?>>($"/api/v1/message/{ConverSationId}/messages?messageCount={Messagecount}");
+                if (conversationId.HasValue) url += $"&conversationId={conversationId}";
+                if (channelId.HasValue) url += $"&channelId={channelId}";
+                if (before.HasValue) url += $"&before={Uri.EscapeDataString(before.Value.ToString("O"))}";
 
-            if (!messages.isSucceded)
-            {
-                return null;
-            }
-          return messages.result;
+                var response = await _httpClient
+                    .GetFromJsonAsync<BaseResponseDto<SearchPageDto>>(url, cancellationToken);
+
+                return response?.isSucceded == true ? response.result : null;
             }
             catch (Exception)
             {
-
                 return null;
             }
         }
 
+        public async Task<List<ChatMessageDto>?> LoadMessagesAround(
+            Guid messageId,
+            int take = 20,
+            CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var response = await _httpClient
+                    .GetFromJsonAsync<BaseResponseDto<List<ChatMessageDto>>>(
+                        $"/api/v1/message/{messageId}/around?take={take}", cancellationToken);
+
+                return response?.isSucceded == true ? response.result : null;
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+        public async Task<MessagesPageDto?> LoadMessages(
+     Guid conversationId,
+     DateTime? before = null,
+     int take = 30,
+     CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var url = $"/api/v1/message/{conversationId}/messages?take={take}";
+
+                // فرمت "O" رفت‌وبرگشت دقیق دارد و چون CreateDate در سرور Unspecified
+                // است، آفستی اضافه نمی‌شود و ساعت جابه‌جا نمی‌شود.
+                if (before.HasValue)
+                    url += $"&before={Uri.EscapeDataString(before.Value.ToString("O"))}";
+
+                var response = await _httpClient
+                    .GetFromJsonAsync<BaseResponseDto<MessagesPageDto>>(url, cancellationToken);
+
+                return response?.isSucceded == true ? response.result : null;
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
         public async Task<(bool,Guid MessageId)> SendMessageAsync(Guid ConversationId, string Message, Guid? ParentId = null, float? latitude = null, float? Longitude = null, CancellationToken cancellationToken = default)
         {
             try

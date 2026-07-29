@@ -334,5 +334,33 @@ namespace NaraChat.Application.Services.ChatServices.Channels
                 return (false, "عملیات با خطا مواجه شد!!");
             }
         }
+        public async Task<(bool status, string message)> ClearChannelHistory(
+         Guid channelId, CancellationToken cancellationToken = default)
+         => await SendDelete($"/api/v1/channel/{channelId}/history", cancellationToken);
+
+        public async Task<(bool status, string message)> DeleteChannel(
+            Guid channelId, CancellationToken cancellationToken = default)
+            => await SendDelete($"/api/v1/channel/{channelId}", cancellationToken);
+        private async Task<(bool status, string message)> SendDelete(
+    string url, CancellationToken cancellationToken)
+        {
+            try
+            {
+                var result = await _client.DeleteAsync(url, cancellationToken);
+                var content = await result.Content.ReadAsStringAsync(cancellationToken);
+
+                var response = JsonSerializer.Deserialize<BaseResponseDto<string>>(
+                    content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                return response?.status == 200
+                    ? (true, response.message)
+                    : (false, response?.message ?? "عملیات ناموفق بود.");
+            }
+            catch (Exception)
+            {
+                return (false, "خطا در ارتباط با سرور.");
+            }
+        }
+
     }
 }

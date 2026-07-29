@@ -5,6 +5,8 @@ using Microsoft.JSInterop;
 using MudBlazor;
 using NaraChat.Application.Services;
 using NaraChat.Application.Services.ChatServices.Conversation;
+using NaraChat.Application.Services.Upload;
+using NaraChat.Contract.Models.BaseResponse;
 using NaraChat.Contract.Models.Chat.Conversation;
 using NaraChat.Contract.Models.Users;
 using NaraChat.Contract.Utilities.FilesExtensions;
@@ -20,7 +22,13 @@ namespace NaraChatFrontEnd.Pages.ChatPages;
 public partial class ChatDetail : ComponentBase, IAsyncDisposable
 {
     #region parameters & fields
-
+    [Inject] private IBrowserUploader Uploader { get; set; } = default!;
+    private DateTime? _oldestCursor;      // تاریخ قدیمی‌ترین پیامی که داریم
+    private bool _hasMoreOlder = true;    // آیا صفحه‌ی قدیمی‌تری هست
+    private bool _isLoadingOlder;
+    public int UploadPercent { get; set; }
+    public string UploadSizeText { get; set; } = string.Empty;
+    private string? _activeUploadHandle;
     [CascadingParameter(Name = "Theme")] public ThemeChanging ThemeCascading { get; set; }
     private MudTextField<string> messageInput;
 
@@ -88,13 +96,15 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
     private Guid? PreviousSelectedChannelId = null;
     private Guid? PreviousSelectedGroupId = null;
 
+
     [Display(Name = "ایونت کم شدن تعداد پیغام ها")]
     [Parameter] public EventCallback<(Guid otherUserId, int MessagesCountSeened)> ReduceMessageSeenedCount { get; set; }
-
+    [Parameter]
+    public Guid? DeletedMessageId { get; set; }
     public bool EditMode { get; set; } = false;
     public EditedMessageDto? EditedMessage { get; set; } = null;
-
-    [Parameter] public Guid? DeletedMessageId { get; set; }
+    [Parameter] public Guid? ClearedHistoryId { get; set; }
+    [Parameter] public EventCallback OnHistoryCleared { get; set; }
 
     public bool ReplyMode { get; set; } = false;
 
@@ -156,6 +166,20 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
     [Parameter]
     public int channelcount { get; set; }
 
+    private bool _searchOpen;
+    private string _searchTerm = string.Empty;
+    private List<SearchHitDto> _searchResults = new();
+    private DateTime? _searchCursor;
+    private bool _searchHasMore;
+    private bool _searchBusy;
+    private int _searchActiveIndex = -1;      // نتیجه‌ای که الان روی آن هستیم
+
+    private Guid? _highlightedMessageId;      // پیامی که بعد از پرش هایلایت می‌شود
+    private bool _inJumpMode;                 // در حالت پرش، virtualization خاموش است
+
+    private System.Timers.Timer? _searchDebounce;
+    private CancellationTokenSource? _searchCts;
+
 
     #endregion
     //private static MarkupString LinkifyMentions(string content)
@@ -175,7 +199,35 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
         await OnSendMessageSession.InvokeAsync();
   
     }
+    private async Task UploadChannelFileWithProgress(BrowserFileHandle handle, string caption)
+    {
+        // دقت کن: نام فیلد اینجا channelId است نه conversationId
+        var fields = new Dictionary<string, string>
+        {
+            ["channelId"] = SelectedChannel!.Id.ToString(),
+            ["caption"] = caption
+        };
 
+        await RunUploadAsync(handle, "/api/v1/channel/UploadFile", fields, caption);
+    }
+
+    public async Task cancelUpload()
+    {
+        if (_activeUploadHandle is not null)
+            await Uploader.AbortAsync(_activeUploadHandle);
+
+        _cancellationTokenSource?.Cancel();   // برای مسیر قدیمیِ پیام صوتی
+        IsUploading = false;
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        string[] units = { "بایت", "کیلوبایت", "مگابایت", "گیگابایت" };
+        double value = bytes;
+        var unit = 0;
+        while (value >= 1024 && unit < units.Length - 1) { value /= 1024; unit++; }
+        return $"{value:0.#} {units[unit]}";
+    }
     protected override async Task OnParametersSetAsync()
     {
 
@@ -185,6 +237,7 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
         try
         {
             HandleDeletedMessage();
+            await HandleClearedHistory();
             await HandleReactionAsync();
             await HandleEmojiReactionAsync();
             HandleEditedMessage();
@@ -268,33 +321,33 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
 
     private void NeedScrollToBottom() => _pendingScrollToBottom = true;
 
-    [JSInvokable]
-    public async Task LoadMoreMessages()
-    {
-        if (_messages.Count >= MessageCount)
-        {
-            IsloadedOldMessages = true;
+    //[JSInvokable]
+    //public async Task LoadMoreMessages()
+    //{
+    //    if (_messages.Count >= MessageCount)
+    //    {
+    //        IsloadedOldMessages = true;
 
-            var previousScrollHeight = await js.InvokeAsync<int>("getScrollHeight", _chatContainer);
+    //        var previousScrollHeight = await js.InvokeAsync<int>("getScrollHeight", _chatContainer);
 
-            MessageCount += 15;
+    //        MessageCount += 15;
 
-            await LoadMoreMesages(MessageCount);
+    //        await LoadMoreMesages(MessageCount);
 
-            StateHasChanged();
+    //        StateHasChanged();
 
-            await Task.Delay(50);
+    //        await Task.Delay(50);
 
-            var newScrollHeight = await js.InvokeAsync<int>("getScrollHeight", _chatContainer);
-            var scrollDiff = newScrollHeight - previousScrollHeight;
+    //        var newScrollHeight = await js.InvokeAsync<int>("getScrollHeight", _chatContainer);
+    //        var scrollDiff = newScrollHeight - previousScrollHeight;
 
-            await js.InvokeVoidAsync("setScrollPosition", _chatContainer, scrollDiff);
-        }
-        else
-        {
-            MessageCount = 15;
-        }
-    }
+    //        await js.InvokeVoidAsync("setScrollPosition", _chatContainer, scrollDiff);
+    //    }
+    //    else
+    //    {
+    //        MessageCount = 15;
+    //    }
+    //}
 
     [JSInvokable]
     public async Task LoadMoreChannelMessages()
@@ -405,11 +458,22 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
         SelectedMessageToReply = message;
     }
 
-    public string? HandelParentMessage(Guid? ParentMessageId)
+    public string? HandelParentMessage(ChatMessageDto message)
     {
-        if (ParentMessageId == null) return null;
-        var parent = _messages.FirstOrDefault(x => x.Id == ParentMessageId.Value);
-        return parent?.Content;
+        if (message.ParentId is null) return null;
+
+        // اگر والد در همین صفحه لود شده باشد متن به‌روزش را بگیر
+        // (ممکن است بعد از ارسال ویرایش شده باشد)، وگرنه از پیش‌نمایش سرور.
+        var loaded = _messages.FirstOrDefault(x => x.Id == message.ParentId.Value);
+        return loaded?.Content ?? message.ParentContent;
+    }
+
+    public string? HandelParentSender(ChatMessageDto message)
+    {
+        if (message.ParentId is null) return null;
+
+        var loaded = _messages.FirstOrDefault(x => x.Id == message.ParentId.Value);
+        return loaded?.SenderName ?? message.ParentSenderName;
     }
 
     private void SuccessMessage()
@@ -471,29 +535,31 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
         var dialog = await DialogService.ShowAsync<UploadDialogComponent>();
         var result = await dialog.Result;
 
-        if (!result.Canceled && result.Data is UploadResult uploadResult)
+        if (!result.Canceled && result.Data is UploadDialogComponent.UploadResult r)
         {
-            await UploadFile(uploadResult.File, uploadResult.Caption ?? string.Empty);
+            await UploadFileWithProgress(r.Handle, r.Caption ?? string.Empty);
         }
     }
+
     public async Task uploadFileDialog()
     {
         var dialog = await DialogService.ShowAsync<UploadDialogComponent>();
         var result = await dialog.Result;
 
-        if (!result.Canceled && result.Data is UploadResult uploadResult)
+        if (!result.Canceled && result.Data is UploadDialogComponent.UploadResult r)
         {
-            await UploadGroupFile(uploadResult.File, uploadResult.Caption ?? string.Empty);
+            await UploadGroupFileWithProgress(r.Handle, r.Caption ?? string.Empty);
         }
     }
+
     public async Task uploadChannelDialog()
     {
         var dialog = await DialogService.ShowAsync<UploadDialogComponent>();
         var result = await dialog.Result;
 
-        if (!result.Canceled && result.Data is UploadResult uploadResult)
+        if (!result.Canceled && result.Data is UploadDialogComponent.UploadResult r)
         {
-            await UploadChannelFile(uploadResult.File, uploadResult.Caption ?? string.Empty);
+            await UploadChannelFileWithProgress(r.Handle, r.Caption ?? string.Empty);
         }
     }
     public async Task gotoDetailForMobile(UserDto? chosenUser)
@@ -508,20 +574,27 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
 
     #region data loading & mutations
 
-    private async Task LoadMesages(int count = 15)
+    private async Task LoadMesages()
     {
         _messages.Clear();
+        _oldestCursor = null;
+        _hasMoreOlder = true;
+
         Conversation = await chatService.ReadyOrCreateConversationBy(OtherUser!.Id);
         var other = Conversation!.users.First(c => c.Id != CurrentUser!.Id);
 
-        var messages = await messageService.LoadMessages(Conversation!.id, count);
-        if (messages?.Any() == true)
-        {
-            _messages.AddRange(messages);
+        var page = await messageService.LoadMessages(Conversation!.id);
 
-            var messageIds = messages.Where(x => !x.IsSeen).Select(m => m.Id).ToList();
+        if (page is not null && page.Items.Count > 0)
+        {
+            _messages.AddRange(page.Items);
+            _oldestCursor = page.NextCursor;
+            _hasMoreOlder = page.HasMore;
+
+            var messageIds = page.Items.Where(x => !x.IsSeen).Select(m => m.Id).ToList();
             if (messageIds.Count > 0)
-                await HandleMessageSeen(new MessageSeenDto(messageIds, other.Id, Conversation.id, CurrentUser!.Id));
+                await HandleMessageSeen(
+                    new MessageSeenDto(messageIds, other.Id, Conversation.id, CurrentUser!.Id));
 
             await ReduceMessageSeenedCount.InvokeAsync((OtherUser.Id, 1100));
 
@@ -529,10 +602,72 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
             await trueScroll.InvokeAsync();
         }
 
-
         if (OtherUser != null && _drafts.TryGetValue(OtherUser.Id, out var draft))
             NewMessage = draft;
     }
+
+
+    // ---- اسکرول به بالا ----
+
+    [JSInvokable]                       // ← بدون این، JS نمی‌تواند صدایش بزند
+    public async Task LoadMoreMessages()
+    {
+        if (_isLoadingOlder) return;
+        _isLoadingOlder = true;
+        IsloadedOldMessages = true;
+
+        try
+        {
+            var previousHeight = await js.InvokeAsync<int>("getScrollHeight", _chatContainer);
+            List<ChatMessageDto> fresh;
+
+            if (SelectedGroup != null)
+            {
+                // گروه هنوز روی صفحه‌بندی قدیمی است تا وقتی بک‌اندش را هم مهاجرت بدهیم
+                if (!_hasMoreOlder) return;
+
+                MessageCount += 15;
+                var messages = await chatService.LoadGroupMessages(SelectedGroup.Id, MessageCount);
+                if (messages is null) return;
+
+                var known = new HashSet<Guid>(_messages.Select(m => m.Id));
+                fresh = messages.Where(m => !known.Contains(m.Id)).ToList();
+                _hasMoreOlder = fresh.Count > 0;
+            }
+            else
+            {
+                if (!_hasMoreOlder) return;
+
+                Conversation ??= await chatService.ReadyOrCreateConversationBy(OtherUser!.Id);
+                var page = await messageService.LoadMessages(Conversation!.id, _oldestCursor);
+                if (page is null) return;
+
+                _hasMoreOlder = page.HasMore;
+                if (page.NextCursor.HasValue)
+                    _oldestCursor = page.NextCursor;
+
+                var known = new HashSet<Guid>(_messages.Select(m => m.Id));
+                fresh = page.Items.Where(m => !known.Contains(m.Id)).ToList();
+            }
+
+            if (fresh.Count > 0)
+            {
+                _messages.InsertRange(0, fresh);
+                _messages.Sort((a, b) => a.SendAt.CompareTo(b.SendAt));
+            }
+
+            StateHasChanged();
+            await Task.Delay(50);
+
+            var newHeight = await js.InvokeAsync<int>("getScrollHeight", _chatContainer);
+            await js.InvokeVoidAsync("setScrollPosition", _chatContainer, newHeight - previousHeight);
+        }
+        finally
+        {
+            _isLoadingOlder = false;
+        }
+    }
+
     public async Task LoadChannelMesages(int count = 15)
     {
         _messages.Clear();
@@ -589,56 +724,8 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
         Loading = false;
     }
 
-    private async Task LoadMoreMesages(int count = 15)
-    {
-        if (SelectedGroup != null)
-        {
-            List<ChatMessageDto>? messages = await chatService.LoadGroupMessages(SelectedGroup!.Id, count);
-
-            var known = new HashSet<Guid>(_messages.Select(m => m.Id));
-            var newMessages = messages.Where(m => !known.Contains(m.Id)).ToList();
-
-            if (newMessages.Any())
-            {
-                foreach (var m in newMessages)
-                    m.Content = m.Content;
-                _messages.AddRange(newMessages);
-                _messages.Sort((a, b) => a.SendAt.CompareTo(b.SendAt));
-              
-            }
-          
-        }
-        else { 
-            Conversation ??= await chatService.ReadyOrCreateConversationBy(OtherUser!.Id);
-        List<ChatMessageDto>? messages = await messageService.LoadMessages(Conversation!.id, count);
-
-        var known = new HashSet<Guid>(_messages.Select(m => m.Id));
-        var newMessages = messages.Where(m => !known.Contains(m.Id)).ToList();
-
-        if (newMessages.Any())
-        {
-            foreach (var m in newMessages)
-                m.Content =m.Content;
-            _messages.AddRange(newMessages);
-            _messages.Sort((a, b) => a.SendAt.CompareTo(b.SendAt));
-        }}
-    }
-    private async Task LoadMoreGroupMesages(int count = 15)
-    {
-        var messages = await chatService.LoadGroupMessages(SelectedGroup!.Id, count);
 
 
-        var known = new HashSet<Guid>(_messages.Select(m => m.Id));
-        var newMessages = messages.Where(m => !known.Contains(m.Id)).ToList();
-
-        if (newMessages.Any())
-        {
-            foreach (var m in newMessages)
-                m.Content = m.Content;
-            _messages.AddRange(newMessages);
-            _messages.Sort((a, b) => a.SendAt.CompareTo(b.SendAt));
-        }
-    }
     private async Task LoadMoreChannelMesages(int count = 15)
     {
    
@@ -1162,14 +1249,7 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
         }
     }
 
-    public void cancelUpload()
-    {
-        if (_cancellationTokenSource is not null)
-        {
-            _cancellationTokenSource.Cancel();
-            IsUploading = false;
-        }
-    }
+
 
     public class MessageComparer : IEqualityComparer<ChatMessageDto>
     {
@@ -1410,6 +1490,452 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
 
     private async Task HandleMessageSeen(MessageSeenDto messagesForSeen)
         => await OnMessageSeen.InvokeAsync(messagesForSeen);
+    private async Task UploadFileWithProgress(BrowserFileHandle handle, string caption)
+    {
+        var fields = new Dictionary<string, string>
+        {
+            ["ConversationId"] = Conversation!.id.ToString(),
+            ["caption"] = caption
+        };
+
+        await RunUploadAsync(handle, "/api/v1/message/UploadFile", fields, caption);
+    }
+
+
+    // ------------------------------------------------------------------- گروه
+
+    private async Task UploadGroupFileWithProgress(BrowserFileHandle handle, string caption)
+    {
+        var fields = new Dictionary<string, string>
+        {
+            ["conversationId"] = SelectedGroup!.Id.ToString(),
+            ["caption"] = caption
+        };
+
+        await RunUploadAsync(handle, "/api/v1/Groups/UploadFile", fields, caption);
+    }
+
+
+    // ------------------------------------------------------------------ کانال
+
+
+
+
+    // ------------------------------------------------ منطق مشترک هر سه حالت
+
+    private async Task RunUploadAsync(
+        BrowserFileHandle handle,
+        string endpoint,
+        Dictionary<string, string> fields,
+        string caption)
+    {
+        _activeUploadHandle = handle.Handle;
+        IsUploading = true;
+        UploadPercent = 0;
+        UploadSizeText = string.Empty;
+        StateHasChanged();
+
+        try
+        {
+            var response = await Uploader.SendAsync(
+                handle.Handle,
+                endpoint,
+                fields,
+                (percent, loaded, total) =>
+                {
+                    UploadPercent = percent;
+                    UploadSizeText = $"{FormatBytes(loaded)} از {FormatBytes(total)}";
+                    InvokeAsync(StateHasChanged);
+                });
+
+            if (response.IsAborted)
+                return;
+
+            if (!response.IsSuccess)
+            {
+                ErrorMessage(response.Status switch
+                {
+                    413 => "حجم فایل بیش از حد مجاز است. فایل کوچک‌تری انتخاب کنید.",
+                    401 => "نشست شما منقضی شده. دوباره وارد شوید.",
+                    0 => "ارتباط با سرور قطع شد. اتصال اینترنت را بررسی کنید.",
+                    _ => "آپلود فایل با خطا مواجه شد لطفا مجدد تلاش فرمایید!"
+                });
+                return;
+            }
+
+            var dto = JsonSerializer.Deserialize<BaseResponseDto<UploadFileResult>>(
+                response.Body, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+            if (dto?.result is null)
+            {
+                ErrorMessage("پاسخ سرور نامعتبر بود.");
+                return;
+            }
+
+            _messages.Add(new ChatMessageDto
+            {
+                Id = dto.result.MessageId,
+                SendAt = DateTime.Now,
+                SenderName = CurrentUser!.Name,
+                IsMine = true,
+                Content = caption,
+                Type = (MessageType)dto.result.MessageType,
+                UserId = CurrentUser!.Id,
+                FileContent = new ChatFilesDto
+                {
+                    FileId = dto.result.FileId,
+                    FileName = handle.Name,
+                    FileSize = handle.Size.ToString()
+                }
+            });
+
+            NeedScrollToBottom();
+
+            NewMessage = string.Empty;
+            SelectedMessageToReply = null;
+            ReplyMode = false;
+        }
+        catch (Exception)
+        {
+            ErrorMessage("آپلود فایل با خطا مواجه شد لطفا مجدد تلاش فرمایید!");
+        }
+        finally
+        {
+            await Uploader.ReleaseAsync(handle.Handle);
+            _activeUploadHandle = null;
+            IsUploading = false;
+            UploadPercent = 0;
+            StateHasChanged();
+        }
+    }
+
+    private void ToggleSearch()
+    {
+        _searchOpen = !_searchOpen;
+        if (!_searchOpen) ResetSearch();
+    }
+
+    private void ResetSearch()
+    {
+        _searchTerm = string.Empty;
+        _searchResults.Clear();
+        _searchCursor = null;
+        _searchHasMore = false;
+        _searchActiveIndex = -1;
+        _searchCts?.Cancel();
+    }
+
+
+    // ------------------------------------------------------- تایپ با debounce
+
+    private void OnSearchTermChanged(string value)
+    {
+        _searchTerm = value;
+
+        _searchDebounce?.Stop();
+        _searchDebounce?.Dispose();
+
+        if (string.IsNullOrWhiteSpace(value) || value.Trim().Length < 2)
+        {
+            _searchResults.Clear();
+            _searchHasMore = false;
+            StateHasChanged();
+            return;
+        }
+
+        // بدون debounce هر حرفی که تایپ می‌شود یک کوئری روی ۱۰۰ هزار ردیف می‌زند
+        _searchDebounce = new System.Timers.Timer(350) { AutoReset = false };
+        _searchDebounce.Elapsed += async (_, _) => await InvokeAsync(() => RunSearch(reset: true));
+        _searchDebounce.Start();
+    }
+
+
+    // -------------------------------------------------------------- اجرای جستجو
+    /// <summary>
+    /// ترتیب مهم است: کانال، بعد گروه، بعد خصوصی.
+    /// فیلد Conversation از چت قبلی باقی می‌ماند، پس نباید اول چک شود.
+    /// </summary>
+    private (Guid? conversationId, Guid? channelId) CurrentScope()
+    {
+        if (SelectedChannel is not null) return (null, SelectedChannel.Id);
+        if (SelectedGroup is not null) return (SelectedGroup.Id, null);
+        return (Conversation?.id, null);
+    }
+    private async Task RunSearch(bool reset)
+    {
+        if (_searchBusy) return;
+
+        var term = _searchTerm?.Trim() ?? string.Empty;
+        if (term.Length < 2) return;
+
+        _searchBusy = true;
+        if (reset)
+        {
+            _searchResults.Clear();
+            _searchCursor = null;
+            _searchActiveIndex = -1;
+        }
+        StateHasChanged();
+
+        // اگر کاربر سریع تایپ کند، درخواست قبلی لغو می‌شود
+        _searchCts?.Cancel();
+        _searchCts = new CancellationTokenSource();
+
+        try
+        {
+            var (convId, chanId) = CurrentScope();
+
+            var page = await messageService.SearchMessages(
+                conversationId: convId,
+                channelId: chanId,
+                term: term,
+                before: _searchCursor,
+                cancellationToken: _searchCts.Token);
+
+            if (page is null) return;
+
+            _searchResults.AddRange(page.Items);
+            _searchCursor = page.NextCursor;
+            _searchHasMore = page.HasMore;
+        }
+        catch (OperationCanceledException)
+        {
+            // درخواست جدیدتری جایگزین شده
+        }
+        finally
+        {
+            _searchBusy = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadMoreResults()
+    {
+        if (_searchHasMore && !_searchBusy)
+            await RunSearch(reset: false);
+    }
+
+
+    // ------------------------------------------------- پرش به یک نتیجه
+
+    private async Task JumpToMessage(Guid messageId)
+    {
+        // اگر پیام از قبل لود شده، فقط virtualization را خاموش کن و برو سراغش.
+        // بدون خاموش کردنش، عنصر ممکن است در DOM نباشد و scrollToElement کاری نکند.
+        var alreadyLoaded = _messages.Any(m => m.Id == messageId);
+
+        if (!alreadyLoaded)
+        {
+            var context = await messageService.LoadMessagesAround(messageId);
+            if (context is null || context.Count == 0)
+            {
+                snackbar.Add("پیام مورد نظر یافت نشد یا حذف شده است.", Severity.Warning);
+                return;
+            }
+
+            _messages.Clear();
+            _messages.AddRange(context);
+            _oldestCursor = context.Min(m => m.SendAt);
+            _hasMoreOlder = true;
+        }
+
+        _inJumpMode = true;
+        _highlightedMessageId = messageId;
+
+        StateHasChanged();
+        await Task.Delay(80);                 // تا DOM رندر شود
+
+        await js.InvokeVoidAsync("scrollToElement", $"msg-{messageId}");
+
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(3000);
+            _highlightedMessageId = null;
+            await InvokeAsync(StateHasChanged);
+        });
+    }
+
+    private async Task JumpToResult(int index)
+    {
+        if (index < 0 || index >= _searchResults.Count) return;
+
+        _searchActiveIndex = index;
+        await JumpToMessage(_searchResults[index].Id);
+    }
+    private Task NextResult() => JumpToResult(_searchActiveIndex + 1);
+    private Task PreviousResult() => JumpToResult(_searchActiveIndex - 1);
+
+
+    // --------------------------------------------- بازگشت به آخرین پیام‌ها
+
+    private async Task BackToLatest()
+    {
+        _inJumpMode = false;
+        _highlightedMessageId = null;
+        _searchActiveIndex = -1;
+
+        if (SelectedChannel is not null)
+            await LoadChannelMesages();
+        else if (SelectedGroup is not null)
+            await LoadGroupMesages();
+        else
+            await LoadMesages();
+
+        StateHasChanged();
+    }
+
+
+    // ---------------------------------------------------------------- کمکی
+
+    /// <summary>بریده‌ای از متن پیام حول کلمه‌ی جستجو، برای نمایش در لیست نتایج.</summary>
+    private string Snippet(SearchHitDto hit)
+    {
+        var text = hit.Content;
+
+        if (string.IsNullOrWhiteSpace(text))
+            return hit.FileName ?? "(پیوست)";
+
+        var term = _searchTerm.Trim();
+        var idx = text.IndexOf(term, StringComparison.OrdinalIgnoreCase);
+
+        if (idx < 0 || text.Length <= 90)
+            return text.Length <= 90 ? text : text[..90] + "…";
+
+        var start = Math.Max(0, idx - 30);
+        var length = Math.Min(90, text.Length - start);
+
+        return (start > 0 ? "…" : "") + text.Substring(start, length) + "…";
+    }
+
+    public void DisposeSearch()
+    {
+        _searchDebounce?.Stop();
+        _searchDebounce?.Dispose();
+        _searchCts?.Cancel();
+        _searchCts?.Dispose();
+    }
+    public async Task ClearHistoryDialog()
+    {
+        var parameters = new DialogParameters<ConfirmDangerDialog>
+    {
+        { x => x.Title, "پاک کردن تاریخچه" },
+        { x => x.Message, $"تمام پیام‌ها و فایل‌های «{CurrentChatTitle}» برای همه‌ی اعضا حذف می‌شود." },
+        { x => x.ConfirmLabel, "پاک کن" }
+    };
+
+        var dialog = await DialogService.ShowAsync<ConfirmDangerDialog>(
+            "پاک کردن تاریخچه", parameters);
+
+        var result = await dialog.Result;
+        if (result.Canceled) return;
+
+        (bool status, string message) response;
+
+        if (SelectedChannel is not null)
+            response = await _channelservice.ClearChannelHistory(SelectedChannel.Id);
+        else if (SelectedGroup is not null)
+            response = await chatService.ClearGroupHistory(SelectedGroup.Id);
+        else if (Conversation is not null)
+            response = await chatService.ClearConversationHistory(Conversation.id);
+        else
+            return;
+
+        if (!response.status)
+        {
+            ErrorMessage(response.message);
+            return;
+        }
+
+        _messages.Clear();
+        _oldestCursor = null;
+        _hasMoreOlder = false;
+        _inJumpMode = false;
+        ResetSearch();
+
+        snackbar.Add(response.message, Severity.Success);
+        StateHasChanged();
+    }
+
+
+    // ------------------------------------------------------- حذف گروه یا کانال
+
+    public async Task DeleteChatDialog()
+    {
+        var isChannel = SelectedChannel is not null;
+        var title = CurrentChatTitle;
+
+        var parameters = new DialogParameters<ConfirmDangerDialog>
+    {
+        { x => x.Title, isChannel ? "حذف کانال" : "حذف گروه" },
+        { x => x.Message, $"«{title}» به همراه تمام پیام‌ها، فایل‌ها و اعضایش برای همیشه حذف می‌شود." },
+        { x => x.ConfirmLabel, "حذف کن" },
+        { x => x.ConfirmationText, title }        // کاربر باید نام را تایپ کند
+    };
+
+        var dialog = await DialogService.ShowAsync<ConfirmDangerDialog>(
+            isChannel ? "حذف کانال" : "حذف گروه", parameters);
+
+        var result = await dialog.Result;
+        if (result.Canceled) return;
+
+        var response = isChannel
+            ? await _channelservice.DeleteChannel(SelectedChannel!.Id)
+            : await chatService.DeleteGroup(SelectedGroup!.Id);
+
+        if (!response.status)
+        {
+            ErrorMessage(response.message);
+            return;
+        }
+
+        snackbar.Add(response.message, Severity.Success);
+
+        // خروج از صفحه‌ی چتی که دیگر وجود ندارد
+        _messages.Clear();
+        SelectedChannel = null;
+        SelectedGroup = null;
+        Conversation = null;
+
+        await BackToUserList();
+        StateHasChanged();
+    }
+    private async Task HandleClearedHistory()
+    {
+        if (ClearedHistoryId is null) return;
+
+        // فقط اگر همین گفتگو باز است صفحه را خالی کن
+        var current = SelectedChannel?.Id ?? SelectedGroup?.Id ?? Conversation?.id;
+
+        if (current == ClearedHistoryId.Value)
+        {
+            _messages.Clear();
+            _oldestCursor = null;
+            _hasMoreOlder = false;
+            _inJumpMode = false;
+            _highlightedMessageId = null;
+            ResetSearch();
+
+            snackbar.Add("تاریخچه‌ی این گفتگو پاک شد.", Severity.Info);
+        }
+
+        ClearedHistoryId = null;
+
+        // به والد خبر بده تا فیلدش را خالی کند، وگرنه رندر بعدی دوباره
+        // همین مقدار را پاس می‌دهد و پیام تکراری نشان داده می‌شود.
+        if (OnHistoryCleared.HasDelegate)
+            await OnHistoryCleared.InvokeAsync();
+    }
+
+    // -------------------------------------------- دریافت رویداد از سایر اعضا
+    // این را کنار بقیه‌ی hubConnection.On<...> در همان متد راه‌اندازی هاب بگذار.
+
+
+    private bool CanManageCurrentChat =>
+    (SelectedChannel is not null && SelectedChannel.channel.CreatorId == CurrentUser?.Id)
+    || (SelectedGroup is not null && SelectedGroup.channel.CreatorId == CurrentUser?.Id);
+
+    private string CurrentChatTitle =>
+        SelectedChannel?.Name ?? SelectedGroup?.Name ?? OtherUser?.Name ?? string.Empty;
 
     #endregion
 }

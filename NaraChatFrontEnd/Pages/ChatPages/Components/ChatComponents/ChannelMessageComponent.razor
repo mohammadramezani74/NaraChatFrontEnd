@@ -24,11 +24,16 @@
                     <!-- ✅ ریپلای -->
                     @if (ParentMessage != null)
                     {
-                        <MudPaper Class="reply-preview px-2 py-1 mb-1" style="@($"{replyColor()}; max-width:100%; box-sizing:border-box;")">
-                            <MudText Class="text-truncate" Style="text-align:right; color:gray; font-size:10px; padding-bottom:6px;">
-                                @(SelectedChannel.IsChannel ? SelectedChannel.Name : message.SenderName)
+                        <MudPaper Class="reply-preview px-2 py-1 mb-1"
+                                  style="@($"{replyColor()}; max-width: 100%; box-sizing: border-box; cursor: pointer;")"
+                                  @onclick="GoToParent">
+
+                            <MudText Class="text-truncate"
+                                     Style="text-align: right; color:gray; font-size: 10px; padding-bottom: 6px;">
+                                @(ParentSenderName )
                             </MudText>
-                            <MudText Class="text-truncate" Style="font-size:12px;">
+
+                            <MudText Class="text-truncate" Style="font-size: 12px;">
                                 @ParentMessage.TruncateMessage()
                             </MudText>
                         </MudPaper>
@@ -119,19 +124,18 @@
          SelectedChannel.IsChannel
              ? (SelectedChannel.channel?.CreatorId == CurrentUser.Id || SelectedChannel.channel?.admins.Any(x => x.Id == CurrentUser.Id) == true)
              : SelectedChannel.Id == CurrentUser.Id;
-    public string replyColor() => message.IsMine
-        ? $"background-color: {ThemeCascading.MyColorReply}"
-        : $"background-color: {ThemeCascading.OtherColorReply}";
+    // public string replyColor() => message.IsMine
+    //     ? $"background-color: {ThemeCascading.MyColorReply}"
+    //     : $"background-color: {ThemeCascading.OtherColorReply}";
 
     public string ClockColor() => $"color: {ThemeCascading.ClockColor};";
 
-    public string Style() { 
-        if (ThemeCascading.ClockColor == "#270aff")
-        {
-            return $"min-width:305px; background-color:#ffffff"; }
-        return $"min-width:305px; background-color:#0B1220";
-
-    }
+    public string replyColor() => message.IsMine
+    ? $"background-color: {ThemeCascading.MyColorReply}; border-right: 3px solid {ThemeCascading.ReplyAccent};"
+    : $"background-color: {ThemeCascading.OtherColorReply}; border-right: 3px solid {ThemeCascading.ReplyAccent};";
+    public string Style() => message.IsMine
+      ? $"min-width: 305px; background-color: {ThemeCascading.myColorChat}; color: {ThemeCascading.MyTextColor};"
+      : $"min-width: 305px; background-color: {ThemeCascading.OtherColorChat}; color: {ThemeCascading.OtherTextColor};";
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -203,4 +207,16 @@
 
     public async Task ReplyMessage(ChatMessageDto message)
         => await ReplyMessageEvent.InvokeAsync(message);
+    [Parameter]
+    public string? ParentSenderName { get; set; }
+
+    [Parameter]
+    public EventCallback<Guid> OnParentClick { get; set; }
+
+    // ---- ScrollToMessage قدیمی را حذف کن و به‌جایش این ----
+
+    private Task GoToParent()
+        => message.ParentId is null
+            ? Task.CompletedTask
+            : OnParentClick.InvokeAsync(message.ParentId.Value);
 }

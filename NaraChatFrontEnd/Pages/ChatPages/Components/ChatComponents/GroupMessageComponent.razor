@@ -24,21 +24,15 @@
                     <!-- ریپلای نمایش -->
                     @if (ParentMessage != null)
                     {
-                        <MudPaper Class="reply-preview px-2 py-1 mb-1" style="@($"{replyColor()}; max-width: 100%; box-sizing: border-box;")">
-                            @if (IsMine)
-                            {
-                                <a href="javascript:void(0)" @onclick="() => ScrollToMessage(message.ParentId!.Value)">
-                                    <MudText Class="text-truncate" Style="text-align: right; color:gray;font-size: 10px;    padding-bottom: 6px;">
-                                        test
-                                    </MudText>
-                                </a>
-                            }
-                            else
-                            {
-                                <MudText Class="text-truncate" Style="text-align: right; color:gray;font-size: 10px;    padding-bottom: 6px;">
-                                    @CurrentUser.Name
-                                </MudText>
-                            }
+                        <MudPaper Class="reply-preview px-2 py-1 mb-1"
+                                  style="@($"{replyColor()}; max-width: 100%; box-sizing: border-box; cursor: pointer;")"
+                                  @onclick="GoToParent">
+
+                            <MudText Class="text-truncate"
+                                     Style="text-align: right; color:gray; font-size: 10px; padding-bottom: 6px;">
+                                @(ParentSenderName )
+                            </MudText>
+
                             <MudText Class="text-truncate" Style="font-size: 12px;">
                                 @ParentMessage.TruncateMessage()
                             </MudText>
@@ -621,6 +615,18 @@
        
         }
     }
+    [Parameter]
+    public string? ParentSenderName { get; set; }
+
+    [Parameter]
+    public EventCallback<Guid> OnParentClick { get; set; }
+
+    // ---- ScrollToMessage قدیمی را حذف کن و به‌جایش این ----
+
+    private Task GoToParent()
+        => message.ParentId is null
+            ? Task.CompletedTask
+            : OnParentClick.InvokeAsync(message.ParentId.Value);
     private async Task MessageAction(string actionType, ChatMessageDto messsage)
     {
         if (!string.IsNullOrEmpty(message.Reaction))
@@ -668,6 +674,7 @@
                 default:
                     break;
             }
+
             var Other = Conversation.users.Where(c => c.Id != CurrentUser.Id).FirstOrDefault()!.Id;
             var reactionInstance = new MessageReaction(message.Id, message.Reaction, Other);
             var result = await _messageservice.newReactionOnMessage(reactionInstance.Reaction, reactionInstance.MessageId);

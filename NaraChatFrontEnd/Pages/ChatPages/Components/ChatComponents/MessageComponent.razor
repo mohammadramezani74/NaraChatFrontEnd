@@ -22,25 +22,22 @@
                     <p style="text-align: right; color:gray;font-size: 10px;"><small> @(message.IsMine ? myName : OtherName) </small></p>
 
                     <!-- ریپلای نمایش -->
-                    @if (ParentMessage != null)
-                    {
-                        <MudPaper Class="reply-preview px-2 py-1 mb-1" style="@($"{replyColor()}; max-width: 100%; box-sizing: border-box;")">
-                            @if(IsMine){
-                                <a href="javascript:void(0)" @onclick="() => ScrollToMessage(message.ParentId!.Value)">
-                                    <MudText Class="text-truncate" Style="text-align: right; color:gray;font-size: 10px;    padding-bottom: 6px;">
-                                        @OtherName
-                                    </MudText>
-                                </a>
-                            }else{
-                                <MudText Class="text-truncate" Style="text-align: right; color:gray;font-size: 10px;    padding-bottom: 6px;">
-                                    @CurrentUser.Name
-                                </MudText>
-                            }
-                            <MudText Class="text-truncate" Style="font-size: 12px;">
-                                @ParentMessage.TruncateMessage()
-                            </MudText>
-                        </MudPaper>
-                    }
+           @if (ParentMessage != null)
+{
+    <MudPaper Class="reply-preview px-2 py-1 mb-1"
+              style="@($"{replyColor()}; max-width: 100%; box-sizing: border-box; cursor: pointer;")"
+              @onclick="GoToParent">
+
+        <MudText Class="text-truncate"
+                 Style="text-align: right; color:gray; font-size: 10px; padding-bottom: 6px;">
+            @(ParentSenderName ?? (IsMine ? OtherName : CurrentUser.Name))
+        </MudText>
+
+        <MudText Class="text-truncate" Style="font-size: 12px;">
+            @ParentMessage.TruncateMessage()
+        </MudText>
+    </MudPaper>
+}
 
                     <MudText id="@message.Id" Color="Color.Default" >
                         @if (IsMention(message.Content))
@@ -315,6 +312,18 @@
     public string? OtherAvatar { get; set; }
     public string? myName { get; set; }
     public string? OtherName { get; set; }
+    [Parameter]
+public string? ParentSenderName { get; set; }
+ 
+[Parameter]
+public EventCallback<Guid> OnParentClick { get; set; }
+ 
+// ---- ScrollToMessage قدیمی را حذف کن و به‌جایش این ----
+ 
+private Task GoToParent()
+    => message.ParentId is null
+        ? Task.CompletedTask
+        : OnParentClick.InvokeAsync(message.ParentId.Value);
 
     public string? GetAvatar() {
 
@@ -327,10 +336,12 @@
       await  JoinChannel.InvokeAsync(message);
 
     }
-    public string replyColor() { return message.IsMine ? $"background-color: {ThemeCascading.MyColorReply}" : $"background-color: {ThemeCascading.OtherColorReply}"; }
-    public string ClockColor () => $"color: {ThemeCascading.ClockColor};";
-    public string Style() { return message.IsMine ? $"min-width: 305px;background-color: {ThemeCascading.myColorChat}" : $"min-width: 50px;background-color: {ThemeCascading.OtherColorChat}"; }
-    protected override async Task OnInitializedAsync()
+    public string replyColor() => message.IsMine
+    ? $"background-color: {ThemeCascading.MyColorReply}; border-right: 3px solid {ThemeCascading.ReplyAccent};"
+    : $"background-color: {ThemeCascading.OtherColorReply}; border-right: 3px solid {ThemeCascading.ReplyAccent};";    public string ClockColor () => $"color: {ThemeCascading.ClockColor};";
+  public string Style() => message.IsMine
+    ? $"min-width: 305px; background-color: {ThemeCascading.myColorChat}; color: {ThemeCascading.MyTextColor};"
+    : $"min-width: 50px; background-color: {ThemeCascading.OtherColorChat}; color: {ThemeCascading.OtherTextColor};";  protected override async Task OnInitializedAsync()
     {
         var me = Conversation.users.Where(c => c.Id == CurrentUser.Id).FirstOrDefault();
         var other = Conversation.users.Where(c => c.Id != CurrentUser.Id).FirstOrDefault();

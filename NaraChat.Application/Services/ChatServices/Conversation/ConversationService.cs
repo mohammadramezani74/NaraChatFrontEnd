@@ -440,6 +440,43 @@ namespace NaraChat.Application.Services.ChatServices.Conversation
                 return (false, "عملیات با خطا مواجه شد!!");
             }
         }
+        public async Task<(bool status, string message)> ClearConversationHistory(
+         Guid conversationId, CancellationToken cancellationToken = default)
+         => await SendDelete($"/api/v1/message/{conversationId}/history", cancellationToken);
+
+        public async Task<(bool status, string message)> ClearGroupHistory(
+            Guid groupId, CancellationToken cancellationToken = default)
+            => await SendDelete($"/api/v1/Groups/{groupId}/history", cancellationToken);
+
+        public async Task<(bool status, string message)> DeleteGroup(
+            Guid groupId, CancellationToken cancellationToken = default)
+            => await SendDelete($"/api/v1/Groups/{groupId}", cancellationToken);
+
+
+        /// <summary>
+        /// چون هر سه فراخوانی یک شکل دارند، منطق مشترک اینجا جمع شده.
+        /// این را در همان کلاس به صورت private بگذار.
+        /// </summary>
+        private async Task<(bool status, string message)> SendDelete(
+            string url, CancellationToken cancellationToken)
+        {
+            try
+            {
+                var result = await _client.DeleteAsync(url, cancellationToken);
+                var content = await result.Content.ReadAsStringAsync(cancellationToken);
+
+                var response = JsonSerializer.Deserialize<BaseResponseDto<string>>(
+                    content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                return response?.status == 200
+                    ? (true, response.message)
+                    : (false, response?.message ?? "عملیات ناموفق بود.");
+            }
+            catch (Exception)
+            {
+                return (false, "خطا در ارتباط با سرور.");
+            }
+        }
     }
 }
 

@@ -196,34 +196,66 @@
     {
         _drawerOpen = !_drawerOpen;
     }
-    void DarkModel()
+  void DarkModel()
+{
+    IsDarkMode = !IsDarkMode;
+    localStorage.SetItemAsync(nameof(IsDarkMode), IsDarkMode.ToString());
+    ApplyTheme();
+    StateHasChanged();
+}
+ 
+void ApplyTheme()
+{
+    if (!IsDarkMode)
     {
-        localStorage.SetItemAsync(nameof(IsDarkMode),IsDarkMode.ToString());
-        IsDarkMode = !IsDarkMode;
-        if(!IsDarkMode){
-            ThemeChanging = new ThemeChanging("", " color:rgb(255 64 129);", " box-shadow: 0 16px 45px #ecc7ee;");
-            ThemeChanging.backGroundChatStyle = "height: 100%; overflow-y: auto;background-image:url(lib/assets/Images/light.png);    background-size: cover;background-repeat:no-repeat;background-position: center; background-attachment: scroll;";
-            ThemeChanging.myColorChat = "rgb(183 230 239 / 61%)";
-            ThemeChanging.OtherColorChat = "rgb(233 236 239 / 86%)";
-            ThemeChanging.SeenColor = Color.Secondary;
-            ThemeChanging.ClockColor = "#270aff";
-            ThemeChanging.MyColorReply = "#c4beff";
-            ThemeChanging.OtherColorReply = "#f6effd";
-            StateHasChanged();
-        }
-        else{
-            ThemeChanging = new ThemeChanging("", " color:#776be7;", " box-shadow: 0 16px 45px #776be77d");
-            ThemeChanging.backGroundChatStyle = "height: 100%; overflow-y: auto;background-image:url(lib/assets/Images/pxfuel.jpg);    background-size: cover;background-repeat:no-repeat;background-position: center; background-attachment: scroll;";
-            ThemeChanging.OtherColorChat = "#495057e0";
-            ThemeChanging.myColorChat = "rgb(28 62 95 / 86%)";
-            ThemeChanging.SeenColor = Color.Info;
-            ThemeChanging.ClockColor = "#00fdff";
-            ThemeChanging.MyColorReply = "#112539";
-            ThemeChanging.OtherColorReply = "#373740";
-            StateHasChanged();
-        }
-
+        ThemeChanging = new ThemeChanging("", " color:#1D6FD0;", " box-shadow: 0 16px 45px #cbd5e1;");
+ 
+ThemeChanging.backGroundChatStyle =
+    "height: 100%; overflow-y: auto; background-color: #EEF4FA; " +
+    "background-image: url(lib/assets/Images/light.svg); " +
+    "background-repeat: repeat; background-size: 96px 96px;";
+ 
+        // اپاسیتی بالا نگه داشته شده چون حباب روی تصویر می‌نشیند
+        ThemeChanging.myColorChat    = "rgba(219, 234, 254, 0.94)";   // Blue 100
+        ThemeChanging.OtherColorChat = "rgba(255, 255, 255, 0.94)";
+        ThemeChanging.MyTextColor    = "#0F172A";
+        ThemeChanging.OtherTextColor = "#0F172A";
+ 
+        ThemeChanging.SeenColor  = Color.Primary;
+        ThemeChanging.ClockColor = "#475569";                          // Slate 600
+ 
+        ThemeChanging.MyColorReply    = "#BFDBFE";                     // Blue 200
+        ThemeChanging.OtherColorReply = "#EFF6FF";                     // Blue 50
+        ThemeChanging.ReplyAccent     = "#1D6FD0";
     }
+    else
+    {
+        ThemeChanging = new ThemeChanging("", " color:#64B5F6;", " box-shadow: 0 16px 45px #0b1220");
+ 
+        // ThemeChanging.backGroundChatStyle =
+        //     "height: 100%; overflow-y: auto; background-image:url(lib/assets/Images/pxfuel.jpg); background-size: cover; background-repeat:no-repeat; background-position: center; background-attachment: scroll;";
+ ThemeChanging.backGroundChatStyle =
+    "height: 100%; overflow-y: auto; background-color: #0B1220; " +
+    "background-image: url(lib/assets/Images/chat-bg-dark.svg); " +
+    "background-repeat: repeat; background-size: 96px 96px;";
+        ThemeChanging.myColorChat    = "rgba(30, 58, 95, 0.94)";       // ته‌مایه آبی
+        ThemeChanging.OtherColorChat = "rgba(30, 41, 59, 0.94)";       // Slate 800
+        ThemeChanging.MyTextColor    = "#E5E7EB";
+        ThemeChanging.OtherTextColor = "#E5E7EB";
+ 
+        ThemeChanging.SeenColor  = Color.Primary;
+        ThemeChanging.ClockColor = "#94A3B8";                          // Slate 400
+ 
+        ThemeChanging.MyColorReply    = "#172554";                     // Blue 950
+        ThemeChanging.OtherColorReply = "#0F172A";
+        ThemeChanging.ReplyAccent     = "#64B5F6";
+    }
+}
+ 
+ 
+// ---- در OnAfterRenderAsync، بلوک خواندن از localStorage ----
+
+ 
 
     private async Task Logout()
     {
@@ -354,44 +386,41 @@
                     // {
                     //     DefaultBorderRadius = "12px"
                     // },
-
 PaletteLight = new PaletteLight
 {
-    Primary = "#2196F3",           
-    Secondary = "#4FC3F7",        
-    Tertiary = "#00ACC1",         
+    Primary   = "#1D6FD0",   // آبی تیره‌تر، ۵.۱:۱ روی سفید
+    Secondary = "#0E7490",   // فیروزه‌ای — هم‌خانواده با Info تم تیره
+    Tertiary  = "#6D28D9",   // بنفش — هم‌خانواده با Tertiary تم تیره
+    Info      = "#0369A1",
+    Success   = "#047857",   // Emerald 700، هم‌خانواده با #34D399 تیره
+    Warning   = "#B45309",   // Amber 700، هم‌خانواده با #FBBF24 تیره
+    Error     = "#DC2626",
 
-    Info = "#29B6F6",              
-    Success = "#43A047",           
-    Warning = "#FB8C00",           
-    Error = "#E53935",             
+    Background       = "#F1F5F9",   // Slate 100 — کارت سفید از آن جدا می‌شود
+    Surface          = "#FFFFFF",
+    AppbarBackground = "#FFFFFF",
+    AppbarText       = "#0F172A",
+    DrawerBackground = "#F8FAFC",
+    DrawerText       = "#1E293B",
+    DrawerIcon       = "#1D6FD0",
 
-    Background = "#F9FBFD",        
-    Surface = "#FFFFFF",           
-    AppbarBackground = "#F0F7FF",  
-    AppbarText = "#0F172A",        
+    TextPrimary   = "#0F172A",
+    TextSecondary = "#475569",
 
-    DrawerBackground = "#F5FAFF",  
-    DrawerText = "#1E3A5F",        
-    DrawerIcon = "#1565C0",        
+    LinesDefault = "#E2E8F0",
+    LinesInputs  = "#CBD5E1",
+    TableLines   = "#E2E8F0",
+    Divider      = "#E2E8F0",
 
-    TextPrimary = "#0F172A",       
-    TextSecondary = "#475569",     
-
-    LinesDefault = "#E2E8F0",      
-    LinesInputs = "#CBD5E1",       
-    TableLines = "#E2E8F0",
-    Divider = "#E2E8F0",
-
-    ActionDefault = "#1565C0",     
-    ActionDisabled = "#94A3B8",    
+    ActionDefault            = "#1D6FD0",   // با Primary یکی شد
+    ActionDisabled           = "#94A3B8",
     ActionDisabledBackground = "#E2E8F0"
 },
                 // --- Dark (آبی/مشکی حرفه‌ای) ---
                     PaletteDark = new PaletteDark
                     {
                         Primary = "#64B5F6",           // Light Blue برای کنتراست عالی روی تیره
-                        Secondary = "#82B1FF",         // Cornflower برای اکستنت
+                        Secondary     = "#22D3EE",         // Cornflower برای اکستنت
                         Tertiary = "#8B5CF6",          // Purple accent
                         Info = "#64B5F6",
                         Success = "#34D399",           // سبز ملایم و خوانا
@@ -416,7 +445,7 @@ PaletteLight = new PaletteLight
                         TableLines = "#233044",
                         Divider = "#233044",
 
-                        ActionDefault = "#E5E7EB",
+                     ActionDefault = "#64B5F6",
                         ActionDisabled = "#64748B",
                         ActionDisabledBackground = "#1E293B"
                     }

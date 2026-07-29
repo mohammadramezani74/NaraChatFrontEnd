@@ -11,14 +11,13 @@
 @inject IDialogService DialogService
 @implements IAsyncDisposable 
 @attribute [StreamRendering]
+
 @if (SelectedChannel != null)
 {
     <MudCard Class="d-flex flex-column h-100 w-100" >
 
         <MudCardHeader @onclick="()=>gotoDetailForMobile(SelectedChannel)" Class="border-bottom" Style="flex-shrink:0;">
             <div class="d-flex justify-content-between align-items-center w-100">
-
-
 
                 <div class="d-flex align-items-center">
                     @if (SelectedChannel != null)
@@ -32,11 +31,7 @@
                         <MudStack Row="false">
                             <MudText Typo="Typo.h1" Class="mr-3">@(SelectedChannel?.Name ?? string.Empty)</MudText>
 
-
                             <MudText Style="font-size:10px; color:gray;" Class="mr-3"><b> تعداد اعضا @channelcount نفر</b></MudText>
-
-
-
 
                         </MudStack>
                     }
@@ -46,8 +41,28 @@
                     <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
                     OnClick="BackToUserList" />
                 }
+                @if (CanManageCurrentChat || Conversation is not null)
+                {
+                    <MudMenuItem Icon="@Icons.Material.Filled.DeleteSweep" OnClick="ClearHistoryDialog">
+                        پاک کردن تاریخچه
+                    </MudMenuItem>
+                }
+
+                @if (CanManageCurrentChat)
+                {
+                    <MudMenuItem Icon="@Icons.Material.Filled.Delete"
+                                 IconColor="Color.Error"
+                                 OnClick="DeleteChatDialog">
+                        @(SelectedChannel is not null ? "حذف کانال" : "حذف گروه")
+                    </MudMenuItem>
+                }
+                <MudIconButton Icon="@Icons.Material.Filled.Search"
+                               Color="@(_searchOpen ? Color.Primary : Color.Default)"
+                               OnClick="ToggleSearch" />
             </div>
         </MudCardHeader>
+
+        @SearchPanel
 
         <MudCardContent Class="flex-grow-1 p-0" Style="overflow-y:auto; width:100%; scrollbar-width: none;" data-scroll-container="true">
             <div id="mainchat"  @ref="_channelContainer" style="@ThemeCascading.backGroundChatStyle">
@@ -58,42 +73,21 @@
                         <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
                     }
                     else if(_messages.Count>0){
-                        <MudVirtualize Items="_messages" Context="message"   OverscanCount="5" >
-                            <ItemContent>
-                                <div @key="message.Id" >
-
-                                    @if (lastDate == null || message.SendAt.Date != lastDate.Value.Date)
-                                    {
-                                        if (message.SendAt.Date <= DateTime.Today.Date)
-                                        {
-                                            <div style="display: flex; align-items: center; gap: 10px; margin: 10px 0;">
-                                                <div style="flex-grow: 1; height: 1px; background-color: gray;"></div>
-                                                <MudChipSet T="string" SelectionMode="SelectionMode.MultiSelection">
-                                                    <MudChip Text="pink" Variant="Variant.Text" Color="ThemeCascading.SeenColor">@message.SendAt.ToFarsi().ConvertPersianDate()</MudChip>
-                                                </MudChipSet>
-                                                <div style="flex-grow: 1; height: 1px; background-color: gray;"></div>
-                                            </div>
-                                        }
-                                        lastDate = message.SendAt.Date;
-                                    } 
-
-                                    @if(message.Type==MessageType.Text||message.Type==MessageType.Location){
-
-                                        <ChannelMessageComponent DeletedMessageevent="DeleteTargetMessage" CurrentUser="CurrentUser" message="message"
-                                        ReplyMessageEvent="HandleReplyMessage" EditMessageEvent="OnEditMessageHandler"
-                                        ParentMessage="@HandelParentMessage(message.ParentId)"
-                                        SelectedChannel="SelectedChannel"
-                                        ></ChannelMessageComponent>
-
-                                    }
-                                    else{
-                                        <ChannelFileMessageComponent DeletedMessageevent="DeleteTargetMessage" IsMine="message.IsMine" CurrentUser="CurrentUser" message="message"
-                                        ReplyMessageEvent="HandleReplyMessage" Conversation="Conversation" EditMessageEvent="OnEditMessageHandler"
-                                        ParentMessage="@HandelParentMessage(message.ParentId)"></ChannelFileMessageComponent>
-                                    }
-                                </div>
-                            </ItemContent>
-                        </MudVirtualize>
+                        @if (_inJumpMode)
+                        {
+                            @foreach (var message in _messages)
+                            {
+                                @ChannelMessageRow(message)
+                            }
+                        }
+                        else
+                        {
+                            <MudVirtualize Items="_messages" Context="message"   OverscanCount="5" >
+                                <ItemContent>
+                                    @ChannelMessageRow(message)
+                                </ItemContent>
+                            </MudVirtualize>
+                        }
                     }
                     else{
                         <EmptyMessagesComponnent OtherId="@SelectedChannel"/>
@@ -118,14 +112,9 @@
                             </MudText>
                         </MudPaper>
                     }
-                    @if(IsUploading){
-                        <MudPaper Class="d-flex align-center px-2 py-1 reply-bar" Elevation="1">
-                            <MudIconButton Icon="@Icons.Material.Filled.Close"
-                            OnClick="cancelUpload"
-                            Color="Color.Secondary"
-                            Class="mr-2" />
-                            <MudProgressLinear Color="ThemeCascading.SeenColor" Indeterminate="true" Class="my-7" />
-                        </MudPaper>
+                    @if (IsUploading)
+                    {
+                        @UploadProgressBar
                     }
 
                     <MudGrid Class="align-center w-100" Spacing="2">
@@ -198,8 +187,6 @@ else if (SelectedGroup != null)
         <MudCardHeader @onclick="()=>gotoDetailForMobile(SelectedGroup)" Class="border-bottom" Style="flex-shrink:0;">
             <div class="d-flex justify-content-between align-items-center w-100">
 
-
-
                 <div class="d-flex align-items-center">
                     @if (SelectedGroup != null)
                     {
@@ -212,11 +199,7 @@ else if (SelectedGroup != null)
                         <MudStack Row="false">
                             <MudText Typo="Typo.h1" Class="mr-3">@(SelectedGroup?.Name ?? string.Empty)</MudText>
 
-
                             <MudText Style="font-size:10px; color:gray;" Class="mr-3"><b> تعداد اعضا @SelectedGroup.Age نفر</b></MudText>
-
-
-
 
                         </MudStack>
                     }
@@ -226,8 +209,28 @@ else if (SelectedGroup != null)
                     <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
                     OnClick="BackToUserList" />
                 }
+                @if (CanManageCurrentChat || Conversation is not null)
+                {
+                    <MudMenuItem Icon="@Icons.Material.Filled.DeleteSweep" OnClick="ClearHistoryDialog">
+                        پاک کردن تاریخچه
+                    </MudMenuItem>
+                }
+
+                @if (CanManageCurrentChat)
+                {
+                    <MudMenuItem Icon="@Icons.Material.Filled.Delete"
+                                 IconColor="Color.Error"
+                                 OnClick="DeleteChatDialog">
+                        @(SelectedChannel is not null ? "حذف کانال" : "حذف گروه")
+                    </MudMenuItem>
+                }
+                <MudIconButton Icon="@Icons.Material.Filled.Search"
+                               Color="@(_searchOpen ? Color.Primary : Color.Default)"
+                               OnClick="ToggleSearch" />
             </div>
         </MudCardHeader>
+
+        @SearchPanel
 
         <MudCardContent Class="flex-grow-1 p-0" Style="overflow-y:auto; width:100%; scrollbar-width: none;" data-scroll-container="true">
             <div id="mainchat"  @ref="_channelContainer" style="@ThemeCascading.backGroundChatStyle">
@@ -238,49 +241,21 @@ else if (SelectedGroup != null)
                         <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
                     }
                     else if(_messages.Count>0){
-                        <MudVirtualize Items="_messages" Context="message"   OverscanCount="5" >
-                            <ItemContent>
-                                <div @key="message.Id" >
-
-                                    @if (lastDate == null || message.SendAt.Date != lastDate.Value.Date)
-                                    {
-                                        if (message.SendAt.Date <= DateTime.Today.Date)
-                                        {
-                                            <div style="display: flex; align-items: center; gap: 10px; margin: 10px 0;">
-                                                <div style="flex-grow: 1; height: 1px; background-color: gray;"></div>
-                                                <MudChipSet T="string" SelectionMode="SelectionMode.MultiSelection">
-                                                    <MudChip Text="pink" Variant="Variant.Text" Color="ThemeCascading.SeenColor">@message.SendAt.ToFarsi().ConvertPersianDate()</MudChip>
-                                                </MudChipSet>
-                                                <div style="flex-grow: 1; height: 1px; background-color: gray;"></div>
-                                            </div>
-                                        }
-                                        lastDate = message.SendAt.Date;
-                                    } 
-
-                                    @if(message.Type==MessageType.Text||message.Type==MessageType.Location)
-                                    {
-
-                                         <GroupMessageComponent DeletedMessageevent="DeleteTargetMessage" IsMine="message.IsMine" CurrentUser="CurrentUser" message="message"  
-                                                         ReplyMessageEvent="HandleReplyMessage" Conversation="Conversation" EditMessageEvent="OnEditMessageHandler"  
-                                                     ParentMessage="@HandelParentMessage(message.ParentId)" 
-                                                           Adminlist="@SelectedGroup.channel.admins"
-                                                           CreateorId="@SelectedGroup.channel.CreatorId"
-                                                           GroupId="@SelectedGroup.Id"
-                                                        MessageReactionEvent="SendReactions"  
-                                                         JoinChannel="JoinToChannelEvent"></GroupMessageComponent> 
- 
-                                    }
-                                    else{
-                                        <FileGroupMessageComponent DeletedMessageevent="DeleteTargetMessage" IsMine="message.IsMine" CurrentUser="CurrentUser" message="message"
-                                                              ReplyMessageEvent="HandleReplyMessage" Conversation="Conversation" EditMessageEvent="OnEditMessageHandler"
-                                                              ParentMessage="@HandelParentMessage(message.ParentId)"
-                                                                   Adminlist="@SelectedGroup.channel.admins"
-                                                                   CreateorId="@SelectedGroup.channel.CreatorId"
-                                                                   GroupId="@SelectedGroup.Id"></FileGroupMessageComponent>
-                                    }
-                                </div>
-                            </ItemContent>
-                        </MudVirtualize>
+                        @if (_inJumpMode)
+                        {
+                            @foreach (var message in _messages)
+                            {
+                                @GroupMessageRow(message)
+                            }
+                        }
+                        else
+                        {
+                            <MudVirtualize Items="_messages" Context="message"   OverscanCount="5" >
+                                <ItemContent>
+                                    @GroupMessageRow(message)
+                                </ItemContent>
+                            </MudVirtualize>
+                        }
                     }
                     else{
                         <EmptyMessagesComponnent OtherId="@SelectedChannel"/>
@@ -304,14 +279,9 @@ else if (SelectedGroup != null)
                             </MudText>
                         </MudPaper>
                     }
-                    @if(IsUploading){
-                        <MudPaper Class="d-flex align-center px-2 py-1 reply-bar" Elevation="1">
-                            <MudIconButton Icon="@Icons.Material.Filled.Close"
-                            OnClick="cancelUpload"
-                            Color="Color.Secondary"
-                            Class="mr-2" />
-                            <MudProgressLinear Color="ThemeCascading.SeenColor" Indeterminate="true" Class="my-7" />
-                        </MudPaper>
+                    @if (IsUploading)
+                    {
+                        @UploadProgressBar
                     }
 
                     <MudGrid Class="align-center w-100" Spacing="2">
@@ -384,8 +354,6 @@ else
     <MudCardHeader @onclick="()=>gotoDetailForMobile(OtherUser)" Class="border-bottom" Style="flex-shrink:0;">
         <div class="d-flex justify-content-between align-items-center w-100">
 
-        
-
             <div class="d-flex align-items-center">
                 @if (OtherUser != null)
                 {
@@ -425,8 +393,21 @@ else
                 <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
                                OnClick="BackToUserList" />
             }
+                @if (CanManageCurrentChat || Conversation is not null)
+                {
+                    <MudMenuItem Icon="@Icons.Material.Filled.DeleteSweep" OnClick="ClearHistoryDialog">
+                        پاک کردن تاریخچه
+                    </MudMenuItem>
+                }
+
+         
+                <MudIconButton Icon="@Icons.Material.Filled.Search"
+                               Color="@(_searchOpen ? Color.Primary : Color.Default)"
+                               OnClick="ToggleSearch" />
         </div>
     </MudCardHeader>
+
+    @SearchPanel
 
         <MudCardContent Class="flex-grow-1 p-0" Style="overflow-y:auto; width:100%;scrollbar-width: none;">
             <div id="mainchat" @ref="_chatContainer" style="@ThemeCascading.backGroundChatStyle">
@@ -437,41 +418,21 @@ else
                     <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
                 }
                 else if(_messages.Count>0){
-                    <MudVirtualize Items="_messages" Context="message"   OverscanCount="5" >
-                        <ItemContent>
-                            <div @key="message.Id" >
-
-                                @if (lastDate == null || message.SendAt.Date != lastDate.Value.Date)
-                                {
-                                    if (message.SendAt.Date <= DateTime.Today.Date)
-                                    {
-                                        <div style="display: flex; align-items: center; gap: 10px; margin: 10px 0;">
-                                            <div style="flex-grow: 1; height: 1px; background-color: gray;"></div>
-                                            <MudChipSet T="string" SelectionMode="SelectionMode.MultiSelection">
-                                                <MudChip Text="pink" Variant="Variant.Text" Color="ThemeCascading.SeenColor">@message.SendAt.ToFarsi().ConvertPersianDate()</MudChip>
-                                            </MudChipSet>
-                                            <div style="flex-grow: 1; height: 1px; background-color: gray;"></div>
-                                        </div>
-                                    }
-                                    lastDate = message.SendAt.Date;
-                                } 
-
-                                @if(message.Type==MessageType.Text||message.Type==MessageType.Location){
-                                    <MessageComponent DeletedMessageevent="DeleteTargetMessage"  IsMine="message.IsMine" CurrentUser="CurrentUser" message="message"
-                                                      ReplyMessageEvent="HandleReplyMessage" Conversation="Conversation" EditMessageEvent="OnEditMessageHandler"
-                                                      ParentMessage="@HandelParentMessage(message.ParentId)"
-                                                      OtherAvatar="@OtherUser.avatar"
-                                                      MessageReactionEvent="SendReactions"
-                                                      JoinChannel="JoinToChannelEvent"></MessageComponent>
-                                }
-                                else{
-                                    <FileMessageComponent DeletedMessageevent="DeleteTargetMessage" IsMine="message.IsMine" CurrentUser="CurrentUser" message="message"
-                                                          ReplyMessageEvent="HandleReplyMessage" Conversation="Conversation" EditMessageEvent="OnEditMessageHandler"
-                                                          ParentMessage="@HandelParentMessage(message.ParentId)"></FileMessageComponent>
-                                }
-                            </div>
-                        </ItemContent>
-                    </MudVirtualize>
+                    @if (_inJumpMode)
+                    {
+                        @foreach (var message in _messages)
+                        {
+                            @PrivateMessageRow(message)
+                        }
+                    }
+                    else
+                    {
+                        <MudVirtualize Items="_messages" Context="message"   OverscanCount="5" >
+                            <ItemContent>
+                                @PrivateMessageRow(message)
+                            </ItemContent>
+                        </MudVirtualize>
+                    }
                 }
                 else{
                     <EmptyMessagesComponnent OtherId="@OtherUser"/>
@@ -495,14 +456,9 @@ else
                     </MudText>
                 </MudPaper>
             }
-            @if(IsUploading){
-                <MudPaper Class="d-flex align-center px-2 py-1 reply-bar" Elevation="1">
-                    <MudIconButton Icon="@Icons.Material.Filled.Close"
-                    OnClick="cancelUpload"
-                    Color="Color.Secondary"
-                    Class="mr-2" />
-                    <MudProgressLinear Color="ThemeCascading.SeenColor" Indeterminate="true" Class="my-7" />
-                </MudPaper>
+            @if (IsUploading)
+            {
+                @UploadProgressBar
             }
 
             <MudGrid Class="align-center w-100" Spacing="2">
@@ -571,3 +527,251 @@ else
 </MudCard>
 }
 
+
+@* ==========================================================================
+   قطعات مشترک
+   ========================================================================== *@
+
+@code {
+
+    // ---------------------------------------------------------- نوار آپلود
+    // قبلاً سه بار تکرار شده بود. ضمناً @UploadPercent٪ به @(UploadPercent)٪
+    // تغییر کرد، چون «٪» فارسی کاراکتر معتبر شناسه نیست و پارسر Razor
+    // گاهی سر آن گیج می‌شود.
+
+    private RenderFragment UploadProgressBar =>
+    @<MudPaper Class="pa-3 ma-2" Elevation="1">
+        <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+            <MudText Typo="Typo.body2">در حال ارسال فایل…</MudText>
+            <MudStack Row AlignItems="AlignItems.Center" Spacing="1">
+                <MudText Typo="Typo.body2">@(UploadPercent)٪</MudText>
+                <MudIconButton Icon="@Icons.Material.Filled.Close"
+                               Size="Size.Small"
+                               OnClick="cancelUpload" />
+            </MudStack>
+        </MudStack>
+
+        <MudProgressLinear Color="Color.Primary"
+                           Value="@UploadPercent"
+                           Size="Size.Medium"
+                           Class="mt-2" />
+
+        <MudText Typo="Typo.caption" Class="mt-1">@UploadSizeText</MudText>
+    </MudPaper>;
+
+
+    // ------------------------------------------------------ پنل جستجو
+
+    private RenderFragment SearchPanel =>
+    @<div>
+        @if (_searchOpen)
+        {
+            <div style="border-bottom: 1px solid var(--mud-palette-lines-default); padding: 8px; flex-shrink: 0;">
+
+                <MudStack Row AlignItems="AlignItems.Center" Spacing="1">
+                    <MudTextField T="string"
+                                  Value="@_searchTerm"
+                                  ValueChanged="OnSearchTermChanged"
+                                  Immediate="true"
+                                  Placeholder="جستجو در پیام‌ها…"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Search"
+                                  Clearable="true" />
+
+                    @if (_searchResults.Count > 0)
+                    {
+                        <MudText Typo="Typo.caption" Style="white-space: nowrap;">
+                            @(_searchActiveIndex + 1) از @_searchResults.Count@(_searchHasMore ? "+" : "")
+                        </MudText>
+
+                        <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowUp"
+                                       Size="Size.Small"
+                                       Disabled="@(_searchActiveIndex >= _searchResults.Count - 1)"
+                                       OnClick="NextResult" />
+
+                        <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowDown"
+                                       Size="Size.Small"
+                                       Disabled="@(_searchActiveIndex <= 0)"
+                                       OnClick="PreviousResult" />
+                    }
+
+                    <MudIconButton Icon="@Icons.Material.Filled.Close"
+                                   Size="Size.Small"
+                                   OnClick="ToggleSearch" />
+                </MudStack>
+
+                @if (_searchBusy)
+                {
+                    <MudProgressLinear Indeterminate Color="Color.Primary" Class="mt-1" />
+                }
+
+                @if (_searchResults.Count > 0)
+                {
+                    <div style="max-height: 260px; overflow-y: auto; margin-top: 8px;">
+                        <MudList T="string" Dense="true">
+                            @for (var i = 0; i < _searchResults.Count; i++)
+                            {
+                                var index = i;
+                                var hit = _searchResults[i];
+
+                                <MudListItem T="string"
+                                             OnClick="@(() => JumpToResult(index))"
+                                             Style="@(index == _searchActiveIndex
+                                                      ? "background-color: var(--mud-palette-action-default-hover);"
+                                                      : "")">
+                                    <MudStack Spacing="0">
+                                        <MudStack Row Justify="Justify.SpaceBetween">
+                                            <MudText Typo="Typo.caption" Color="Color.Primary">
+                                                <b>@hit.SenderName</b>
+                                            </MudText>
+                                            <MudText Typo="Typo.caption" Style="color: gray;">
+                                                @hit.SendAt.ToFarsi().ConvertPersianDate() @hit.SendAt.ToString(@"HH\:mm")
+                                            </MudText>
+                                        </MudStack>
+                                        <MudText Typo="Typo.body2">@Snippet(hit)</MudText>
+                                    </MudStack>
+                                </MudListItem>
+                            }
+                        </MudList>
+
+                        @if (_searchHasMore)
+                        {
+                            <MudButton FullWidth
+                                       Variant="Variant.Text"
+                                       Size="Size.Small"
+                                       Disabled="@_searchBusy"
+                                       OnClick="LoadMoreResults">
+                                نتایج بیشتر
+                            </MudButton>
+                        }
+                    </div>
+                }
+                else if (!_searchBusy && (_searchTerm?.Trim().Length ?? 0) >= 2)
+                {
+                    <MudText Typo="Typo.body2" Class="mt-2" Style="color: gray;">
+                        نتیجه‌ای یافت نشد.
+                    </MudText>
+                }
+            </div>
+        }
+
+        @if (_inJumpMode)
+        {
+            <MudButton FullWidth
+                       Variant="Variant.Text"
+                       Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.ArrowDownward"
+                       OnClick="BackToLatest">
+                بازگشت به آخرین پیام‌ها
+            </MudButton>
+        }
+    </div>;
+
+
+    // -------------------------------------------------- ردیف پیام‌ها
+    // هر ردیف id می‌گیرد تا scrollToElement بتواند پیدایش کند، و اگر هدف
+    // پرش باشد هایلایت می‌شود.
+
+    private string RowStyle(ChatMessageDto message) =>
+        _highlightedMessageId == message.Id
+            ? "background-color: rgba(25,118,210,0.18); border-radius: 8px; transition: background-color .4s;"
+            : "transition: background-color .4s;";
+
+    private RenderFragment DateDivider(ChatMessageDto message) =>
+    @<div>
+        @if (lastDate == null || message.SendAt.Date != lastDate.Value.Date)
+        {
+            if (message.SendAt.Date <= DateTime.Today.Date)
+            {
+                <div style="display: flex; align-items: center; gap: 10px; margin: 10px 0;">
+                    <div style="flex-grow: 1; height: 1px; background-color: gray;"></div>
+                    <MudChipSet T="string" SelectionMode="SelectionMode.MultiSelection">
+                        <MudChip Text="pink" Variant="Variant.Text" Color="ThemeCascading.SeenColor">@message.SendAt.ToFarsi().ConvertPersianDate()</MudChip>
+                    </MudChipSet>
+                    <div style="flex-grow: 1; height: 1px; background-color: gray;"></div>
+                </div>
+            }
+            lastDate = message.SendAt.Date;
+        }
+    </div>;
+
+
+    private RenderFragment PrivateMessageRow(ChatMessageDto message) =>
+    @<div @key="message.Id" id="@($"msg-{message.Id}")" style="@RowStyle(message)">
+
+        @DateDivider(message)
+
+        @if (message.Type == MessageType.Text || message.Type == MessageType.Location)
+        {
+        <MessageComponent DeletedMessageevent="DeleteTargetMessage" IsMine="message.IsMine" CurrentUser="CurrentUser" message="message"
+                          ReplyMessageEvent="HandleReplyMessage" Conversation="Conversation" EditMessageEvent="OnEditMessageHandler"
+                          ParentMessage="@HandelParentMessage(message)"
+                          ParentSenderName="@HandelParentSender(message)"
+                          OnParentClick="JumpToMessage"
+                          OtherAvatar="@OtherUser.avatar"
+                          MessageReactionEvent="SendReactions"
+                          JoinChannel="JoinToChannelEvent"></MessageComponent>
+        }
+        else
+        {
+            <FileMessageComponent DeletedMessageevent="DeleteTargetMessage" IsMine="message.IsMine" CurrentUser="CurrentUser" message="message"
+                                  ReplyMessageEvent="HandleReplyMessage" Conversation="Conversation" EditMessageEvent="OnEditMessageHandler"
+                                  ParentMessage="@HandelParentMessage(message)"></FileMessageComponent>
+        }
+    </div>;
+
+
+    private RenderFragment GroupMessageRow(ChatMessageDto message) =>
+    @<div @key="message.Id" id="@($"msg-{message.Id}")" style="@RowStyle(message)">
+
+        @DateDivider(message)
+
+        @if (message.Type == MessageType.Text || message.Type == MessageType.Location)
+        {
+            <GroupMessageComponent DeletedMessageevent="DeleteTargetMessage" IsMine="message.IsMine" CurrentUser="CurrentUser" message="message"
+                                   ReplyMessageEvent="HandleReplyMessage" Conversation="Conversation" EditMessageEvent="OnEditMessageHandler"
+                               
+                               ParentMessage="@HandelParentMessage(message)"
+                               ParentSenderName="@HandelParentSender(message)"
+                                   Adminlist="@SelectedGroup.channel.admins"
+                                   CreateorId="@SelectedGroup.channel.CreatorId"
+                                   GroupId="@SelectedGroup.Id"
+                                   MessageReactionEvent="SendReactions"
+                                   JoinChannel="JoinToChannelEvent"></GroupMessageComponent>
+        }
+        else
+        {
+            <FileGroupMessageComponent DeletedMessageevent="DeleteTargetMessage" IsMine="message.IsMine" CurrentUser="CurrentUser" message="message"
+                                       ReplyMessageEvent="HandleReplyMessage" Conversation="Conversation" EditMessageEvent="OnEditMessageHandler"
+                                       ParentMessage="@HandelParentMessage(message)"
+                                       Adminlist="@SelectedGroup.channel.admins"
+                                       CreateorId="@SelectedGroup.channel.CreatorId"
+                                       GroupId="@SelectedGroup.Id"></FileGroupMessageComponent>
+        }
+    </div>;
+
+
+    private RenderFragment ChannelMessageRow(ChatMessageDto message) =>
+    @<div @key="message.Id" id="@($"msg-{message.Id}")" style="@RowStyle(message)">
+
+        @DateDivider(message)
+
+        @if (message.Type == MessageType.Text || message.Type == MessageType.Location)
+        {
+            <ChannelMessageComponent DeletedMessageevent="DeleteTargetMessage" CurrentUser="CurrentUser" message="message"
+                                     ReplyMessageEvent="HandleReplyMessage" EditMessageEvent="OnEditMessageHandler"
+                                 
+                                 ParentMessage="@HandelParentMessage(message)"
+                                 ParentSenderName="@HandelParentSender(message)"
+                                     SelectedChannel="SelectedChannel"></ChannelMessageComponent>
+        }
+        else
+        {
+            <ChannelFileMessageComponent DeletedMessageevent="DeleteTargetMessage" IsMine="message.IsMine" CurrentUser="CurrentUser" message="message"
+                                         ReplyMessageEvent="HandleReplyMessage" Conversation="Conversation" EditMessageEvent="OnEditMessageHandler"
+                                         ParentMessage="@HandelParentMessage(message)"></ChannelFileMessageComponent>
+        }
+    </div>;
+}

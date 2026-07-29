@@ -29,6 +29,13 @@ namespace NaraChat.Application.Services.ChatServices.Conversation
         Task<List<ChannelFileItem>?> getGroupFiles(Guid groupId, CancellationToken cancellationToken = default);
         Task<string?> downloadGroupFile(Guid fileid, CancellationToken cancellationToken = default);
         Task<(bool issuccess, string message)> Changebio(ChangeBioGroupCommand command, CancellationToken cancellationToken = default);
+        Task<(bool status, string message)> ClearConversationHistory(
+    Guid conversationId, CancellationToken cancellationToken = default);
 
+        Task<(bool status, string message)> ClearGroupHistory(
+            Guid groupId, CancellationToken cancellationToken = default);
+
+        Task<(bool status, string message)> DeleteGroup(
+            Guid groupId, CancellationToken cancellationToken = default);
     }
 }

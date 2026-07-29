@@ -9,7 +9,11 @@ namespace NaraChat.Application.Services.ChatServices.Conversation
 {
     public interface IMessageService
     {
-         Task<List<ChatMessageDto>?>LoadMessages(Guid ConverSationId,int MessageCount=50,CancellationToken cancellationToken=default);
+        Task<MessagesPageDto?> LoadMessages(
+    Guid conversationId,
+    DateTime? before = null,
+    int take = 30,
+    CancellationToken cancellationToken = default);
         Task<(bool, Guid MessageId)> SendMessageAsync(Guid ConversationId, string Message,Guid? ParentId=null, float? latitude = null, float? Longitude = null, CancellationToken cancellationToken = default);
         Task<(bool, string message)> EditMessageAsync(EditedMessageDto messageDto, CancellationToken cancellationToken = default);
         Task<(bool, string message)> DeleteMessageAsync(Guid MessageId,Guid OtherId, CancellationToken cancellationToken = default);
@@ -18,5 +22,17 @@ namespace NaraChat.Application.Services.ChatServices.Conversation
         Task<Stream?> GetFileById(Guid Id,CancellationToken cancellationToken=default);
         Task<ChatPhotoMessageDto?> GetImageById(Guid Id, CancellationToken cancellationToken = default);
         Task<(bool issuccess,string Message)> newReactionOnMessage(string? reaction, Guid Message);
+        Task<SearchPageDto?> SearchMessages(
+          Guid? conversationId,
+          Guid? channelId,
+          string term,
+          DateTime? before = null,
+          int take = 20,
+          CancellationToken cancellationToken = default);
+
+        Task<List<ChatMessageDto>?> LoadMessagesAround(
+            Guid messageId,
+            int take = 20,
+            CancellationToken cancellationToken = default);
     }
 }

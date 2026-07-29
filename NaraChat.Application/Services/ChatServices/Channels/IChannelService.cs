@@ -26,5 +26,10 @@ namespace NaraChat.Application.Services.ChatServices.Channels
         Task<string?> downloadChannelFile(Guid fileid, CancellationToken cancellationToken = default);
         Task<List<ChannelFileItem>?> getChannelFiles(Guid channelId, CancellationToken cancellationToken = default);
         Task<(bool status, string message)> RemoveMemberFromChannel(Guid memberid, Guid channelid, CancellationToken cancellationToken = default);
+        Task<(bool status, string message)> ClearChannelHistory(
+        Guid channelId, CancellationToken cancellationToken = default);
+
+        Task<(bool status, string message)> DeleteChannel(
+            Guid channelId, CancellationToken cancellationToken = default);
     }
 }

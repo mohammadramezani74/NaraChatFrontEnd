@@ -27,5 +27,6 @@ namespace NaraChat.Application.HunSettings.Abstraction
         Task BlockUser(BlockDto blockDto);
         Task GetDeletedChannel(Guid channelId);
         Task ReceiveNewChannel(UserDto user);
+        Task ChatHistoryCleared(Guid conversationOrChannelId);
     }
 }
