@@ -26,6 +26,7 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
     private DateTime? _oldestCursor;      // تاریخ قدیمی‌ترین پیامی که داریم
     private bool _hasMoreOlder = true;    // آیا صفحه‌ی قدیمی‌تری هست
     private bool _isLoadingOlder;
+    [Parameter] public EventCallback<Guid> OnChatDeleted { get; set; }
     public int UploadPercent { get; set; }
     public string UploadSizeText { get; set; } = string.Empty;
     private string? _activeUploadHandle;
@@ -1859,9 +1860,12 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
 
     // ------------------------------------------------------- حذف گروه یا کانال
 
-    public async Task DeleteChatDialog()
+    private async Task DeleteChatDialog()
     {
         var isChannel = SelectedChannel is not null;
+        var deletedId = SelectedChannel?.Id ?? SelectedGroup?.Id;
+        if (deletedId is null) return;
+
         var title = CurrentChatTitle;
 
         var parameters = new DialogParameters<ConfirmDangerDialog>
@@ -1869,7 +1873,7 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
         { x => x.Title, isChannel ? "حذف کانال" : "حذف گروه" },
         { x => x.Message, $"«{title}» به همراه تمام پیام‌ها، فایل‌ها و اعضایش برای همیشه حذف می‌شود." },
         { x => x.ConfirmLabel, "حذف کن" },
-        { x => x.ConfirmationText, title }        // کاربر باید نام را تایپ کند
+        { x => x.ConfirmationText, title }
     };
 
         var dialog = await DialogService.ShowAsync<ConfirmDangerDialog>(
@@ -1879,8 +1883,8 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
         if (result.Canceled) return;
 
         var response = isChannel
-            ? await _channelservice.DeleteChannel(SelectedChannel!.Id)
-            : await chatService.DeleteGroup(SelectedGroup!.Id);
+            ? await _channelservice.DeleteChannel(deletedId.Value)
+            : await chatService.DeleteGroup(deletedId.Value);
 
         if (!response.status)
         {
@@ -1890,14 +1894,12 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
 
         snackbar.Add(response.message, Severity.Success);
 
-        // خروج از صفحه‌ی چتی که دیگر وجود ندارد
         _messages.Clear();
-        SelectedChannel = null;
-        SelectedGroup = null;
-        Conversation = null;
+        ResetSearch();
 
-        await BackToUserList();
-        StateHasChanged();
+        // والد باید پاک کند، نه ما — SelectedGroup اینجا فقط یک پارامتر است
+        if (OnChatDeleted.HasDelegate)
+            await OnChatDeleted.InvokeAsync(deletedId.Value);
     }
     private async Task HandleClearedHistory()
     {

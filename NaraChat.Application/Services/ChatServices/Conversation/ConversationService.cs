@@ -40,7 +40,7 @@ namespace NaraChat.Application.Services.ChatServices.Conversation
             return new UserAvatar();
         }
 
-        public async Task<(bool IsSuccess, string Message)> PinConversation(bool IsPin,Guid ConversationId, CancellationToken cancellationToken = default(CancellationToken))
+         public async Task<(bool IsSuccess, string Message)> PinConversation(bool IsPin,Guid ConversationId, CancellationToken cancellationToken = default(CancellationToken))
         {
             try
             {

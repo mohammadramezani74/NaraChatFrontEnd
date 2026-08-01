@@ -45,6 +45,7 @@
                         <MudItem xs="12" Class="h-100 d-flex px-0">
                             <ChatDetail @key="ThemeChanging.IsShowSetting"
                             OtherUser="OtherUser"
+                                        OnChatDeleted="HandleChatDeleted"
                             ClearedHistoryId="ClearedHistoryId"
                             OnHistoryCleared="NullClearedHistory"
                             NewIncomingMessage="_newIncomingMessage"
@@ -117,6 +118,7 @@
                     <MudItem xs="12" sm="@( ThemeChanging.IsShowSetting ? 6 : 9)" Class="h-100 d-flex px-0">
                         <ChatDetail @key="ThemeChanging.IsShowSetting"
                         OtherUser="OtherUser"
+                                    OnChatDeleted="HandleChatDeleted"
                         ClearedHistoryId="ClearedHistoryId"
                         OnHistoryCleared="NullClearedHistory"
                         NewIncomingMessage="_newIncomingMessage"
@@ -502,17 +504,12 @@
 
 
        });
-        hubConnection.On<ICollection<UserDto>>(nameof(IChatHubClient.GetDeletedChannel), (onlineUsers) =>
-    {
-        foreach (var user in Users)
-        {
-            if (onlineUsers.Any(x => x.Id == user.Id))
-            {
-                user.IsOnline = true;
-            }
-        }
-        StateHasChanged();
-    });
+        hubConnection.On<Guid>(nameof(IChatHubClient.GetDeletedChannel), async (deletedId) =>
+      {
+         
+          await HandleChatDeleted(deletedId);
+      
+      });
         hubConnection.On<BlockDto>(nameof(IChatHubClient.BlockUser), (blockedUser) =>
      {
          var user = Users.Where(u => u.Id == blockedUser.UserId).FirstOrDefault();
@@ -987,5 +984,19 @@
     private void NullClearedHistory()
     {
         ClearedHistoryId = null;
+    }
+    public async Task HandleChatDeleted(Guid deletedId)
+    {
+        var item = Users.FirstOrDefault(x => x.Id == deletedId);
+        if (item is not null) Users.Remove(item);
+
+        if (SelectedGroup?.Id == deletedId || SelectedChannel?.Id == deletedId)
+        {
+            SelectedGroup = null;
+            SelectedChannel = null;
+            OtherUser = null;
+        }
+
+        await InvokeAsync(StateHasChanged);
     }
 }
