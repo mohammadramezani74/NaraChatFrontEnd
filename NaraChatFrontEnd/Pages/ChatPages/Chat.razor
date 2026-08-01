@@ -717,9 +717,10 @@
       });
         hubConnection.On<Guid>(nameof(IChatHubClient.IncreaseMessageCount), (userId) =>
     {
-        var users = Users.First(x => x.Id == userId);
-        Users.First(x => x.Id == userId).messageUnreadedCount += 1;
-        users.messageUnreadedCount = users.messageUnreadedCount += 1;
+        var user = Users.FirstOrDefault(x => x.Id == userId);
+        if (user is null) return;
+
+        user.messageUnreadedCount += 1;
         StateHasChanged();
 
     });

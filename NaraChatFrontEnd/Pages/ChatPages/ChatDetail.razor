@@ -36,29 +36,23 @@
                         </MudStack>
                     }
                 </div>
-                @if (IsMobile)
+            
+                <div class="d-flex align-items-center flex-shrink-0" @onclick:stopPropagation="true">
+
+                    <MudIconButton Icon="@Icons.Material.Filled.Search"
+                                   Color="@(_searchOpen ? Color.Primary : Color.Default)"
+                                   OnClick="ToggleSearch" />
+
+                    @if (ShowChatActions)
+                    {
+                        @ChatActionsMenu
+                    }  
+                    @if (IsMobile)
                 {
                     <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
                     OnClick="BackToUserList" />
                 }
-                @if (CanManageCurrentChat || Conversation is not null)
-                {
-                    <MudMenuItem Icon="@Icons.Material.Filled.DeleteSweep" OnClick="ClearHistoryDialog">
-                        پاک کردن تاریخچه
-                    </MudMenuItem>
-                }
-
-                @if (CanManageCurrentChat)
-                {
-                    <MudMenuItem Icon="@Icons.Material.Filled.Delete"
-                                 IconColor="Color.Error"
-                                 OnClick="DeleteChatDialog">
-                        @(SelectedChannel is not null ? "حذف کانال" : "حذف گروه")
-                    </MudMenuItem>
-                }
-                <MudIconButton Icon="@Icons.Material.Filled.Search"
-                               Color="@(_searchOpen ? Color.Primary : Color.Default)"
-                               OnClick="ToggleSearch" />
+                </div>
             </div>
         </MudCardHeader>
 
@@ -204,29 +198,24 @@ else if (SelectedGroup != null)
                         </MudStack>
                     }
                 </div>
-                @if (IsMobile)
-                {
-                    <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
-                    OnClick="BackToUserList" />
-                }
-                @if (CanManageCurrentChat || Conversation is not null)
-                {
-                    <MudMenuItem Icon="@Icons.Material.Filled.DeleteSweep" OnClick="ClearHistoryDialog">
-                        پاک کردن تاریخچه
-                    </MudMenuItem>
-                }
+             
 
-                @if (CanManageCurrentChat)
-                {
-                    <MudMenuItem Icon="@Icons.Material.Filled.Delete"
-                                 IconColor="Color.Error"
-                                 OnClick="DeleteChatDialog">
-                        @(SelectedChannel is not null ? "حذف کانال" : "حذف گروه")
-                    </MudMenuItem>
-                }
-                <MudIconButton Icon="@Icons.Material.Filled.Search"
-                               Color="@(_searchOpen ? Color.Primary : Color.Default)"
-                               OnClick="ToggleSearch" />
+                <div class="d-flex align-items-center flex-shrink-0" @onclick:stopPropagation="true">
+
+                    <MudIconButton Icon="@Icons.Material.Filled.Search"
+                                   Color="@(_searchOpen ? Color.Primary : Color.Default)"
+                                   OnClick="ToggleSearch" />
+
+                    @if (ShowChatActions)
+                    {
+                        @ChatActionsMenu
+                    }
+                    @if (IsMobile)
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
+                                       OnClick="BackToUserList" />
+                    }
+                </div>
             </div>
         </MudCardHeader>
 
@@ -388,22 +377,23 @@ else
                     </MudStack>
                 }
             </div>
-            @if (IsMobile)
-            {
-                <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
-                               OnClick="BackToUserList" />
-            }
-                @if (CanManageCurrentChat || Conversation is not null)
-                {
-                    <MudMenuItem Icon="@Icons.Material.Filled.DeleteSweep" OnClick="ClearHistoryDialog">
-                        پاک کردن تاریخچه
-                    </MudMenuItem>
-                }
+                <div class="d-flex align-items-center flex-shrink-0" @onclick:stopPropagation="true">
 
-         
-                <MudIconButton Icon="@Icons.Material.Filled.Search"
-                               Color="@(_searchOpen ? Color.Primary : Color.Default)"
-                               OnClick="ToggleSearch" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Search"
+                                   Color="@(_searchOpen ? Color.Primary : Color.Default)"
+                                   OnClick="ToggleSearch" />
+
+                    @if (ShowChatActions)
+                    {
+                        @ChatActionsMenu
+                    }
+
+                    @if (IsMobile)
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
+                                       OnClick="BackToUserList" />
+                    }
+                </div>
         </div>
     </MudCardHeader>
 
@@ -751,8 +741,32 @@ else
                                        GroupId="@SelectedGroup.Id"></FileGroupMessageComponent>
         }
     </div>;
+    private bool ShowChatActions =>
+           SelectedChannel is not null || SelectedGroup is not null || Conversation is not null;
+    private RenderFragment ChatActionsMenu =>
+    @<MudMenu Icon="@Icons.Material.Filled.MoreVert"
+                  AnchorOrigin="Origin.BottomRight"
+                  TransformOrigin="Origin.TopRight"
+                  AriaLabel="مدیریت گفتگو">
 
+        <MudMenuItem Icon="@Icons.Material.Filled.DeleteSweep"
+                     OnClick="ClearHistoryDialog">
+            پاک کردن تاریخچه
+        </MudMenuItem>
 
+        @if (CanManageCurrentChat)
+    {
+        <MudDivider Class="my-1" />
+
+        <MudMenuItem Icon="@Icons.Material.Filled.DeleteForever"
+                     IconColor="Color.Error"
+                     OnClick="DeleteChatDialog">
+            <MudText Color="Color.Error">
+                @(SelectedChannel is not null ? "حذف کانال" : "حذف گروه")
+            </MudText>
+        </MudMenuItem>
+    }
+    </MudMenu>;
     private RenderFragment ChannelMessageRow(ChatMessageDto message) =>
     @<div @key="message.Id" id="@($"msg-{message.Id}")" style="@RowStyle(message)">
 

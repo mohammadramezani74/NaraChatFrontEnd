@@ -472,7 +472,7 @@ namespace NaraChat.Application.Services.ChatServices.Conversation
                     ? (true, response.message)
                     : (false, response?.message ?? "عملیات ناموفق بود.");
             }
-            catch (Exception)
+            catch (Exception x)
             {
                 return (false, "خطا در ارتباط با سرور.");
             }
