@@ -2,7 +2,7 @@
 @using NaraChatFrontEnd.Pages.ChatPages.Components.DialogComponents
 @inject IJSRuntime JS
 @inject ITokenService tokenservice
-
+@implements IDisposable
 @if (message.FileContent != null)
 {
     <div style="display: flex; flex-direction: column; align-items: center; max-width: 300px; margin: auto; padding: 10px; border: 1px solid #ddd; border-radius: 10px; box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1); direction: rtl;">
@@ -20,8 +20,25 @@
         }
         @if (Loading)
         {
-            <div id="@message.FileContent!.FileId" class="video-overlay ">
-                <MudProgressCircular Color="ThemeCascading.SeenColor" Indeterminate="true" />
+            <div class="video-overlay" style="flex-direction: column; gap: 8px;">
+                @if (_percent < 0)
+                {
+                    <MudProgressCircular Color="ThemeCascading.SeenColor" Indeterminate="true" />
+                }
+                else
+                {
+                    <MudProgressCircular Color="ThemeCascading.SeenColor"
+                                         Value="@_percent"
+                                         Size="Size.Large" />
+                    <MudText Typo="Typo.caption" Style="color: white;">@(_percent)٪</MudText>
+                }
+
+                <MudText Typo="Typo.caption" Style="color: white;">@_sizeText</MudText>
+
+                <MudIconButton Icon="@Icons.Material.Filled.Close"
+                               Size="Size.Small"
+                               Style="color: white;"
+                               OnClick="CancelVideoLoad" />
             </div>
         }
     </div>
@@ -86,26 +103,76 @@
 @code {
     private bool isVideoPlaying = false;
 
+
+    private int _percent;
+    private string _sizeText = string.Empty;
+    private Guid? _loadingFileId;
+    private DotNetObjectReference<VideoMessageComponent>? _selfRef;
+
     public async Task loadVideo(Guid FileId)
     {
         Loading = true;
+        _percent = 0;
+        _sizeText = string.Empty;
+        _loadingFileId = FileId;
         StateHasChanged();
-        var token = await tokenservice.GetAccessTokenAsync() ;
-        var url = SiteSettings.ApiUrl;
-        var videoUrl = url + $"api/v1/chatfiles/{FileId}/files";
-        await JS.InvokeVoidAsync("playVideoFromApi", $"{FileId}", videoUrl, token);
+
+        _selfRef ??= DotNetObjectReference.Create(this);
+
+        var token = await tokenservice.GetAccessTokenAsync();
+        var videoUrl = SiteSettings.ApiUrl + $"api/v1/chatfiles/{FileId}/files";
+
+        await JS.InvokeVoidAsync("playVideoFromApi", $"{FileId}", videoUrl, token, _selfRef);
+
         Loading = false;
+        _loadingFileId = null;
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public Task OnVideoProgress(int percent, long loaded, long total)
+    {
+        // ۲- خطا، ۳- لغو شده
+        if (percent == -2 || percent == -3)
+        {
+            Loading = false;
+            _loadingFileId = null;
+            return InvokeAsync(StateHasChanged);
+        }
+
+        _percent = percent;
+        _sizeText = percent < 0
+            ? $"{FormatBytes(loaded)} دریافت شد"
+            : $"{FormatBytes(loaded)} از {FormatBytes(total)}";
+
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private async Task CancelVideoLoad()
+    {
+        if (_loadingFileId is not null)
+            await JS.InvokeVoidAsync("abortVideoLoad", _loadingFileId.ToString());
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        string[] units = { "بایت", "کیلوبایت", "مگابایت", "گیگابایت" };
+        double value = bytes;
+        var unit = 0;
+        while (value >= 1024 && unit < units.Length - 1) { value /= 1024; unit++; }
+        return $"{value:0.#} {units[unit]}";
     }
     private void OnVideoPlay()
     {
         isVideoPlaying = true;
-        StateHasChanged(); 
+        StateHasChanged();
     }
 
-   
     private void OnVideoEnded()
     {
         isVideoPlaying = false;
-        StateHasChanged(); 
+        StateHasChanged();
     }
+    public void Dispose() => _selfRef?.Dispose();
+}
 }

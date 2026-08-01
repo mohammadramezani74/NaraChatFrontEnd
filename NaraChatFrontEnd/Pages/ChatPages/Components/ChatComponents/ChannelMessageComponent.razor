@@ -81,6 +81,12 @@
                                 <MudTooltip Text="حذف">
                                     <span class="emoji" @onclick="()=>DeleteMessagePopUp(message.Id)">❌</span>
                                 </MudTooltip>
+                                @if (CanPin)
+                                {
+                                    <MudTooltip Text="@(message.IsPinned ? "برداشتن سنجاق" : "سنجاق کردن")">
+                                        <span class="emoji" @onclick="()=>TogglePin(message)">📌</span>
+                                    </MudTooltip>
+                                }
                             }
                         </div>
                     </MudPopover>
@@ -208,6 +214,11 @@
     public async Task ReplyMessage(ChatMessageDto message)
         => await ReplyMessageEvent.InvokeAsync(message);
     [Parameter]
+    public bool CanPin { get; set; }
+
+    [Parameter]
+    public EventCallback<(Guid MessageId, bool Pin)> TogglePinEvent { get; set; }
+    [Parameter]
     public string? ParentSenderName { get; set; }
 
     [Parameter]
@@ -219,4 +230,9 @@
         => message.ParentId is null
             ? Task.CompletedTask
             : OnParentClick.InvokeAsync(message.ParentId.Value);
+    private async Task TogglePin(ChatMessageDto message)
+    {
+        HoverStop("click");
+        await TogglePinEvent.InvokeAsync((message.Id, !message.IsPinned));
+    }
 }

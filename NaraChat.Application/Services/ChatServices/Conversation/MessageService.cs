@@ -247,5 +247,45 @@ namespace NaraChat.Application.Services.ChatServices.Conversation
             return (false, "ارسال ری اکشن با خطا مواجه شد!");
 
         }
+        public async Task<(bool status, string message)> TogglePin(
+         Guid messageId, bool pin, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var result = await _httpClient.PostAsync(
+                    $"/api/v1/message/{messageId}/pin?pin={pin.ToString().ToLower()}",
+                    null, cancellationToken);
+
+                var content = await result.Content.ReadAsStringAsync(cancellationToken);
+                var response = JsonSerializer.Deserialize<BaseResponseDto<string>>(
+                    content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                return response?.status == 200
+                    ? (true, response.message)
+                    : (false, response?.message ?? "عملیات ناموفق بود.");
+            }
+            catch (Exception)
+            {
+                return (false, "خطا در ارتباط با سرور.");
+            }
+        }
+
+        public async Task<List<PinnedMessageDto>?> GetPinnedMessages(
+            Guid scopeId, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var response = await _httpClient
+                    .GetFromJsonAsync<BaseResponseDto<List<PinnedMessageDto>>>(
+                        $"/api/v1/message/{scopeId}/pinned", cancellationToken);
+
+                return response?.isSucceded == true ? response.result : null;
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
     }
 }

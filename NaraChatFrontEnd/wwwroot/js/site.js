@@ -281,19 +281,79 @@ window.naraUpload = (function () {
         download: function (url, token, fallbackName, dotNetRef, downloadId) {
 
             function saveBlob(blob, fileName) {
-                const objectUrl = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = objectUrl;
-                a.download = fileName;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
+                try {
+                    // پاک‌سازی نام فایل از کاراکترهایی که ویندوز قبول نمی‌کند
+                    let safeName = (fileName || 'download')
+                        .replace(/[<>:"/\\|?*\u0000-\u001F]/g, '_')
+                        .replace(/^\.+/, '')
+                        .trim();
 
-                // بلافاصله آزاد نکن، وگرنه دانلود در بعضی مرورگرها لغو می‌شود
-                setTimeout(function () { URL.revokeObjectURL(objectUrl); }, 60000);
+                    if (!safeName) safeName = 'download';
+                    if (safeName.length > 200) {
+                        const dot = safeName.lastIndexOf('.');
+                        const ext = dot > 0 ? safeName.slice(dot) : '';
+                        safeName = safeName.slice(0, 200 - ext.length) + ext;
+                    }
 
-                return { ok: true, status: 200 };
+                    // مسیر مدرن: کاربر خودش محل ذخیره را انتخاب می‌کند و مرورگر
+                    // مستقیم روی دیسک می‌نویسد. برای فایل بزرگ خیلی مطمئن‌تر است.
+                    // فقط در کروم و اج در دسترس است.
+                    if (window.showSaveFilePicker && blob.size > 100 * 1024 * 1024) {
+                        return window.showSaveFilePicker({ suggestedName: safeName })
+                            .then(function (handle) {
+                                return handle.createWritable().then(function (writable) {
+                                    return writable.write(blob).then(function () {
+                                        return writable.close();
+                                    });
+                                });
+                            })
+                            .then(function () {
+                                return { ok: true, status: 200 };
+                            })
+                            .catch(function (err) {
+                                // کاربر انصراف داد
+                                if (err && err.name === 'AbortError') {
+                                    return { ok: false, status: 0, aborted: true };
+                                }
+                                // پشتیبانی نشد یا خطا داد — به روش کلاسیک برگرد
+                                return legacySave(blob, safeName);
+                            });
+                    }
+
+                    return Promise.resolve(legacySave(blob, safeName));
+
+                } catch (e) {
+                    console.error('[nara] saveBlob failed:', e);
+                    return Promise.resolve({ ok: false, status: 0 });
+                }
             }
+
+            function legacySave(blob, safeName) {
+                try {
+                    const objectUrl = URL.createObjectURL(blob);
+
+                    const a = document.createElement('a');
+                    a.href = objectUrl;
+                    a.download = safeName;
+                    a.style.display = 'none';
+                    document.body.appendChild(a);
+                    a.click();
+
+                    // حذف عنصر را عقب بینداز — بعضی مرورگرها اگر لینک بلافاصله از DOM
+                    // برداشته شود دانلود را لغو می‌کنند
+                    setTimeout(function () {
+                        if (a.parentNode) document.body.removeChild(a);
+                    }, 1000);
+
+                    setTimeout(function () { URL.revokeObjectURL(objectUrl); }, 120000);
+
+                    return { ok: true, status: 200 };
+                } catch (e) {
+                    console.error('[nara] legacySave failed:', e);
+                    return { ok: false, status: 0 };
+                }
+            }
+
 
             const controller = new AbortController();
             if (downloadId) downloads.set(downloadId, controller);
@@ -546,3 +606,25 @@ window.naraUpload = (function () {
     };
 
 })();
+window.naraLoadImage = async function (url, token) {
+    try {
+        const response = await fetch(url, {
+            headers: { 'Authorization': 'Bearer ' + token }
+        });
+
+        if (!response.ok) return null;
+
+        const blob = await response.blob();
+
+        // blob: URL مستقیم در src تگ img می‌نشیند. مرورگر خودش رمزگشایی
+        // می‌کند و برخلاف Base64، رشته‌ای از حافظه‌ی .NET رد نمی‌شود.
+        return URL.createObjectURL(blob);
+    } catch (e) {
+        console.error('[nara] image load failed:', e);
+        return null;
+    }
+};
+
+window.naraRevokeImage = function (objectUrl) {
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
+};

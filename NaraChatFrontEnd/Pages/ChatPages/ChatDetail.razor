@@ -57,6 +57,7 @@
         </MudCardHeader>
 
         @SearchPanel
+        @PinnedBanner
 
         <MudCardContent Class="flex-grow-1 p-0" Style="overflow-y:auto; width:100%; scrollbar-width: none;" data-scroll-container="true">
             <div id="mainchat"  @ref="_channelContainer" style="@ThemeCascading.backGroundChatStyle">
@@ -220,6 +221,7 @@ else if (SelectedGroup != null)
         </MudCardHeader>
 
         @SearchPanel
+        @PinnedBanner
 
         <MudCardContent Class="flex-grow-1 p-0" Style="overflow-y:auto; width:100%; scrollbar-width: none;" data-scroll-container="true">
             <div id="mainchat"  @ref="_channelContainer" style="@ThemeCascading.backGroundChatStyle">
@@ -398,6 +400,7 @@ else
     </MudCardHeader>
 
     @SearchPanel
+        @PinnedBanner
 
         <MudCardContent Class="flex-grow-1 p-0" Style="overflow-y:auto; width:100%;scrollbar-width: none;">
             <div id="mainchat" @ref="_chatContainer" style="@ThemeCascading.backGroundChatStyle">
@@ -700,6 +703,8 @@ else
                           ParentMessage="@HandelParentMessage(message)"
                           ParentSenderName="@HandelParentSender(message)"
                           OnParentClick="JumpToMessage"
+                          CanPin="@CanPin"
+                          TogglePinEvent="OnTogglePinRequested"
                           OtherAvatar="@OtherUser.avatar"
                           MessageReactionEvent="SendReactions"
                           JoinChannel="JoinToChannelEvent"></MessageComponent>
@@ -707,7 +712,8 @@ else
         else
         {
             <FileMessageComponent DeletedMessageevent="DeleteTargetMessage" IsMine="message.IsMine" CurrentUser="CurrentUser" message="message"
-                                  ReplyMessageEvent="HandleReplyMessage" Conversation="Conversation" EditMessageEvent="OnEditMessageHandler"
+                                 
+            ReplyMessageEvent="HandleReplyMessage" Conversation="Conversation" EditMessageEvent="OnEditMessageHandler"
                                   ParentMessage="@HandelParentMessage(message)"></FileMessageComponent>
         }
     </div>;
@@ -722,19 +728,23 @@ else
         {
             <GroupMessageComponent DeletedMessageevent="DeleteTargetMessage" IsMine="message.IsMine" CurrentUser="CurrentUser" message="message"
                                    ReplyMessageEvent="HandleReplyMessage" Conversation="Conversation" EditMessageEvent="OnEditMessageHandler"
-                               
+                               CanPin="@CanPin"
+                               TogglePinEvent="OnTogglePinRequested"
                                ParentMessage="@HandelParentMessage(message)"
                                ParentSenderName="@HandelParentSender(message)"
                                    Adminlist="@SelectedGroup.channel.admins"
                                    CreateorId="@SelectedGroup.channel.CreatorId"
                                    GroupId="@SelectedGroup.Id"
                                    MessageReactionEvent="SendReactions"
-                                   JoinChannel="JoinToChannelEvent"></GroupMessageComponent>
+                                   JoinChannel="JoinToChannelEvent"
+                                   ></GroupMessageComponent>
         }
         else
         {
             <FileGroupMessageComponent DeletedMessageevent="DeleteTargetMessage" IsMine="message.IsMine" CurrentUser="CurrentUser" message="message"
                                        ReplyMessageEvent="HandleReplyMessage" Conversation="Conversation" EditMessageEvent="OnEditMessageHandler"
+                                   CanPin="@CanPin"
+                                   TogglePinEvent="OnTogglePinRequested"
                                        ParentMessage="@HandelParentMessage(message)"
                                        Adminlist="@SelectedGroup.channel.admins"
                                        CreateorId="@SelectedGroup.channel.CreatorId"
@@ -776,7 +786,8 @@ else
         {
             <ChannelMessageComponent DeletedMessageevent="DeleteTargetMessage" CurrentUser="CurrentUser" message="message"
                                      ReplyMessageEvent="HandleReplyMessage" EditMessageEvent="OnEditMessageHandler"
-                                 
+                                 CanPin="@CanPin"
+                                 TogglePinEvent="OnTogglePinRequested"
                                  ParentMessage="@HandelParentMessage(message)"
                                  ParentSenderName="@HandelParentSender(message)"
                                      SelectedChannel="SelectedChannel"></ChannelMessageComponent>
@@ -787,5 +798,38 @@ else
                                          ReplyMessageEvent="HandleReplyMessage" Conversation="Conversation" EditMessageEvent="OnEditMessageHandler"
                                          ParentMessage="@HandelParentMessage(message)"></ChannelFileMessageComponent>
         }
+    </div>;
+    private RenderFragment PinnedBanner =>
+    @<div>
+        @if (ActivePin is not null)
+    {
+        <div style="display: flex; align-items: center; gap: 8px; padding: 6px 12px;
+                        border-bottom: 1px solid var(--mud-palette-lines-default);
+                        cursor: pointer; flex-shrink: 0;"
+             @onclick="GoToPinned">
+
+            <MudIcon Icon="@Icons.Material.Filled.PushPin" Size="Size.Small" Color="Color.Primary" />
+
+            <div style="flex-grow: 1; min-width: 0;">
+                <MudText Typo="Typo.caption" Color="Color.Primary">
+                    <b>پیام سنجاق‌شده</b>
+                    @if (_pinned.Count > 1)
+                {
+                    <span> (@(_pinnedIndex + 1) از @_pinned.Count)</span>
+                }
+                </MudText>
+                <MudText Typo="Typo.body2" Class="text-truncate">@PinPreview(ActivePin)</MudText>
+            </div>
+
+            @if (CanPin)
+        {
+            <span @onclick:stopPropagation="true">
+                <MudIconButton Icon="@Icons.Material.Filled.Close"
+                               Size="Size.Small"
+                               OnClick="@(() => TogglePinMessage(ActivePin.Id, false))" />
+            </span>
+        }
+        </div>
+    }
     </div>;
 }

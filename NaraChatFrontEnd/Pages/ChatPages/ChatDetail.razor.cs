@@ -28,6 +28,8 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
     private bool _isLoadingOlder;
     [Parameter] public EventCallback<Guid> OnChatDeleted { get; set; }
     public int UploadPercent { get; set; }
+    private List<PinnedMessageDto> _pinned = new();
+    private int _pinnedIndex = 0;
     public string UploadSizeText { get; set; } = string.Empty;
     private string? _activeUploadHandle;
     [CascadingParameter(Name = "Theme")] public ThemeChanging ThemeCascading { get; set; }
@@ -149,7 +151,7 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
     // اگر لازم بود:
     [Parameter] public EventCallback<UserDto?> GoToSettingInMobile { get; set; }
     [Parameter] public EventCallback<string> joinchannelevent { get; set; }
-
+    [Parameter] public Guid? PinChangedScopeId { get; set; }
     public int MessageCount { get; set; } = 15;
     public bool IsloadedOldMessages { get; set; } = false;
 
@@ -229,14 +231,22 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
         while (value >= 1024 && unit < units.Length - 1) { value /= 1024; unit++; }
         return $"{value:0.#} {units[unit]}";
     }
+    private async Task OnTogglePinRequested((Guid MessageId, bool Pin) request)
+    {
+        await TogglePinMessage(request.MessageId, request.Pin);
+    }
     protected override async Task OnParametersSetAsync()
     {
 
         if (isProcessing) return;
         isProcessing = true;
-
-        try
+        if (PinChangedScopeId is not null && PinChangedScopeId == CurrentScopeId)
         {
+            PinChangedScopeId = null;
+            await LoadPinnedAsync();
+        }
+        try
+            {
             HandleDeletedMessage();
             await HandleClearedHistory();
             await HandleReactionAsync();
@@ -1261,7 +1271,59 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
     #endregion
 
     #region handlers pack
+    private Guid? CurrentScopeId =>
+    SelectedChannel?.Id ?? SelectedGroup?.Id ?? Conversation?.id;
+    private async Task LoadPinnedAsync()
+    {
+        if (CurrentScopeId is null) return;
 
+        _pinned = await messageService.GetPinnedMessages(CurrentScopeId.Value) ?? new();
+        _pinnedIndex = 0;
+        StateHasChanged();
+    }
+    public async Task TogglePinMessage(Guid messageId, bool pin)
+    {
+        var (ok, message) = await messageService.TogglePin(messageId, pin);
+
+        if (!ok)
+        {
+            ErrorMessage(message);
+            return;
+        }
+
+        snackbar.Add(message, Severity.Success);
+        await LoadPinnedAsync();
+    }
+
+
+    // کلیک روی نوار پین — از همان JumpToMessage جستجو استفاده می‌کند
+    private async Task GoToPinned()
+    {
+        if (ActivePin is null) return;
+
+        var target = ActivePin.Id;
+
+        // اگر چند پین داریم، هر کلیک به بعدی می‌رود — رفتار تلگرام
+        if (_pinned.Count > 1)
+            _pinnedIndex = (_pinnedIndex + 1) % _pinned.Count;
+
+        await JumpToMessage(target);
+    }
+
+    private string PinPreview(PinnedMessageDto pin)
+    {
+        if (!string.IsNullOrWhiteSpace(pin.Content))
+            return pin.Content.Length > 70 ? pin.Content[..70] + "…" : pin.Content;
+
+        return pin.FileName ?? "پیوست";
+    }
+    /// <summary>فقط مدیران می‌توانند پین کنند. در چت خصوصی هر دو طرف.</summary>
+    private bool CanPin =>
+        (SelectedChannel is null && SelectedGroup is null && Conversation is not null)
+        || CanManageCurrentChat;
+
+    private PinnedMessageDto? ActivePin =>
+        _pinned.Count > 0 && _pinnedIndex < _pinned.Count ? _pinned[_pinnedIndex] : null;
     private void HandleDeletedMessage()
     {
         if (DeletedMessageId != null)

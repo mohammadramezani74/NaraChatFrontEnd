@@ -45,6 +45,7 @@
                         <MudItem xs="12" Class="h-100 d-flex px-0">
                             <ChatDetail @key="ThemeChanging.IsShowSetting"
                             OtherUser="OtherUser"
+                                        PinChangedScopeId="PinChangedScopeId"
                                         OnChatDeleted="HandleChatDeleted"
                             ClearedHistoryId="ClearedHistoryId"
                             OnHistoryCleared="NullClearedHistory"
@@ -118,6 +119,7 @@
                     <MudItem xs="12" sm="@( ThemeChanging.IsShowSetting ? 6 : 9)" Class="h-100 d-flex px-0">
                         <ChatDetail @key="ThemeChanging.IsShowSetting"
                         OtherUser="OtherUser"
+                                    PinChangedScopeId="PinChangedScopeId"
                                     OnChatDeleted="HandleChatDeleted"
                         ClearedHistoryId="ClearedHistoryId"
                         OnHistoryCleared="NullClearedHistory"
@@ -269,7 +271,7 @@
     public UserDto? SelectedGroup = null;
     public Guid? ClearedHistoryId { get; set; }
     public int ChannelCount { get; set; }
-
+    public Guid? PinChangedScopeId { get; set; }
 
     public async Task HandleBackToUserListMobile(){
         gotoDetailByMobile = false;
@@ -492,7 +494,12 @@
     ClearedHistoryId = id;
     StateHasChanged();
     });
-
+    hubConnection.On<Guid, Guid, bool>(nameof(IChatHubClient.MessagePinChanged),
+        (scopeId, messageId, pinned) =>
+    {
+        PinChangedScopeId = scopeId;
+        StateHasChanged();
+    });
         hubConnection.On<Guid>(nameof(IChatHubClient.OnlineUserList), (channelId) =>
        {
            var selectedChannel = Users.Where(x => x.Id == channelId).FirstOrDefault();

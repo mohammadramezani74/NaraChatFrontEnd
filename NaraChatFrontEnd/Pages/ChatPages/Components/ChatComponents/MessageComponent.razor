@@ -22,22 +22,22 @@
                     <p style="text-align: right; color:gray;font-size: 10px;"><small> @(message.IsMine ? myName : OtherName) </small></p>
 
                     <!-- ریپلای نمایش -->
-           @if (ParentMessage != null)
-{
-    <MudPaper Class="reply-preview px-2 py-1 mb-1"
-              style="@($"{replyColor()}; max-width: 100%; box-sizing: border-box; cursor: pointer;")"
-              @onclick="GoToParent">
+                    @if (ParentMessage != null)
+                    {
+                        <MudPaper Class="reply-preview px-2 py-1 mb-1"
+                        style="@($"{replyColor()}; max-width: 100%; box-sizing: border-box; cursor: pointer;")"
+                        @onclick="GoToParent">
 
-        <MudText Class="text-truncate"
-                 Style="text-align: right; color:gray; font-size: 10px; padding-bottom: 6px;">
-            @(ParentSenderName ?? (IsMine ? OtherName : CurrentUser.Name))
-        </MudText>
+                            <MudText Class="text-truncate"
+                            Style="text-align: right; color:gray; font-size: 10px; padding-bottom: 6px;">
+                                @(ParentSenderName ?? (IsMine ? OtherName : CurrentUser.Name))
+                            </MudText>
 
-        <MudText Class="text-truncate" Style="font-size: 12px;">
-            @ParentMessage.TruncateMessage()
-        </MudText>
-    </MudPaper>
-}
+                            <MudText Class="text-truncate" Style="font-size: 12px;">
+                                @ParentMessage.TruncateMessage()
+                            </MudText>
+                        </MudPaper>
+                    }
 
                     <MudText id="@message.Id" Color="Color.Default" >
                         @if (IsMention(message.Content))
@@ -87,7 +87,12 @@
                         @onmouseenter="@(() => _paperHovering = true)"
                         @onmouseleave="@(() => HoverStop("paper"))">
                             <div class="d-flex" style="width: 100%;" @onclick:stopPropagation="true" @onclick:preventDefault="true">
-
+                            @if (CanPin)
+{
+    <MudTooltip Text="@(message.IsPinned ? "برداشتن سنجاق" : "سنجاق کردن")">
+        <span class="emoji" @onclick="()=>TogglePin(message)">📌</span>
+    </MudTooltip>
+}
                                 <MudTooltip Text="رونوشت">
                                     <span class="emoji" @onclick="()=>copyMessage(message)">📝</span>
                                 </MudTooltip>
@@ -306,7 +311,11 @@
     private bool showContextMenu = false;
     private Guid? showContextMenuForMessageId = null;
     private int contextMenuX;
-    private int contextMenuY;
+   [Parameter]
+public bool CanPin { get; set; }
+
+[Parameter]
+public EventCallback<(Guid MessageId, bool Pin)> TogglePinEvent { get; set; }    private int contextMenuY;
     public string? myAvatar { get; set; }
     [Parameter]
     public string? OtherAvatar { get; set; }
@@ -424,6 +433,7 @@ private Task GoToParent()
         );
         return withLinks;
     }
+
     public async Task PerformDeleteMessageAsync(Guid MessageId){
         var otherId= Conversation.users.Where(c => c.Id != CurrentUser.Id).FirstOrDefault()!.Id;
         var result=  await _messageservice.DeleteMessageAsync(MessageId, otherId);
@@ -457,7 +467,11 @@ private Task GoToParent()
         _bubbleHovering = true;
         _hoverMessage = message;
     }
-
+    private async Task TogglePin(ChatMessageDto message)
+{
+    HoverStop("click");   // پاپ‌اور را ببند، مثل بقیه‌ی اقدامات
+    await TogglePinEvent.InvokeAsync((message.Id, !message.IsPinned));
+}
     private void HoverStop(string typeOfStop)
     {
         try

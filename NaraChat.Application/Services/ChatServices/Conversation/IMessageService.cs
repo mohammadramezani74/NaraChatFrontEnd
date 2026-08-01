@@ -34,5 +34,10 @@ namespace NaraChat.Application.Services.ChatServices.Conversation
             Guid messageId,
             int take = 20,
             CancellationToken cancellationToken = default);
+        Task<(bool status, string message)> TogglePin(
+    Guid messageId, bool pin, CancellationToken cancellationToken = default);
+
+        Task<List<PinnedMessageDto>?> GetPinnedMessages(
+            Guid scopeId, CancellationToken cancellationToken = default);
     }
 }

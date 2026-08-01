@@ -4,6 +4,7 @@
 @inject IJSRuntime JS
 @inject IMessageService _messageservice
 @inject ITokenService tokenservice
+@implements IAsyncDisposable
 
                 @if (message.FileContent != null)
                 {
@@ -15,7 +16,7 @@
                             ObjectFit="ObjectFit.Cover"
                             Height="250"
                             Width="300"
-                            Src="@(ImageData!=null?$"data:image/png;base64, {ImageData}":@CurrentImageSrc)"
+                      Src="@(ImageObjectUrl ?? CurrentImageSrc)"
                             Elevation="25"
                             Class="rounded-lg" />
 
@@ -75,19 +76,21 @@
     public string? ImageData { get; set; } = null;
     private bool IsLoading = false;
     private string CurrentImageSrc = "lib/assets/Images/blured.jpg";
-  
+    public string? ImageObjectUrl { get; set; }
 
     public async Task LoadImage(Guid imageId)
     {
         IsLoading = true;
-        var message= await _messageservice.GetImageById(imageId);
-        if(message!=null){
-            ImageData = message.Data;
-            StateHasChanged();
-        }
-        ImageLoaded = true;
-        IsLoading = false;
+        StateHasChanged();
 
+        var token = await tokenservice.GetAccessTokenAsync();
+        var url = SiteSettings.ApiUrl + $"api/v1/chatfiles/{imageId}/files";
+
+        ImageObjectUrl = await JS.InvokeAsync<string?>("naraLoadImage", url, token);
+
+        ImageLoaded = ImageObjectUrl is not null;
+        IsLoading = false;
+        StateHasChanged();
     }
 
 }
@@ -101,6 +104,14 @@
 };
 
             await DialogService.ShowAsync<ImageDialogComponent>("نمایش تصویر", parameters);
+        }
+    }
+    public async ValueTask DisposeAsync()
+    {
+        if (ImageObjectUrl is not null)
+        {
+            try { await JS.InvokeVoidAsync("naraRevokeImage", ImageObjectUrl); }
+            catch (JSDisconnectedException) { }
         }
     }
 }
