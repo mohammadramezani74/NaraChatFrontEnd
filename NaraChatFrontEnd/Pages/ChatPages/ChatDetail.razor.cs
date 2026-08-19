@@ -1042,9 +1042,13 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
             SendAt = DateTime.Now,
             SenderName = CurrentUser!.Name,
             IsMine = true,
-            Content = NewMessage,
+            // NewMessage چند خط بالاتر خالی شده بود، پس اینجا همیشه رشته‌ی خالی
+            // به لیست می‌رفت و آخرین پیامِ خودم در لیست کناری بی‌متن می‌ماند.
+            Content = newMessage.Content,
             Type = 0,
             UserId = other.Id,
+            ScopeId = Conversation!.id,
+            ConversationType = ConversationType.Private,
             ParentId = ParentId,
         };
         await changeUserLastMessage.InvokeAsync(newMessageForUsers);
@@ -1396,14 +1400,22 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
     {
         if (NewIncomingMessage != null)
         {
-            var name = CurrentUser.Name;
-            NewIncomingMessage.Content = NewIncomingMessage.Content;
-         if(_messages.Any(x=>x.ConversationType==NewIncomingMessage.ConversationType))
-            _messages.Add(NewIncomingMessage);
+            // پیام فقط وقتی به این صفحه اضافه می‌شود که مال همین گفتگو باشد.
+            // شرط قبلی فقط *نوع* گفتگو را مقایسه می‌کرد، پس پیام یک گروه در
+            // گروهِ باز هم می‌نشست چون هر دو «گروه» بودند.
+            var belongsHere = CurrentScopeId is not null
+                              && NewIncomingMessage.ScopeId == CurrentScopeId.Value;
+
+            // تکراری نشود؛ ممکن است همین پیام از مسیر پیام‌های ازدست‌رفته هم آمده باشد
+            if (belongsHere && !_messages.Any(m => m.Id == NewIncomingMessage.Id))
+                _messages.Add(NewIncomingMessage);
+
             await IncommingMessageRecieved.InvokeAsync();
             NewIncomingMessage = null;
 
-            NeedScrollToBottom();
+            if (belongsHere)
+                NeedScrollToBottom();
+
             StateHasChanged();
         }
     }

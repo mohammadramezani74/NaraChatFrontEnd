@@ -532,90 +532,51 @@
        {
            try
            {
-               var sender = Users.FirstOrDefault(x => x.Id == messageDto.UserId);
+               // ردیف لیست کناری با کلید خودش پیدا می‌شود، نه با فرستنده:
+               //   خصوصی → کاربر مقابل (که از دید ما همان فرستنده است)
+               //   گروه و کانال → خود گفتگو
+               // قبلاً همیشه UserId استفاده می‌شد و برای پیام گروهی به ردیف چت
+               // خصوصیِ فرستنده می‌خورد؛ برای همین آخرین پیام روی کاربر اشتباه
+               // می‌نشست.
+               var isPrivate = messageDto.ConversationType == ConversationType.Private;
+               var rowId = isPrivate ? messageDto.UserId : messageDto.ScopeId;
 
-               if (sender == null)
+               var row = Users.FirstOrDefault(x => x.Id == rowId);
+
+               if (row == null)
                {
                    LoadScroll = true;
                    StateHasChanged();
                    return;
                }
 
-               var isGroup = SelectedGroup?.IsGroup == true;
-               var isChannel = sender.IsChannel;
+               // آیا این پیام مال همان گفتگویی است که الان باز است؟
+               // تصمیم بر اساس خود پیام گرفته می‌شود، نه بر اساس اینکه چه چیزی
+               // باز است — همان اشتباهی که پیام گروه دیگر را در گروه فعلی
+               // نشان می‌داد.
+               var openScopeId = SelectedChannel?.Id ?? SelectedGroup?.Id ?? Conversation?.id;
+               var isForOpenChat = openScopeId is not null && openScopeId == messageDto.ScopeId;
 
-               // =======================
-               // GROUP
-               // =======================
-               if (isGroup)
+               if (isForOpenChat)
                {
                    _newIncomingMessage = messageDto;
 
-                   if (sender.messageUnreadedCount > 0)
-                       sender.messageUnreadedCount--;
-
-                   if (!string.IsNullOrWhiteSpace(messageDto.Content))
-                   {
-                       var length =
-                           messageDto.Content.Length > 15
-                           ? 15
-                           : messageDto.Content.Length;
-
-                       SelectedGroup.LastReceivedMessage =
-                           messageDto.Content.Substring(0, length);
-
-                       if (messageDto.Content.Length > 15)
-                           SelectedGroup.LastReceivedMessage += "...";
-                   }
-
-                   SelectedGroup.LastReceivedMessageId =
-                       messageDto.Id;
+                   if (row.messageUnreadedCount > 0)
+                       row.messageUnreadedCount--;
                }
 
-               // =======================
-               // CHANNEL
-               // =======================
-               else if (isChannel)
+               // متن و زمان آخرین پیام همیشه به‌روز می‌شود، چه گفتگو باز باشد
+               // چه نباشد. LastMessageDate کلید مرتب‌سازی لیست است و قبلاً در
+               // مسیر دریافت اصلاً ست نمی‌شد، برای همین ترتیب لیست تکان نمی‌خورد.
+               row.LastReceivedMessage = (messageDto.Content ?? string.Empty).TruncateMessage();
+               row.LastReceivedMessageId = messageDto.Id;
+               row.IsLastReceivedMessageForMe = false;
+               row.LastMessageDate = messageDto.SendAt;
+               row.LastReceivedMessageSendDate = messageDto.SendAt.FormatPersianDate().ToPersianNumber();
+
+               if (!Users.Any(x => x.Id == row.Id))
                {
-                   if (SelectedChannel?.Id == messageDto.UserId)
-                   {
-                       _newIncomingMessage = messageDto;
-
-                       if (sender.messageUnreadedCount > 0)
-                           sender.messageUnreadedCount--;
-                   }
-                   else
-                   {
-                       sender.LastReceivedMessage =
-                           messageDto.Content;
-                   }
-               }
-
-               // =======================
-               // PRIVATE CHAT
-               // =======================
-               else
-               {
-                   SelectedGroup = null;
-                   
-                   if (OtherUser?.Id == messageDto.UserId)
-                   {
-                       _newIncomingMessage = messageDto;
-
-                       if (sender.messageUnreadedCount > 0)
-                           sender.messageUnreadedCount--;
-                   }
-                   else
-                   {
-                       sender.LastReceivedMessage =
-                           messageDto.Content;
-                   }
-               }
-
-               // اگر وجود نداشت اضافه کن
-               if (!Users.Any(x => x.Id == sender.Id))
-               {
-                   Users.Insert(0, sender);
+                   Users.Insert(0, row);
                }
 
                LoadScroll = true;

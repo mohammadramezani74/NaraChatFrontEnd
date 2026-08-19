@@ -630,8 +630,12 @@
         // 2) اعمال MissedMessageCount (با نال‌چک و امن در برابر تکراری‌ها)
         if (MissedMessageCount != null && MissedMessageCount.Count > 0)
         {
+            // با کلید ردیف گروه‌بندی می‌شود نه با فرستنده: پیام گروهی که با
+            // UserId گروه‌بندی شود روی ردیف چت خصوصیِ فرستنده می‌نشیند.
             var groupedMissed = MissedMessageCount
-                .GroupBy(m => m.UserId)
+                .GroupBy(m => m.ConversationType == ConversationType.Private
+                              ? m.UserId
+                              : m.ScopeId)
                 .ToDictionary(
                     g => g.Key,
                     g => new
@@ -660,6 +664,7 @@
 
                     targetUser.LastReceivedMessageSendDate = info.Last.SendAt.FormatPersianDate().ToPersianNumber();
                     targetUser.LastReceivedMessageId = info.Last.Id;
+                    targetUser.LastMessageDate = info.Last.SendAt;
                 }
             }
 
@@ -670,6 +675,8 @@
         // 3) پیام تازه‌ی ورودی از هاب/سرور
         if (newIncomingMessage != null)
         {
+            // این مسیر فقط برای پیامی است که خودم فرستاده‌ام؛ فرستنده‌ی آن
+            // UserId را از قبل برابر شناسه‌ی ردیف می‌گذارد.
             var user = Users.FirstOrDefault(x => x.Id == newIncomingMessage.UserId);
             if (user != null)
             {
@@ -677,6 +684,7 @@
                 user.LastReceivedMessageId = newIncomingMessage.Id;
                 user.IsLastReceivedMessageForMe = newIncomingMessage.IsMine;
                 user.LastReceivedMessageSendDate = newIncomingMessage.SendAt.FormatPersianDate().ToPersianNumber();
+                user.LastMessageDate = newIncomingMessage.SendAt;
             }
 
             await NullIncommengMessage.InvokeAsync();
