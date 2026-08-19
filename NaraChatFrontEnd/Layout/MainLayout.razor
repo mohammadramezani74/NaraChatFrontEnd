@@ -85,7 +85,9 @@
                 <MudSpacer />
                 <MudIconButton @onclick="Logout" title="خروج"  Icon="@Icons.Material.Filled.ExitToApp" Color=" Color.Error" />
                 <MudIconButton @onclick="DarkModel" title="@(IsDarkMode?"تم لایت":"تم دارک")" Icon="@(IsDarkMode? @Icons.Material.Filled.LightMode:@Icons.Material.Filled.DarkMode)" Color="@(IsDarkMode?Color.Warning:Color.Default)" />
-
+               @*  <MudIconButton Icon="@Icons.Material.Outlined.Info" *@
+               @* Size="Size.Small" *@
+               @* OnClick="ShowAbout" /> *@
                 <MudMenu Disabled="@(CurrentUser==null)" Icon="@Icons.Material.Filled.MoreVert" 
                 AriaLabel="Open user menu"> 
                     @* <MudIconButton @onclick="RouteToDownload"  title="اپ اندروید ناراگرام"  Icon="@Icons.Material.Filled.Android" Color=" Color.Tertiary" />  *@
@@ -129,6 +131,17 @@
     }
 </style>
 @code {
+
+private async Task ShowAbout()
+{
+    await DialogService.ShowAsync<AboutDialog>(string.Empty,
+        new DialogOptions
+        {
+            MaxWidth = MaxWidth.ExtraSmall,
+            FullWidth = true,
+            CloseButton = true
+        });
+}
     public void RouteToDownload()
     {
         Nav.NavigateTo("https://sanaapi.irannara.com/source/naragram.apk");

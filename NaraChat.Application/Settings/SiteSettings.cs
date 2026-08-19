@@ -9,7 +9,7 @@ namespace NaraChat.Application.Settings
     public static class SiteSettings
     {
 
-  //public const string ApiUrl = "https://narachatapi.irannara.com/";
+ //public const string ApiUrl = "https://narachatapi.irannara.com/";
       //  public const string ApiUrl = "https://shattest.irannara.com/";
     public const string ApiUrl = "https://localhost:7194/";
 

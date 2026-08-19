@@ -9,7 +9,7 @@ namespace NaraChat.Application.Services;
 public class VersionCheckService
 {
     private readonly IJSRuntime _js;
-    private const string baseversion = "1.2.4";
+    private const string baseversion = "1.4.1";
     public string? LatestVersion { get; private set; }
 
     public VersionCheckService( IJSRuntime js)

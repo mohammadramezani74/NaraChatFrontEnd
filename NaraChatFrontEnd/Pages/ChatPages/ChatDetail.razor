@@ -712,8 +712,9 @@ else
         else
         {
             <FileMessageComponent DeletedMessageevent="DeleteTargetMessage" IsMine="message.IsMine" CurrentUser="CurrentUser" message="message"
-                                 
-            ReplyMessageEvent="HandleReplyMessage" Conversation="Conversation" EditMessageEvent="OnEditMessageHandler"
+                              CanPin="@CanPin"
+                              TogglePinEvent="OnTogglePinRequested"
+                              ReplyMessageEvent="HandleReplyMessage" Conversation="Conversation" EditMessageEvent="OnEditMessageHandler"
                                   ParentMessage="@HandelParentMessage(message)"></FileMessageComponent>
         }
     </div>;
@@ -728,10 +729,10 @@ else
         {
             <GroupMessageComponent DeletedMessageevent="DeleteTargetMessage" IsMine="message.IsMine" CurrentUser="CurrentUser" message="message"
                                    ReplyMessageEvent="HandleReplyMessage" Conversation="Conversation" EditMessageEvent="OnEditMessageHandler"
-                               CanPin="@CanPin"
-                               TogglePinEvent="OnTogglePinRequested"
-                               ParentMessage="@HandelParentMessage(message)"
-                               ParentSenderName="@HandelParentSender(message)"
+                                   CanPin="@CanPin"
+                                   TogglePinEvent="OnTogglePinRequested"
+                                   ParentMessage="@HandelParentMessage(message)"
+                                   ParentSenderName="@HandelParentSender(message)"
                                    Adminlist="@SelectedGroup.channel.admins"
                                    CreateorId="@SelectedGroup.channel.CreatorId"
                                    GroupId="@SelectedGroup.Id"
@@ -785,17 +786,21 @@ else
         @if (message.Type == MessageType.Text || message.Type == MessageType.Location)
         {
             <ChannelMessageComponent DeletedMessageevent="DeleteTargetMessage" CurrentUser="CurrentUser" message="message"
-                                     ReplyMessageEvent="HandleReplyMessage" EditMessageEvent="OnEditMessageHandler"
+                                 ReplyMessageEvent="HandleReplyMessage" EditMessageEvent="OnEditMessageHandler"
                                  CanPin="@CanPin"
                                  TogglePinEvent="OnTogglePinRequested"
                                  ParentMessage="@HandelParentMessage(message)"
                                  ParentSenderName="@HandelParentSender(message)"
-                                     SelectedChannel="SelectedChannel"></ChannelMessageComponent>
+                                 SelectedChannel="SelectedChannel"></ChannelMessageComponent>
         }
         else
         {
             <ChannelFileMessageComponent DeletedMessageevent="DeleteTargetMessage" IsMine="message.IsMine" CurrentUser="CurrentUser" message="message"
-                                         ReplyMessageEvent="HandleReplyMessage" Conversation="Conversation" EditMessageEvent="OnEditMessageHandler"
+                                     CanPin="@CanPin"
+                                     TogglePinEvent="OnTogglePinRequested"
+                                     ReplyMessageEvent="HandleReplyMessage"
+                                     Conversation="Conversation" 
+                                     EditMessageEvent="OnEditMessageHandler"
                                          ParentMessage="@HandelParentMessage(message)"></ChannelFileMessageComponent>
         }
     </div>;

@@ -587,6 +587,8 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
 
     private async Task LoadMesages()
     {
+        _pinned.Clear();
+        _pinnedIndex = 0;
         _messages.Clear();
         _oldestCursor = null;
         _hasMoreOlder = true;
@@ -615,6 +617,7 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
 
         if (OtherUser != null && _drafts.TryGetValue(OtherUser.Id, out var draft))
             NewMessage = draft;
+        await LoadPinnedAsync();
     }
 
 
@@ -682,7 +685,8 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
     public async Task LoadChannelMesages(int count = 15)
     {
         _messages.Clear();
-
+        _pinned.Clear();           
+        _pinnedIndex = 0;
 
 
         var messages = await _channelservice.LoadChannelMessages(SelectedChannel!.Id, count);
@@ -700,11 +704,13 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
         }
         if (_drafts.TryGetValue(SelectedChannel.Id, out var draft))
             NewMessage = draft;
+        await LoadPinnedAsync();
     }
     public async Task LoadGroupMesages(int count = 15)
     {
         _messages.Clear();
-
+        _pinned.Clear();           // ← جدید
+        _pinnedIndex = 0;
 
 
         var messages = await chatService.LoadGroupMessages(SelectedGroup!.Id, count);
@@ -733,6 +739,7 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
         if (_drafts.TryGetValue(SelectedGroup.Id, out var draft))
             NewMessage = draft;
         Loading = false;
+        await LoadPinnedAsync();
     }
 
 
@@ -1271,8 +1278,17 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
     #endregion
 
     #region handlers pack
-    private Guid? CurrentScopeId =>
-    SelectedChannel?.Id ?? SelectedGroup?.Id ?? Conversation?.id;
+    private Guid? CurrentScopeId
+    {
+        get
+        {
+           
+            if (SelectedChannel is not null) return SelectedChannel.Id;
+            if (SelectedGroup is not null) return SelectedGroup.Id;
+            if (OtherUser is not null) return Conversation?.id;
+            return null;
+        }
+    }
     private async Task LoadPinnedAsync()
     {
         if (CurrentScopeId is null) return;

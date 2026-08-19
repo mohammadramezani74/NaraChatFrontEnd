@@ -1,0 +1,116 @@
+﻿<MudDialog>
+    <TitleContent>
+        <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Outlined.Badge" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">شناسنامه محصول</MudText>
+        </MudStack>
+    </TitleContent>
+
+    <DialogContent>
+
+        @* ---------- سربرگ ---------- *@
+        <MudStack AlignItems="AlignItems.Center" Spacing="1" Class="pb-3">
+            <MudImage Src="lib/assets/Images/logo.png"
+                      Width="56" Height="56"
+                      Style="border-radius: 12px;" />
+
+            <MudText Typo="Typo.h6" Class="mt-2">ناراگرام</MudText>
+
+            <MudText Typo="Typo.caption" Style="color: gray;">
+                سامانه پیام‌رسان داخلی سازمان
+            </MudText>
+
+            <MudChip T="string"
+                     Size="Size.Small"
+                     Variant="Variant.Text"
+                     Color="Color.Primary"
+                     Class="mt-1">
+                نسخه @Version
+            </MudChip>
+        </MudStack>
+
+        <MudDivider />
+
+        @* ---------- مشخصات فنی ---------- *@
+        <MudSimpleTable Dense="true" Hover="false" Bordered="false" Striped="false" Class="mt-2">
+            <tbody>
+                @foreach (var row in Specs)
+                {
+                    <tr>
+                        <td style="color: gray; font-size: 12px; width: 42%; padding: 6px 8px;">
+                            @row.Key
+                        </td>
+                        <td style="font-size: 12px; padding: 6px 8px;">
+                            @row.Value
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </MudSimpleTable>
+
+        <MudDivider Class="my-2" />
+
+        @* ---------- امکانات ---------- *@
+        <MudText Typo="Typo.caption" Style="color: gray;" Class="px-2">امکانات</MudText>
+
+        <div class="d-flex flex-wrap gap-1 px-2 py-2">
+            @foreach (var feature in Features)
+            {
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@feature</MudChip>
+            }
+        </div>
+
+        <MudDivider Class="my-2" />
+
+        @* ---------- پدیدآورنده ---------- *@
+        <MudStack AlignItems="AlignItems.Center" Spacing="0" Class="py-2">
+            <MudText Typo="Typo.caption" Style="color: gray;">
+                طراحی و توسعه
+            </MudText>
+            <MudText Typo="Typo.body2">محمد رمضانی</MudText>
+            <MudText Typo="Typo.caption" Style="color: gray;" Class="mt-1">
+                @BuildYear
+            </MudText>
+        </MudStack>
+
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Close">بستن</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    // با هر انتشار این‌ها را به‌روز کن
+    private const string Version = "1.4.0";
+    private const string BuildDate = "۱۴۰۵/۰۵/۱۰";
+    private const string BuildYear = "۱۴۰۵";
+
+    private static readonly Dictionary<string, string> Specs = new()
+        {
+            ["نوع سامانه"] = "پیام‌رسان تحت وب",
+            ["معماری"] = "Clean Architecture",
+            ["سمت کاربر"] = "Blazor WebAssembly",
+            ["سمت سرور"] = "ASP.NET Core 9 · Web API",
+            ["ارتباط بلادرنگ"] = "SignalR",
+            ["پایگاه داده"] = "SQL Server",
+            ["تاریخ انتشار"] = BuildDate
+        };
+
+    private static readonly string[] Features =
+    {
+        "گفتگوی خصوصی",
+        "گروه",
+        "کانال",
+        "ارسال فایل",
+        "پیام صوتی",
+        "جستجوی پیام",
+        "سنجاق پیام",
+        "اعلان لحظه‌ای"
+    };
+
+    private void Close() => MudDialog.Close();
+}

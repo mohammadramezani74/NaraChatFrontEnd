@@ -194,12 +194,7 @@
                             <MudTooltip Text="رونوشت">
                                 <span class="emoji" @onclick="()=>copyMessage(message)">📝</span>
                             </MudTooltip>
-                            @if (CanPin)
-                            {
-                                <MudTooltip Text="@(message.IsPinned ? "برداشتن سنجاق" : "سنجاق کردن")">
-                                    <span class="emoji" @onclick="()=>TogglePin(message)">📌</span>
-                                </MudTooltip>
-                            }
+                          
                             @if (AmIAdmin() || AmICreator())
                             {
                                 if (AmICreator())
@@ -242,6 +237,12 @@
                                       
                                     }
                                 }
+                            }
+                            @if (CanPin)
+                            {
+                                <MudTooltip Text="@(message.IsPinned ? "برداشتن سنجاق" : "سنجاق کردن")">
+                                    <span class="emoji" @onclick="()=>TogglePin(message)">📌</span>
+                                </MudTooltip>
                             }
                         </div>
                     </MudPopover>

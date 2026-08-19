@@ -815,6 +815,7 @@
         {
             LoadScroll = true;
             SelectedChannel = user;
+            SelectedGroup = null;
             _selectedUser = null;
             OtherUser = null;
             var count = await channelService.GetChannelMembers(SelectedChannel.Id);

@@ -152,6 +152,12 @@
                             <MudTooltip Text="حذف">
                                 <span class="emoji" @onclick="()=>DeleteMessagePopUp(message.Id)">❌</span>
                             </MudTooltip>
+                            @if (CanPin)
+                            {
+                                <MudTooltip Text="@(message.IsPinned ? "برداشتن سنجاق" : "سنجاق کردن")">
+                                    <span class="emoji" @onclick="()=>TogglePin(message)">📌</span>
+                                </MudTooltip>
+                            }
                         </div>
                     </MudPopover>
                 }
@@ -171,6 +177,12 @@
                             <MudTooltip Text="رونوشت">
                                 <span class="emoji" @onclick="()=>copyMessage(message)">📝</span>
                             </MudTooltip>
+                            @if (CanPin)
+                            {
+                                <MudTooltip Text="@(message.IsPinned ? "برداشتن سنجاق" : "سنجاق کردن")">
+                                    <span class="emoji" @onclick="()=>TogglePin(message)">📌</span>
+                                </MudTooltip>
+                            }
                         </div>
                     </MudPopover>
                 }
@@ -299,7 +311,17 @@
         myName = me?.Name;
         OtherName = other?.Name;
     }
-  
+    [Parameter]
+    public bool CanPin { get; set; }
+
+    [Parameter]
+    public EventCallback<(Guid MessageId, bool Pin)> TogglePinEvent { get; set; }
+
+    private async Task TogglePin(ChatMessageDto message)
+    {
+        HoverStop("click");
+        await TogglePinEvent.InvokeAsync((message.Id, !message.IsPinned));
+    }
         private string FormatMessage(string? content)
         {
             if (string.IsNullOrEmpty(content))
