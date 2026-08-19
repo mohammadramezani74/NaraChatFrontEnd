@@ -102,9 +102,12 @@
                 }
 
            
-                <MudText id="@message.Id" Color="Color.Default" Style="margin-top: 10px; font-size: 14px; text-align: right; ">
-                    @((MarkupString)message.Content.Replace("\n", "<br />"))
-                </MudText>
+              @if (!string.IsNullOrEmpty(message.Content))
+{
+    <MudText id="@message.Id" Color="Color.Default" Style="margin-top: 10px; font-size: 14px; text-align: right; ">
+        @((MarkupString)message.Content.Replace("\n", "<br />"))
+    </MudText>
+}
 
 
 
