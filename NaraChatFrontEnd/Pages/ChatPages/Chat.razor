@@ -550,12 +550,11 @@
                    return;
                }
 
-               // آیا این پیام مال همان گفتگویی است که الان باز است؟
-               // تصمیم بر اساس خود پیام گرفته می‌شود، نه بر اساس اینکه چه چیزی
-               // باز است — همان اشتباهی که پیام گروه دیگر را در گروه فعلی
-               // نشان می‌داد.
-               var openScopeId = SelectedChannel?.Id ?? SelectedGroup?.Id ?? Conversation?.id;
-               var isForOpenChat = openScopeId is not null && openScopeId == messageDto.ScopeId;
+               // این سه همیشه انحصاری‌اند: OnOtherUserSelected دو تای دیگر را
+               // null می‌کند. با همان rowId مقایسه می‌شود تا هر دو طرف یک
+               // معیار داشته باشند.
+               var openRowId = (SelectedChannel ?? SelectedGroup ?? OtherUser)?.Id;
+               var isForOpenChat = openRowId is not null && openRowId == rowId;
 
                if (isForOpenChat)
                {

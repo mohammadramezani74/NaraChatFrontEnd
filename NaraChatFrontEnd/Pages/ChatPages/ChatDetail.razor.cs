@@ -48,6 +48,10 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
     private DotNetObjectReference<ChatDetail>? objRef;
     private DotNetObjectReference<ChatDetail>? objRef2;
 
+    // درگ‌اند‌دراپ روی صفحه‌ی چت
+    private DotNetObjectReference<ChatDetail>? dropRef;
+    private Guid? _chatDropScope;
+
     public bool IsUploading { get; set; } = false;
     public UserAvatar Avatars { get; set; } = new();
 
@@ -303,6 +307,57 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
                 await js.InvokeVoidAsync("scrollToBottom", 1);
             await MarkVisibleIncomingAsSeenAsync();
         }
+        await EnsureChatDropZoneAsync();
+    }
+    /// <summary>
+    /// درگ‌اند‌دراپ روی خود صفحه‌ی چت. تا قبل از این فقط داخل دیالوگ آپلود
+    /// وجود داشت، ولی کاربر طبیعتاً فایل را روی پنجره‌ی چت می‌کشد؛ چون یک
+    /// listener سراسری در site.js رفتار پیش‌فرض مرورگر را هم می‌گیرد، رها
+    /// کردن فایل هیچ اتفاقی نمی‌افتاد و به نظر می‌رسید قابلیت وجود ندارد.
+    /// </summary>
+    private async Task EnsureChatDropZoneAsync()
+    {
+        // با هر بار عوض شدن گفتگو دوباره نصب می‌شود: سه هدر چت در شاخه‌های
+        // جدا رندر می‌شوند و عنصر با سوئیچ بین خصوصی و گروه و کانال عوض
+        // می‌شود. init در سمت JS اگر قبلاً نصب شده باشد اول پاکش می‌کند،
+        // پس تکرارش بی‌ضرر است.
+        if (_chatDropScope == CurrentScopeId) return;
+
+        dropRef ??= DotNetObjectReference.Create(this);
+
+        if (await Uploader.InitDropZoneAsync("mainchat", dropRef))
+            _chatDropScope = CurrentScopeId;
+    }
+
+    /// <summary>
+    /// از JS صدا زده می‌شود وقتی فایلی روی صفحه‌ی چت رها شود. دیالوگ آپلود را
+    /// با همان فایل باز می‌کند تا کاربر فقط کپشن بنویسد و بفرستد.
+    /// </summary>
+    [JSInvokable]
+    public async Task OnFileDropped(BrowserFileHandle handle)
+    {
+        var parameters = new DialogParameters<UploadDialogComponent>
+        {
+            { x => x.PresetHandle, handle }
+        };
+
+        var dialog = await DialogService.ShowAsync<UploadDialogComponent>(string.Empty, parameters);
+        var result = await dialog.Result;
+
+        if (result.Canceled || result.Data is not UploadDialogComponent.UploadResult r)
+        {
+            // فایل رهاشده در رجیستری JS مانده؛ اگر آپلود نشد آزادش کن
+            await Uploader.ReleaseAsync(handle.Handle);
+            return;
+        }
+
+        // به همان مسیری می‌رود که دکمه‌ی آپلود همان نوع گفتگو می‌رفت
+        if (SelectedChannel is not null)
+            await UploadChannelFileWithProgress(r.Handle, r.Caption ?? string.Empty);
+        else if (SelectedGroup is not null)
+            await UploadGroupFileWithProgress(r.Handle, r.Caption ?? string.Empty);
+        else if (Conversation is not null)
+            await UploadFileWithProgress(r.Handle, r.Caption ?? string.Empty);
     }
 
     public async ValueTask DisposeAsync()
@@ -319,9 +374,13 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
 
             try { await js.InvokeVoidAsync("disposeScrollListener", _chatContainer); } catch { /* ignore */ }
 
+            try { await Uploader.DisposeDropZoneAsync("mainchat"); } catch { /* ignore */ }
+
             objRef?.Dispose();
 
             objRef2?.Dispose();
+
+            dropRef?.Dispose();
         }
         catch { /* ignore */ }
     }

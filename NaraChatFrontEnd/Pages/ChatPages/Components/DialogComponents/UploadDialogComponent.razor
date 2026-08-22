@@ -96,6 +96,12 @@
     [CascadingParameter]
     private IMudDialogInstance MudDialog { get; set; } = default!;
 
+    /// <summary>
+    /// فایلی که کاربر قبلاً روی خود صفحه‌ی چت رها کرده. اگر مقدار داشته باشد
+    /// دیالوگ با همان فایل باز می‌شود و کاربر فقط کپشن می‌نویسد.
+    /// </summary>
+    [Parameter] public BrowserFileHandle? PresetHandle { get; set; }
+
     public class Model
     {
         public IReadOnlyList<IBrowserFile>? Files { get; set; } = new List<IBrowserFile>();
@@ -125,16 +131,39 @@
     private string? _selectedName;
 
     private DotNetObjectReference<UploadDialogComponent>? _selfRef;
+    private bool _dropZoneReady;
 
     private bool HasFile =>
         _droppedHandle is not null || (_model.Files is not null && _model.Files.Any());
 
+    protected override void OnInitialized()
+    {
+        if (PresetHandle is not null)
+        {
+            _droppedHandle = PresetHandle;
+            _selectedName = PresetHandle.Name;
+        }
+    }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender) return;
+        // شرط firstRender برداشته شد. محتوای <DialogContent> را خود دیالوگ در
+        // یک پاس بعدی رندر می‌کند، پس در اولین رندر عنصر nara-upload-host هنوز
+        // در DOM نیست؛ init بی‌صدا false برمی‌گرداند و چون فقط یک بار تلاش
+        // می‌شد، دیگر هیچ‌وقت نصب نمی‌شد.
+        if (_dropZoneReady) return;
 
-        _selfRef = DotNetObjectReference.Create(this);
-        await Uploader.InitDropZoneAsync("nara-upload-host", _selfRef);
+        _selfRef ??= DotNetObjectReference.Create(this);
+
+        // چند تلاش کوتاه تا عنصر ظاهر شود. کران‌دار است تا اگر روزی id عوض شد
+        // اینجا بی‌نهایت نچرخد.
+        for (var attempt = 0; attempt < 10 && !_dropZoneReady; attempt++)
+        {
+            _dropZoneReady = await Uploader.InitDropZoneAsync("nara-upload-host", _selfRef);
+
+            if (!_dropZoneReady)
+                await Task.Delay(60);
+        }
     }
 
     [JSInvokable]
