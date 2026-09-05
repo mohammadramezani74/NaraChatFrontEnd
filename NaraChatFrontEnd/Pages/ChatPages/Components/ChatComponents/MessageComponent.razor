@@ -22,6 +22,15 @@
                     <p style="text-align: right; color:gray;font-size: 10px;"><small> @(message.IsMine ? myName : OtherName) </small></p>
 
                     <!-- ریپلای نمایش -->
+                    @* برچسب فوروارد. ForwardedFromName وقتی پیام فوروارد نباشد
+                       null است، پس خودش نقش پرچم را دارد. *@
+                    @if (!string.IsNullOrWhiteSpace(message.ForwardedFromName))
+                    {
+                        <p class="forwarded-label" style="text-align:right; margin:0 0 4px 0; font-size:12px; opacity:.75;">
+                            <small>↪️ فوروارد شده از @message.ForwardedFromName</small>
+                        </p>
+                    }
+
                     @if (ParentMessage != null)
                     {
                         <MudPaper Class="reply-preview px-2 py-1 mb-1"
