@@ -19,6 +19,12 @@ namespace NaraChat.Contract.Models.Chat.Conversation
         public Guid ScopeId { get; set; }
 
         public Guid UserId { get; set; }
+
+        /// <summary>
+        /// نام فرستنده‌ی اصلی. اگر پیام فوروارد نباشد null است، پس همین برای
+        /// تصمیم به نمایش برچسب کافی است.
+        /// </summary>
+        public string? ForwardedFromName { get; set; }
         public string? SenderName { get; set; }
         public string Content { get; set; } = string.Empty;
         public bool IsMute { get; set; }

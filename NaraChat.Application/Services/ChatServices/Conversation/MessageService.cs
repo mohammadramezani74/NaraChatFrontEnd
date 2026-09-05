@@ -270,6 +270,33 @@ namespace NaraChat.Application.Services.ChatServices.Conversation
             }
         }
 
+        /// <summary>
+        /// فوروارد چند پیام به چند مقصد. خروجی، تعداد پیام‌های ساخته‌شده روی
+        /// سرور است — تعداد پیام‌ها ضربدر تعداد مقصدها.
+        /// </summary>
+        public async Task<(bool status, string message, int forwarded)> ForwardMessages(
+            ForwardMessagesDto request, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var result = await _httpClient.PostAsJsonAsync(
+                    "/api/v1/message/ForwardMessages", request, cancellationToken);
+
+                var content = await result.Content.ReadAsStringAsync(cancellationToken);
+
+                var response = JsonSerializer.Deserialize<BaseResponseDto<int>>(
+                    content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                return response?.status == 200
+                    ? (true, response.message, response.result)
+                    : (false, response?.message ?? "عملیات ناموفق بود.", 0);
+            }
+            catch (Exception)
+            {
+                return (false, "خطا در ارتباط با سرور.", 0);
+            }
+        }
+
         public async Task<List<PinnedMessageDto>?> GetPinnedMessages(
             Guid scopeId, CancellationToken cancellationToken = default)
         {
