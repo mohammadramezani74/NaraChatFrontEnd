@@ -374,14 +374,47 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
 
         snackbar.Add($"{count} پیام فوروارد شد", Severity.Success, x => x.RequireInteraction = false);
 
-        // اگر یکی از مقصدها همین گفتگوی باز بوده، پیام‌های تازه از مسیر عادی
-        // لود نمی‌شوند چون سرور فرستنده را از پخش کنار می‌گذارد.
-        if (CurrentScopeId is not null
-            && targets.Any(t => t.Id == CurrentScopeId.Value
-                             || (Conversation is not null && t.Id == OtherUser?.Id)))
+        // سرور فرستنده را از پخش کنار می‌گذارد، پس لیست کناری خودم از فوروارد
+        // خبردار نمی‌شود. مثل مسیر ارسال عادی، ردیف هر مقصد را محلی به‌روز
+        // می‌کنیم تا هم متن آخرین پیام عوض شود هم گفتگو بیاید بالای لیست
+        // (مرتب‌سازی بر اساس LastMessageDate است).
+        var preview = BuildForwardPreview(messageIds);
+        var now = DateTime.Now;
+
+        foreach (var target in targets)
+            await UpdateTimeList.InvokeAsync((target.Id, now, preview));
+
+        // و اگر یکی از مقصدها همین گفتگوی باز بوده، خود پیام‌ها هم باید بیایند.
+        if (targets.Any(t => (CurrentScopeId is not null && t.Id == CurrentScopeId.Value)
+                          || (Conversation is not null && t.Id == OtherUser?.Id)))
         {
             await LoadMesages();
         }
+    }
+
+    /// <summary>
+    /// متن کوتاهی که زیر نام مخاطب در لیست می‌نشیند. برای پیام متنی خود متن و
+    /// برای فایل، نوعش — همان قالبی که سرور برای پیام‌های عادی می‌سازد.
+    /// </summary>
+    private string BuildForwardPreview(List<Guid> messageIds)
+    {
+        if (messageIds.Count > 1)
+            return $"{messageIds.Count} پیام فوروارد شده";
+
+        var source = _messages.FirstOrDefault(m => m.Id == messageIds[0]);
+
+        if (source is null)
+            return "پیام فوروارد شده";
+
+        return source.Type switch
+        {
+            MessageType.Video => "پیام ویدیویی",
+            MessageType.Audio => "پیام صوتی",
+            MessageType.Image => "پیام تصویری",
+            MessageType.Document => "پیام  اسنادی",
+            MessageType.Location => "لوکیشن",
+            _ => string.IsNullOrWhiteSpace(source.Content) ? "پیام فوروارد شده" : source.Content
+        };
     }
 
     /// <summary>

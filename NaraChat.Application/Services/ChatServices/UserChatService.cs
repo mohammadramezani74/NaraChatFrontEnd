@@ -34,9 +34,12 @@ namespace NaraChat.Application.Services.ChatServices
             var queryParams = string.Empty;
             if (!string.IsNullOrWhiteSpace(Search))
             {
-                queryParams += $"?search={Search}";
+                queryParams += $"?search={Uri.EscapeDataString(Search)}";
             }
-            var response = await _httpClient.GetFromJsonAsync<BaseResponseDto<List<GetUsersViewModel>>>("/api/v1/users/GetAll", new JsonSerializerOptions
+            // queryParams ساخته می‌شد ولی هیچ‌وقت به آدرس اضافه نمی‌شد، پس
+            // درخواست همیشه بدون عبارت جستجو می‌رفت و سرور کل لیست را
+            // برمی‌گرداند. Escape هم لازم است چون نام‌ها فارسی و فاصله‌دارند.
+            var response = await _httpClient.GetFromJsonAsync<BaseResponseDto<List<GetUsersViewModel>>>($"/api/v1/users/GetAll{queryParams}", new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true
             });
