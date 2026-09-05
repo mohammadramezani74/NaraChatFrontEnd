@@ -99,6 +99,9 @@
                                 <MudTooltip Text="پاسخ">
                                     <span class="emoji" @onclick="()=>ReplyMessage(message)">↩️</span>
                                 </MudTooltip>
+                                <MudTooltip Text="فوروارد">
+                                    <span class="emoji" @onclick="()=>ForwardMessage(message)">↪️</span>
+                                </MudTooltip>
                                 <MudTooltip Text="ویرایش">
                                     <span class="emoji" @onclick="()=>EditMessage(message.Id,message.Content)">✏️</span>
                                 </MudTooltip>
@@ -123,6 +126,9 @@
 
                                 <MudTooltip Text="پاسخ ">
                                     <span class="emoji" @onclick="()=>ReplyMessage(message)">↩️</span>
+                                </MudTooltip>
+                                <MudTooltip Text="فوروارد">
+                                    <span class="emoji" @onclick="()=>ForwardMessage(message)">↪️</span>
                                 </MudTooltip>
                                 <MudTooltip Text="رونوشت">
                                     <span class="emoji" @onclick="()=>copyMessage(message)">📝</span>
@@ -300,6 +306,10 @@
     public EventCallback<EditedMessageDto> EditMessageEvent{ get; set; }
     [Parameter]
     public EventCallback<ChatMessageDto> ReplyMessageEvent { get; set; }
+
+    /// <summary>فوروارد این پیام؛ انتخاب مقصد در ChatDetail انجام می‌شود.</summary>
+    [Parameter]
+    public EventCallback<ChatMessageDto> ForwardMessageEvent { get; set; }
     [Parameter]
     public EventCallback<MessageReaction> MessageReactionEvent { get; set; }
     [Parameter]
@@ -585,4 +595,7 @@ private Task GoToParent()
             await JS.InvokeVoidAsync("showMapWithMarker", lat, lng);
         });
     }
+
+    public async Task ForwardMessage(ChatMessageDto message)
+        => await ForwardMessageEvent.InvokeAsync(message);
 }

@@ -1,0 +1,148 @@
+@using NaraChat.Application.Services.ChatServices
+@using NaraChat.Contract.Models.Chat.Conversation
+@using NaraChat.Contract.Models.Users
+
+@inject IUserChatService UserChatService
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6" Style="text-align:right;">
+            فوروارد @(MessageIds.Count > 1 ? $"{MessageIds.Count} پیام" : "پیام")
+        </MudText>
+    </TitleContent>
+
+    <DialogContent>
+        <MudTextField @bind-Value="_search"
+                      Immediate="true"
+                      DebounceInterval="300"
+                      OnDebounceIntervalElapsed="OnSearchChanged"
+                      Placeholder="جستجوی مخاطب، گروه یا کانال"
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      Variant="Variant.Outlined"
+                      Class="mb-2" />
+
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Class="my-4" />
+        }
+        else if (_targets.Count == 0)
+        {
+            <MudText Typo="Typo.body2" Class="my-4" Style="text-align:center;">
+                موردی یافت نشد.
+            </MudText>
+        }
+        else
+        {
+            @* سقف مقصدها روی سرور ۱۰ است؛ همان‌جا هم بررسی می‌شود، اینجا فقط
+               برای این است که کاربر بعد از انتخاب با خطا مواجه نشود. *@
+            <div style="max-height:340px; overflow-y:auto;">
+                @foreach (var t in _targets)
+                {
+                    var selected = _selected.Contains(t.Id);
+
+                    <div class="d-flex align-center pa-2"
+                         style="cursor:pointer; gap:8px;"
+                         @onclick="() => Toggle(t)">
+                        <MudCheckBox T="bool"
+                                     Value="selected"
+                                     ValueChanged="_ => Toggle(t)"
+                                     Dense="true" />
+                        <MudText Typo="Typo.body1" Style="flex:1; text-align:right;">
+                            @t.Name
+                        </MudText>
+                        <MudText Typo="Typo.caption" Style="opacity:.6;">
+                            @Kind(t)
+                        </MudText>
+                    </div>
+                }
+            </div>
+        }
+
+        @if (_selected.Count > MaxTargets)
+        {
+            <MudText Typo="Typo.caption" Color="Color.Error" Style="text-align:right;">
+                حداکثر @MaxTargets مقصد می‌توانید انتخاب کنید.
+            </MudText>
+        }
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton OnClick="Cancel">انصراف</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   Disabled="@(_selected.Count == 0 || _selected.Count > MaxTargets || _sending)"
+                   OnClick="Send">
+            @(_sending ? "در حال ارسال..." : $"فوروارد ({_selected.Count})")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private const int MaxTargets = 10;
+
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    /// <summary>پیام‌هایی که قرار است فوروارد شوند.</summary>
+    [Parameter] public List<Guid> MessageIds { get; set; } = new();
+
+    private readonly List<UserDto> _targets = new();
+    private readonly HashSet<Guid> _selected = new();
+    private string? _search;
+    private bool _loading = true;
+    private bool _sending;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task OnSearchChanged(string _) => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        StateHasChanged();
+
+        var result = await UserChatService.GetUsersAsync(_search);
+
+        _targets.Clear();
+
+        if (result is not null)
+            _targets.AddRange(result);
+
+        _loading = false;
+        StateHasChanged();
+    }
+
+    private void Toggle(UserDto target)
+    {
+        if (!_selected.Remove(target.Id))
+            _selected.Add(target.Id);
+    }
+
+    private static string Kind(UserDto t)
+        => t.IsChannel ? "کانال" : t.IsGroup ? "گروه" : "گفتگوی شخصی";
+
+    private void Send()
+    {
+        _sending = true;
+
+        // شناسه‌ی هر ردیف همان چیزی است که سرور انتظار دارد: کاربر مقابل برای
+        // گفتگوی شخصی، خود گروه یا کانال برای بقیه.
+        var targets = _targets
+            .Where(t => _selected.Contains(t.Id))
+            .Select(t => new ForwardTargetDto
+            {
+                Id = t.Id,
+                Type = t.IsChannel
+                    ? ConversationType.Channel
+                    : t.IsGroup
+                        ? ConversationType.group
+                        : ConversationType.Private
+            })
+            .ToList();
+
+        MudDialog.Close(DialogResult.Ok(targets));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

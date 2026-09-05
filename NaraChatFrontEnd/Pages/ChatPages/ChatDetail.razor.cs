@@ -330,6 +330,61 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
     }
 
     /// <summary>
+    /// فوروارد یک پیام. مقصدها در دیالوگ انتخاب می‌شوند و ارسال همان‌جا انجام
+    /// نمی‌شود؛ دیالوگ فقط فهرست مقصد را برمی‌گرداند تا منطق ارسال یک‌جا بماند.
+    /// </summary>
+    private async Task HandleForwardMessage(ChatMessageDto message)
+        => await ForwardAsync(new List<Guid> { message.Id });
+
+    private async Task ForwardAsync(List<Guid> messageIds)
+    {
+        if (messageIds.Count == 0) return;
+
+        var parameters = new DialogParameters<ForwardDialogComponent>
+        {
+            { x => x.MessageIds, messageIds }
+        };
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.ExtraSmall,
+            FullWidth = true,
+            CloseButton = true
+        };
+
+        var dialog = await DialogService.ShowAsync<ForwardDialogComponent>(
+            string.Empty, parameters, options);
+
+        var result = await dialog.Result;
+
+        if (result.Canceled || result.Data is not List<ForwardTargetDto> targets || targets.Count == 0)
+            return;
+
+        var (ok, message, count) = await messageService.ForwardMessages(new ForwardMessagesDto
+        {
+            MessageIds = messageIds,
+            Targets = targets
+        });
+
+        if (!ok)
+        {
+            snackbar.Add(message, Severity.Error, x => x.RequireInteraction = false);
+            return;
+        }
+
+        snackbar.Add($"{count} پیام فوروارد شد", Severity.Success, x => x.RequireInteraction = false);
+
+        // اگر یکی از مقصدها همین گفتگوی باز بوده، پیام‌های تازه از مسیر عادی
+        // لود نمی‌شوند چون سرور فرستنده را از پخش کنار می‌گذارد.
+        if (CurrentScopeId is not null
+            && targets.Any(t => t.Id == CurrentScopeId.Value
+                             || (Conversation is not null && t.Id == OtherUser?.Id)))
+        {
+            await LoadMesages();
+        }
+    }
+
+    /// <summary>
     /// از JS صدا زده می‌شود وقتی فایلی روی صفحه‌ی چت رها شود. دیالوگ آپلود را
     /// با همان فایل باز می‌کند تا کاربر فقط کپشن بنویسد و بفرستد.
     /// </summary>

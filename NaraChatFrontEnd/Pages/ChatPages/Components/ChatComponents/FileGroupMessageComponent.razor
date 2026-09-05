@@ -151,6 +151,9 @@
                             <MudTooltip Text="پاسخ">
                                 <span class="emoji" @onclick="()=>ReplyMessage(message)">↩️</span>
                             </MudTooltip>
+                            <MudTooltip Text="فوروارد">
+                                <span class="emoji" @onclick="()=>ForwardMessage(message)">↪️</span>
+                            </MudTooltip>
                             <MudTooltip Text="ویرایش">
                                 <span class="emoji" @onclick="()=>EditMessage(message.Id,message.Content)">✏️</span>
                             </MudTooltip>
@@ -193,6 +196,9 @@
                             </MudMenu>
                             <MudTooltip Text="پاسخ ">
                                 <span class="emoji" @onclick="()=>ReplyMessage(message)">↩️</span>
+                            </MudTooltip>
+                            <MudTooltip Text="فوروارد">
+                                <span class="emoji" @onclick="()=>ForwardMessage(message)">↪️</span>
                             </MudTooltip>
                             <MudTooltip Text="رونوشت">
                                 <span class="emoji" @onclick="()=>copyMessage(message)">📝</span>
@@ -426,6 +432,10 @@
     public EventCallback<EditedMessageDto> EditMessageEvent { get; set; }
     [Parameter]
     public EventCallback<ChatMessageDto> ReplyMessageEvent { get; set; }
+
+    /// <summary>فوروارد این پیام؛ انتخاب مقصد در ChatDetail انجام می‌شود.</summary>
+    [Parameter]
+    public EventCallback<ChatMessageDto> ForwardMessageEvent { get; set; }
     [Parameter]
     public EventCallback<Guid> DeletedMessageevent { get; set; }
     [Parameter]
@@ -636,6 +646,7 @@
         int fileSizeInBytes = (base64String.Length * 3) / 4 - (base64String.EndsWith("=") ? (base64String.EndsWith("==") ? 2 : 1) : 0);
         return fileSizeInBytes < 1024 ? $"{fileSizeInBytes} B" : $"{fileSizeInBytes / 1024} KB";
     }
+
+    public async Task ForwardMessage(ChatMessageDto message)
+        => await ForwardMessageEvent.InvokeAsync(message);
 }
-
-

@@ -699,7 +699,7 @@ else
         @if (message.Type == MessageType.Text || message.Type == MessageType.Location)
         {
         <MessageComponent DeletedMessageevent="DeleteTargetMessage" IsMine="message.IsMine" CurrentUser="CurrentUser" message="message"
-                          ReplyMessageEvent="HandleReplyMessage" Conversation="Conversation" EditMessageEvent="OnEditMessageHandler"
+                          ReplyMessageEvent="HandleReplyMessage" ForwardMessageEvent="HandleForwardMessage" Conversation="Conversation" EditMessageEvent="OnEditMessageHandler"
                           ParentMessage="@HandelParentMessage(message)"
                           ParentSenderName="@HandelParentSender(message)"
                           OnParentClick="JumpToMessage"
@@ -714,7 +714,7 @@ else
             <FileMessageComponent DeletedMessageevent="DeleteTargetMessage" IsMine="message.IsMine" CurrentUser="CurrentUser" message="message"
                               CanPin="@CanPin"
                               TogglePinEvent="OnTogglePinRequested"
-                              ReplyMessageEvent="HandleReplyMessage" Conversation="Conversation" EditMessageEvent="OnEditMessageHandler"
+                              ReplyMessageEvent="HandleReplyMessage" ForwardMessageEvent="HandleForwardMessage" Conversation="Conversation" EditMessageEvent="OnEditMessageHandler"
                                   ParentMessage="@HandelParentMessage(message)"></FileMessageComponent>
         }
     </div>;
@@ -728,7 +728,7 @@ else
         @if (message.Type == MessageType.Text || message.Type == MessageType.Location)
         {
             <GroupMessageComponent DeletedMessageevent="DeleteTargetMessage" IsMine="message.IsMine" CurrentUser="CurrentUser" message="message"
-                                   ReplyMessageEvent="HandleReplyMessage" Conversation="Conversation" EditMessageEvent="OnEditMessageHandler"
+                                   ReplyMessageEvent="HandleReplyMessage" ForwardMessageEvent="HandleForwardMessage" Conversation="Conversation" EditMessageEvent="OnEditMessageHandler"
                                    CanPin="@CanPin"
                                    TogglePinEvent="OnTogglePinRequested"
                                    ParentMessage="@HandelParentMessage(message)"
@@ -743,7 +743,7 @@ else
         else
         {
             <FileGroupMessageComponent DeletedMessageevent="DeleteTargetMessage" IsMine="message.IsMine" CurrentUser="CurrentUser" message="message"
-                                       ReplyMessageEvent="HandleReplyMessage" Conversation="Conversation" EditMessageEvent="OnEditMessageHandler"
+                                       ReplyMessageEvent="HandleReplyMessage" ForwardMessageEvent="HandleForwardMessage" Conversation="Conversation" EditMessageEvent="OnEditMessageHandler"
                                    CanPin="@CanPin"
                                    TogglePinEvent="OnTogglePinRequested"
                                        ParentMessage="@HandelParentMessage(message)"
@@ -786,7 +786,7 @@ else
         @if (message.Type == MessageType.Text || message.Type == MessageType.Location)
         {
             <ChannelMessageComponent DeletedMessageevent="DeleteTargetMessage" CurrentUser="CurrentUser" message="message"
-                                 ReplyMessageEvent="HandleReplyMessage" EditMessageEvent="OnEditMessageHandler"
+                                 ReplyMessageEvent="HandleReplyMessage" ForwardMessageEvent="HandleForwardMessage" EditMessageEvent="OnEditMessageHandler"
                                  CanPin="@CanPin"
                                  TogglePinEvent="OnTogglePinRequested"
                                  ParentMessage="@HandelParentMessage(message)"
@@ -798,7 +798,7 @@ else
             <ChannelFileMessageComponent DeletedMessageevent="DeleteTargetMessage" IsMine="message.IsMine" CurrentUser="CurrentUser" message="message"
                                      CanPin="@CanPin"
                                      TogglePinEvent="OnTogglePinRequested"
-                                     ReplyMessageEvent="HandleReplyMessage"
+                                     ReplyMessageEvent="HandleReplyMessage" ForwardMessageEvent="HandleForwardMessage"
                                      Conversation="Conversation" 
                                      EditMessageEvent="OnEditMessageHandler"
                                          ParentMessage="@HandelParentMessage(message)"></ChannelFileMessageComponent>
