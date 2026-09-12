@@ -740,6 +740,28 @@
          DeletedMessageId = messageId;
          StateHasChanged();
      });
+        // آخرین پیام گفتگو عوض شده — حذف پیام یا پاک کردن تاریخچه. برخلاف
+        // DeletedMessageReceived این رویداد به حذف‌کننده هم می‌رسد، پس لیست
+        // کناری هر دو طرف بدون رفرش به‌روز می‌شود.
+        hubConnection.On<LastMessageChangedDto>(nameof(IChatHubClient.LastMessageChanged), async (changed) =>
+     {
+         var row = Users.FirstOrDefault(x => x.Id == changed.ScopeId)
+                   ?? Users.FirstOrDefault(x => x.ConversationId == changed.ScopeId);
+
+         if (row is null) return;
+
+         row.LastReceivedMessage = (changed.Text ?? string.Empty).TruncateMessage();
+         row.LastReceivedMessageId = changed.MessageId;
+
+         // اگر پیامی نمانده، تاریخ هم پاک می‌شود تا گفتگو در ترتیب لیست
+         // بالا نماند. خود ردیف حذف نمی‌شود؛ گفتگو هنوز وجود دارد.
+         row.LastMessageDate = changed.SentAt;
+         row.LastReceivedMessageSendDate = changed.SentAt.HasValue
+             ? changed.SentAt.Value.FormatPersianDate().ToPersianNumber()
+             : string.Empty;
+
+         await InvokeAsync(StateHasChanged);
+     });
         hubConnection.On<TypingReactionDto>(nameof(IChatHubClient.ReceivedReactions), async (messageType) =>
      {
 

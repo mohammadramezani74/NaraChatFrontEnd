@@ -17,6 +17,9 @@ namespace NaraChat.Application.HunSettings.Abstraction
         Task MessagedReceived(ChatMessageDto message);
         Task EditedMessageReceived(EditedMessageDto message);
         Task DeletedMessageReceived(Guid MessageId);
+
+        /// <summary>آخرین پیام گفتگو عوض شد؛ لیست مکالمات باید به‌روز شود.</summary>
+        Task LastMessageChanged(LastMessageChangedDto Message);
         Task MessagedSeenReceived(List<Guid> MessageId);
         Task IncreaseMessageCount(Guid UserId);
         Task ReceivedNotifications(NotificationModelDto notify);
