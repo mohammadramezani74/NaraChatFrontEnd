@@ -73,7 +73,7 @@
 
 @code {
     private bool ImageLoaded = false;
-    public string? ImageData { get; set; } = null;
+    // public string? ImageData { get; set; } = null;
     private bool IsLoading = false;
     private string CurrentImageSrc = "lib/assets/Images/blured.jpg";
     public string? ImageObjectUrl { get; set; }
@@ -95,16 +95,31 @@
 
 }
 @code{
-    public async Task OpenPictureDialog(){
-     
-        if(ImageData!=null){
-            var parameters = new DialogParameters
-{
-    { "ImageData", ImageData }
-};
+    public async Task OpenPictureDialog()
+    {
+       
+        if (message.FileContent is null) return;
 
-            await DialogService.ShowAsync<ImageDialogComponent>("نمایش تصویر", parameters);
-        }
+        
+        if (ImageObjectUrl is null)
+            await LoadImage(message.FileContent.FileId);
+
+        if (ImageObjectUrl is null) return;
+
+        var parameters = new DialogParameters
+        {
+            { "ImageSrc", ImageObjectUrl },
+            { "FileName", message.FileContent.FileName }
+        };
+
+        var options = new DialogOptions
+            {
+                MaxWidth = MaxWidth.Medium,
+                FullWidth = true,
+                CloseButton = true
+            };
+
+        await DialogService.ShowAsync<ImageDialogComponent>("نمایش تصویر", parameters, options);
     }
     public async ValueTask DisposeAsync()
     {

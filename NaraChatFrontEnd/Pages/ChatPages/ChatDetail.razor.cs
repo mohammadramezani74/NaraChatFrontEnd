@@ -26,6 +26,7 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
     private DateTime? _oldestCursor;      // تاریخ قدیمی‌ترین پیامی که داریم
     private bool _hasMoreOlder = true;    // آیا صفحه‌ی قدیمی‌تری هست
     private bool _isLoadingOlder;
+    private int _loadToken;
     [Parameter] public EventCallback<Guid> OnChatDeleted { get; set; }
     public int UploadPercent { get; set; }
     private List<PinnedMessageDto> _pinned = new();
@@ -734,6 +735,8 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
 
     private async Task LoadMesages()
     {
+        var token = ++_loadToken;
+
         _pinned.Clear();
         _pinnedIndex = 0;
         _messages.Clear();
@@ -741,12 +744,19 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
         _hasMoreOlder = true;
 
         Conversation = await chatService.ReadyOrCreateConversationBy(OtherUser!.Id);
+
+        // اگر در این فاصله چت عوض شده، این بارگذاری دیگر مال چت باز نیست
+        if (token != _loadToken) return;
+
         var other = Conversation!.users.First(c => c.Id != CurrentUser!.Id);
 
         var page = await messageService.LoadMessages(Conversation!.id);
 
+        if (token != _loadToken) return;
+
         if (page is not null && page.Items.Count > 0)
         {
+            _messages.Clear();
             _messages.AddRange(page.Items);
             _oldestCursor = page.NextCursor;
             _hasMoreOlder = page.HasMore;
@@ -761,9 +771,15 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
             NeedScrollToBottom();
             await trueScroll.InvokeAsync();
         }
-
+        if(page?.Items.Count ==0)
+        {
+            _messages.Clear();
+        }
         if (OtherUser != null && _drafts.TryGetValue(OtherUser.Id, out var draft))
-            NewMessage = draft;
+        { NewMessage = draft;
+          
+        }
+
         await LoadPinnedAsync();
     }
 
@@ -1569,24 +1585,25 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
 
     private async Task HandleMissedMessagesAsync()
     {
-        if (MissedUserMessage?.Count > 0)
+        if (MissedUserMessage is null || MissedUserMessage.Count == 0) return;
+
+        // فقط پیام‌های همین گفتگو. قبلاً هر چه در صف بود در چت باز ریخته
+        // می‌شد، پس پیام‌های چت قبلی در چت بعدی ظاهر می‌شدند.
+        var mine = MissedUserMessage
+            .Where(m => CurrentScopeId is not null && m.ScopeId == CurrentScopeId.Value)
+            .Where(m => _messages.All(x => x.Id != m.Id))
+            .OrderBy(x => x.SendAt)
+            .ToList();
+
+        if (mine.Count > 0)
         {
-            var known = new HashSet<Guid>(_messages.Select(m => m.Id));
-            var newMessages = MissedUserMessage
-                .Where(m => !known.Contains(m.Id))
-                .OrderBy(x => x.SendAt)
-                .ToList();
-
-            if (newMessages.Count > 0)
-            {
-                foreach (var m in newMessages)
-                    m.Content = m.Content;
-                _messages.AddRange(newMessages);
-                await ClearMissedMessageUser.InvokeAsync();
-
-                NeedScrollToBottom();
-            }
+            _messages.AddRange(mine);
+            NeedScrollToBottom();
         }
+
+        // صف همیشه خالی می‌شود، حتی وقتی چیزی اضافه نشد. قبلاً فقط در حالت
+        // اضافه‌شدن خالی می‌شد و صف چت قبلی برای همیشه باقی می‌ماند.
+        await ClearMissedMessageUser.InvokeAsync();
     }
     public async Task JoinToChannelEvent(string UserName)
     {

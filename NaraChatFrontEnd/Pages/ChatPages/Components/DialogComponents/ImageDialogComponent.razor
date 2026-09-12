@@ -9,7 +9,7 @@
             <MudIconButton  OnClick="Download">+ دانلود</MudIconButton>
         </div>
         <div style="max-width: 100%;height:auto; position: relative;">
-            <img id="image" src="@($" data:image /png;base64, {ImageData}")" class="image" style="background-color: white;" />
+          <img id="image" src="@ImageSrc" class="image" style="background-color: white;" />
         </div>
 
         <!-- دکمه‌ها -->
@@ -21,17 +21,28 @@
 @code {
     [Parameter]
     public string ImageData { get; set; } = string.Empty;
+        /// <summary>
+    /// آدرس تصویر. تصاویر با naraLoadImage به‌صورت object URL بارگذاری می‌شوند،
+    /// پس اینجا هم همان آدرس می‌آید. قبلاً این پارامتر base64 می‌گرفت.
+    /// </summary>
+    [Parameter]
+    public string ImageSrc { get; set; } = string.Empty;
+
+    /// <summary>نام فایل برای ذخیره؛ اگر خالی باشد نام پیش‌فرض استفاده می‌شود.</summary>
+    [Parameter]
+    public string? FileName { get; set; }
     private async Task ZoomIn() => await js.InvokeVoidAsync("cropper.zoom", 0.1);
     private async Task ZoomOut() => await js.InvokeVoidAsync("cropper.zoom", -0.1);
     private async Task Rotate() => await js.InvokeVoidAsync("cropper.rotate", 90);
     private async Task Flip() => await js.InvokeVoidAsync("cropper.scaleX");
-    private async Task Download()
+     private async Task Download()
     {
-        var FileData = $"data:application/octet-stream;base64,{ImageData}";
-       var FileName ="downloaded_file.jpg";
+        if (string.IsNullOrEmpty(ImageSrc)) return;
 
+ 
+        var name = string.IsNullOrWhiteSpace(FileName) ? "downloaded_file.jpg" : FileName;
 
-        await js.InvokeVoidAsync("triggerDownload2", FileData, FileName);
+        await js.InvokeVoidAsync("triggerDownload2", ImageSrc, name);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
