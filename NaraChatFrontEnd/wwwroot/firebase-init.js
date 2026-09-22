@@ -1,5 +1,8 @@
 ﻿import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js";
+import {
+    getMessaging,
+    getToken
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyCDok7ESoslSXEOqXATLyLsiTOd-IGTQ_k",
@@ -17,20 +20,33 @@ const messaging = getMessaging(app);
 window.requestPermission = async function () {
 
     try {
+
         const permission = await Notification.requestPermission();
-        if (permission === 'granted') {
-            const token = await getToken(messaging, {
-                vapidKey: "BGqk9Wa2aoG7OQ-llhSn7u7TcQq7W-y7bz9y5BH_PoCQc3TmvjsPCm6FFBDCasRHHiTI2idAlEu6tWkUW_iHYms"
-            });
-            console.log("✅ FCM Token:", token);
-            return token;
-        } else {
+
+        if (permission !== "granted") {
             console.warn("❌ Notification permission denied.");
             return null;
         }
+
+        // ⭐️ مهم
+        const registration = await navigator.serviceWorker.register(
+            "/firebase-messaging-sw.js"
+        );
+
+        console.log("✅ Service Worker registered:", registration);
+
+        const token = await getToken(messaging, {
+            vapidKey: "BGqk9Wa2aoG7OQ-llhSn7u7TcQq7W-y7bz9y5BH_PoCQc3TmvjsPCm6FFBDCasRHHiTI2idAlEu6tWkUW_iHYms",
+            serviceWorkerRegistration: registration
+        });
+
+        console.log("✅ FCM Token:", token);
+
+        return token;
+
     } catch (err) {
+
         console.error("❌ Error in requestPermission:", err);
         return null;
     }
 };
-

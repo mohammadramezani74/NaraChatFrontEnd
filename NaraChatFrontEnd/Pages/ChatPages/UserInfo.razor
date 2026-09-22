@@ -496,7 +496,7 @@
                         <MudImage Src="@($"{SiteSettings.ApiUrl}{TargetUserInfoResponse.Avatar}")"
                                   ObjectFit="ObjectFit.Cover"
                                   Class="hero-img"
-                                  @onclick="OpenPictureDialog" />
+                                 />
                     }
                     else if (MyAvatar != null && ChosenUser == null)
                     {
@@ -536,7 +536,7 @@
                     }
                 }
 
-                @if (CurrentUser != null)
+                @if (MyAvatar != null && ChosenUser == null)
                 {
                     <div class="hero-camera">
                         <MudFileUpload T="IBrowserFile" FilesChanged="UploadFiles" Disabled="@(IsSelectedFile)">

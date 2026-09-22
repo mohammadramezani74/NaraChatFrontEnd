@@ -46,7 +46,7 @@
                                 <MudAvatar @onclick="SettingsShow" Size="Size.Medium" Class="elevated-avatar">
                                     @if (!string.IsNullOrEmpty(myAvatar))
                                     {
-                                        <MudImage Src="@($"data:image/png;base64,{myAvatar}")"
+                                        <MudImage Src="@($"{SiteSettings.ApiUrl}{myAvatar}")"
                                         Class="rounded-circle avatar-img" />
                                     }
                                     else
@@ -173,16 +173,17 @@ private async Task ShowAbout()
     {
         newVersionAvailable = await VersionChecker.IsNewVersionAvailableAsync();
         CurrentUser = await ((CustomAuthenticationStateProvider)stateprovider).GetUserInfoAsync();
+  myAvatar = $"api/v1/chatfiles/{CurrentUser.Id}/{false}/getAvatar";
         var cachedAvatar = await js.InvokeAsync<string>("localStorage.getItem", "userAvatar");
 
-        if (string.IsNullOrEmpty(cachedAvatar))
+        if (string.IsNullOrEmpty(cachedAvatar)||cachedAvatar!=myAvatar)
         {
             CurrentUser = await ((CustomAuthenticationStateProvider)stateprovider).GetUserInfoAsync();
 
             if (CurrentUser != null)
             {
 
-                myAvatar = await userservice.GetAvatar(CurrentUser.Id);
+                 myAvatar = $"api/v1/chatfiles/{CurrentUser.Id}/{false}/getAvatar";
 
 
                 await js.InvokeVoidAsync("localStorage.setItem", "userAvatar", myAvatar);

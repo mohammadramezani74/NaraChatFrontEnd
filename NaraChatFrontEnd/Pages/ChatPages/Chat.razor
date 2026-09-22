@@ -290,7 +290,7 @@
         try
         {
 
-            // _ = RequestNotificationTokenAsync();
+             _ = RequestNotificationTokenAsync();
 
 
             Logineduser = await ((CustomAuthenticationStateProvider)AuthenticationStateProvider).GetUserInfoAsync();
@@ -339,7 +339,8 @@
             {
                 await userService.StoreToken(token);
                 snackbar.Add($" فعال سازی ناتیفیکیشن با موفقیت انجام شد ", Severity.Success);
-            }
+                
+          }
             else
             {
                 snackbar.Add($" فعال سازی ناتیفیکیشن موفقیت آمیز نبود لطقا یک بار دیگر صفحه را رفرش کنید ", Severity.Warning);
@@ -368,15 +369,14 @@
 
             if (string.IsNullOrEmpty(cachedAvatar))
             {
-                myAvatar = await userService.GetAvatar(Logineduser.Id);
-
+                myAvatar = $"api/v1/chatfiles/{Logineduser.Id}/{false}/getAvatar";
                 await js.InvokeVoidAsync("localStorage.setItem", "userAvatar", myAvatar);
                 await js.InvokeVoidAsync("localStorage.setItem", "userAvatarTime", DateTime.UtcNow.ToString("o"));
 
             }
             else
             {
-                myAvatar = cachedAvatar;
+                myAvatar = $"api/v1/chatfiles/{Logineduser.Id}/{false}/getAvatar";
             }
 
 
