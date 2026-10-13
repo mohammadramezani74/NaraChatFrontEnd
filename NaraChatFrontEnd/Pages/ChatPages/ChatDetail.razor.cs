@@ -5,12 +5,15 @@ using Microsoft.JSInterop;
 using MudBlazor;
 using NaraChat.Application.Services;
 using NaraChat.Application.Services.ChatServices.Conversation;
+using NaraChat.Application.Services.ContactTasks;
 using NaraChat.Application.Services.Upload;
 using NaraChat.Contract.Models.BaseResponse;
 using NaraChat.Contract.Models.Chat.Conversation;
+using NaraChat.Contract.Models.ContactTasks;
 using NaraChat.Contract.Models.Users;
 using NaraChat.Contract.Utilities.FilesExtensions;
 using NaraChatFrontEnd.Models.BaseModels;
+using NaraChatFrontEnd.Pages.ChatPages.Components.ContactTasks;
 using NaraChatFrontEnd.Pages.ChatPages.Components.DialogComponents;
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
@@ -23,6 +26,14 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
 {
     #region parameters & fields
     [Inject] private IBrowserUploader Uploader { get; set; } = default!;
+    [Inject] private ContactTaskStore TaskStore { get; set; } = default!;
+    [Inject] private IContactTaskService TaskService { get; set; } = default!;
+
+    /// <summary>دسکتاپ: دکمه‌ی «کارها» ستون کناری را روی تب کارها باز/بسته می‌کند.</summary>
+    [Parameter] public EventCallback OnToggleTasks { get; set; }
+
+    /// <summary>دسکتاپ: کلیک روی نام مخاطب در سربرگ، تب «مشخصات» را باز می‌کند.</summary>
+    [Parameter] public EventCallback OnShowInfo { get; set; }
     private DateTime? _oldestCursor;      // تاریخ قدیمی‌ترین پیامی که داریم
     private bool _hasMoreOlder = true;    // آیا صفحه‌ی قدیمی‌تری هست
     private bool _isLoadingOlder;
@@ -201,6 +212,11 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
 
     protected override async Task OnInitializedAsync()
     {
+        TaskStore.Changed += OnTaskStoreChanged;
+        TaskStore.OpenRequested += OnTaskOpenRequested;
+        TaskStore.JumpRequested += OnTaskJumpRequested;
+        if (IsMobile && TaskStore.ConsumeOpenRequest())
+            _mobileTasksOpen = true;
         CurrentUser = await ((CustomAuthenticationStateProvider)stateprovider).GetUserInfoAsync();
         objRef ??= DotNetObjectReference.Create(this);
         objRef2 ??= DotNetObjectReference.Create(this);
@@ -262,6 +278,14 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
             HandleSeenMessages();
 
             await HandleUserChangedAsync();
+
+            // برچسب «در کارهای شما» روی پیام‌ها
+            if (OtherUser is not null && SelectedChannel is null && SelectedGroup is null
+                && OtherUser.Id != _tasksSnapshotFor)
+            {
+                _tasksSnapshotFor = OtherUser.Id;
+                _ = TaskStore.EnsureSnapshotAsync(OtherUser.Id);
+            }
 
             await HandleScrollAsync();
         }
@@ -451,6 +475,9 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        TaskStore.Changed -= OnTaskStoreChanged;
+        TaskStore.OpenRequested -= OnTaskOpenRequested;
+        TaskStore.JumpRequested -= OnTaskJumpRequested;
         try
         {
             if (_cancellationTokenSource is not null)
@@ -723,6 +750,12 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
     }
     public async Task gotoDetailForMobile(UserDto? chosenUser)
     {
+        if (!IsMobile && OnShowInfo.HasDelegate)
+        {
+            await OnShowInfo.InvokeAsync();
+            return;
+        }
+
         if (GoToSettingInMobile.HasDelegate)
             await GoToSettingInMobile.InvokeAsync(chosenUser);
         else if (BackToUsersList.HasDelegate)
@@ -2192,6 +2225,124 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
 
     private string CurrentChatTitle =>
         SelectedChannel?.Name ?? SelectedGroup?.Name ?? OtherUser?.Name ?? string.Empty;
+
+    #endregion
+
+    #region کارهای شخصی با مخاطب
+
+    // موبایل: برگه‌ی پایین، باز/بسته‌اش محلی است.
+    // دسکتاپ: کارها یک تب از ستون کناری است (Chat.razor)؛ اینجا فقط وضعیتش خوانده می‌شود.
+    private bool _mobileTasksOpen;
+    private Guid _tasksSnapshotFor;
+
+    private bool TasksOpen => OtherUser is not null
+                              && SelectedChannel is null
+                              && SelectedGroup is null
+                              && (IsMobile
+                                  ? _mobileTasksOpen
+                                  : ThemeCascading?.IsShowSetting == true && TaskStore.SideTab == ContactSideTab.Tasks);
+
+    private int OpenTaskCount => OtherUser is null ? 0 : TaskStore.OpenCount(OtherUser.Id);
+    private int OverdueTaskCount => OtherUser is null ? 0 : TaskStore.OverdueCount(OtherUser.Id);
+    private string OpenTaskCountText => OpenTaskCount > 99 ? "۹۹+" : TaskDates.Fa(OpenTaskCount);
+
+    private async Task ToggleTasks()
+    {
+        if (IsMobile)
+            _mobileTasksOpen = !_mobileTasksOpen;
+        else
+            await OnToggleTasks.InvokeAsync();
+    }
+
+    private void CloseTasks() => _mobileTasksOpen = false;
+
+    private void OnTaskJumpRequested(Guid messageId)
+    {
+        if (OtherUser is not null && SelectedChannel is null && SelectedGroup is null)
+            _ = InvokeAsync(() => JumpToMessage(messageId));
+    }
+
+    private async Task OpenTaskMessage(Guid messageId)
+    {
+        // روی موبایل برگه جلوی پیام را می‌گیرد؛ اول بسته شود.
+        if (IsMobile)
+            _mobileTasksOpen = false;
+
+        await JumpToMessage(messageId);
+    }
+
+    private bool IsMessageInTasks(ChatMessageDto message)
+        => OtherUser is not null && TaskStore.IsLinked(OtherUser.Id, message.Id);
+
+    private void OnTaskStoreChanged(Guid? contactId)
+    {
+        if (contactId is null || contactId == OtherUser?.Id)
+            _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void OnTaskOpenRequested()
+    {
+        if (IsMobile && TaskStore.ConsumeOpenRequest())
+            _mobileTasksOpen = true;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>«افزودن به کارها» از منوی یک پیام در چت خصوصی.</summary>
+    private async Task AddMessageToTasks(ChatMessageDto message)
+    {
+        if (OtherUser is null)
+            return;
+
+        var contact = OtherUser;
+
+        var parameters = new DialogParameters<AddTaskFromMessageDialog>
+        {
+            { x => x.ContactName, contact.Name },
+            { x => x.SenderName, message.IsMine ? "شما" : contact.Name },
+            { x => x.SentAt, message.SendAt },
+            { x => x.Preview, AddTaskFromMessageDialog.PreviewOf(message) },
+            { x => x.IsMobile, IsMobile },
+        };
+
+        var options = new DialogOptions
+        {
+            CloseButton = false,
+            CloseOnEscapeKey = true,
+            BackdropClick = true,
+            FullWidth = true,
+            MaxWidth = MaxWidth.ExtraSmall,
+            Position = IsMobile ? DialogPosition.BottomCenter : DialogPosition.Center,
+        };
+
+        var dialog = await DialogService.ShowAsync<AddTaskFromMessageDialog>(null, parameters, options);
+        var result = await dialog.Result;
+        if (result is null || result.Canceled || result.Data is not AddTaskFromMessageDialog.Draft draft)
+            return;
+
+        var created = await TaskService.CreateAsync(contact.Id, draft.Text, draft.DueDate, message.Id, draft.RemindAt);
+        if (!created.Ok)
+        {
+            snackbar.Add(created.Message, Severity.Error);
+            return;
+        }
+
+        // پنل (باز یا بسته) فهرست را دوباره می‌خواند و شمارش‌ها به‌روز می‌شوند.
+        TaskStore.NotifyRemote(contact.Id);
+
+        if (!TasksOpen)
+        {
+            snackbar.Add("به کارها اضافه شد", Severity.Success, config =>
+            {
+                config.Action = "نمایش";
+                config.ActionColor = Color.Primary;
+                config.OnClick = _ => InvokeAsync(() =>
+                {
+                    if (OtherUser?.Id == contact.Id)
+                        TaskStore.RequestOpen();
+                });
+            });
+        }
+    }
 
     #endregion
 }

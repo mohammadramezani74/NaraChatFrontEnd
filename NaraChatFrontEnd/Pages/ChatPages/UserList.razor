@@ -1,6 +1,8 @@
 ﻿@inject IUserChatService userService
 @inject IConversationService conversationService;
 @inject ISnackbar snackbar
+@inject NaraChat.Application.Services.ContactTasks.ContactTaskStore TaskStore
+@implements IDisposable
 
 <MudPaper Class="people-panel h-100 w-100 d-flex flex-column" Elevation="0">
 
@@ -133,6 +135,15 @@
                                 <p class="row-message" style="@GetLastMessageStyle(user)">
                                     @((MarkupString)RenderMessageHighlighted(user.LastReceivedMessage))
                                 </p>
+
+                                @if (!user.IsChannel && !user.IsGroup && TaskStore.OpenCount(user.Id) is > 0 and var openTasks)
+                                {
+                                    <span class="task-pill @(TaskStore.OverdueCount(user.Id) > 0 ? "is-overdue" : "")"
+                                          title="@($"{openTasks} کار باز با این مخاطب")">
+                                        <TasksIcon Size="12" StrokeWidth="2.3" />
+                                        @(openTasks > 99 ? "۹۹+" : openTasks.ToString().ToPersianNumber())
+                                    </span>
+                                }
 
                                 @if (user.messageUnreadedCount > 0)
                                 {
@@ -415,6 +426,28 @@
         font-weight: 600;
     }
 
+    /* تعداد کارهای باز شما با این مخاطب */
+    .task-pill {
+        flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        height: 19px;
+        padding: 0 7px;
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--mud-palette-primary) 12%, transparent);
+        color: var(--mud-palette-primary);
+        font-size: 10.5px;
+        font-weight: 700;
+        line-height: 1;
+        margin-inline-end: 4px;
+    }
+
+        .task-pill.is-overdue {
+            background: color-mix(in srgb, #B4470F 13%, transparent);
+            color: #B4470F;
+        }
+
     .unread-pill {
         flex-shrink: 0;
         display: inline-flex;
@@ -514,6 +547,18 @@
            : GetMyChatsView().ToList();
 
     Guid? selectedUserId = null;
+
+    protected override void OnInitialized()
+    {
+        TaskStore.Changed += OnTaskCountsChanged;
+    }
+
+    private void OnTaskCountsChanged(Guid? contactId) => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        TaskStore.Changed -= OnTaskCountsChanged;
+    }
     [Parameter] public IEnumerable<UserDto> Users { get; set; } = Enumerable.Empty<UserDto>();
     public List<UserDto> AllUsers { get; set; } = new();
     [Parameter] public bool Loading { get; set; } = true;

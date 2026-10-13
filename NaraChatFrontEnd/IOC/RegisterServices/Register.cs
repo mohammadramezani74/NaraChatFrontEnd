@@ -4,7 +4,7 @@ using NaraChat.Application.Services.Auth;
 using NaraChat.Application.Services.ChatServices;
 using NaraChat.Application.Services.ChatServices.Channels;
 using NaraChat.Application.Services.ChatServices.Conversation;
-using NaraChat.Application.Services.CheckLists;
+using NaraChat.Application.Services.ContactTasks;
 using NaraChat.Application.Services.LocalStorage;
 using NaraChat.Application.Services.TokenProvider;
 using NaraChat.Application.Services.Upload;
@@ -26,7 +26,6 @@ namespace NaraChatFrontEnd.IOC.RegisterServices
            services.AddScoped<CustomAuthenticationStateProvider>();
             services.AddScoped<AuthenticationStateProvider, CustomAuthenticationStateProvider>();
             services.AddScoped<JwtAuthorizationMessageHandler>();
-            services.AddScoped<IContactChecklistService, ContactChecklistService>();
             services.AddSingleton<VersionCheckService>();
             services.AddHttpClient("apiwithAuth", client =>
             {
@@ -54,6 +53,12 @@ namespace NaraChatFrontEnd.IOC.RegisterServices
                 return new MessageService(httpClient);
             });
 
+            services.AddScoped<IContactTaskService, ContactTaskService>(sp =>
+            {
+                var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient("apiwithAuth");
+                return new ContactTaskService(httpClient);
+            });
+            services.AddScoped<ContactTaskStore>();
             services.AddScoped<IBrowserUploader, BrowserUploader>();
             return services;
         }

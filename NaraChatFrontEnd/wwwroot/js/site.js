@@ -628,3 +628,82 @@ window.naraLoadImage = async function (url, token) {
 window.naraRevokeImage = function (objectUrl) {
     if (objectUrl) URL.revokeObjectURL(objectUrl);
 };
+
+// کلیدهای localStorage که با پیشوند داده‌شده شروع می‌شوند. برای انتقال
+// چک‌لیست قدیمی به سرور لازم است، چون از سمت .NET نمی‌شود کلیدها را شمرد.
+window.naraLocalKeys = function (prefix) {
+    try {
+        return Object.keys(window.localStorage).filter(function (k) { return k.indexOf(prefix) === 0; });
+    } catch (e) {
+        return [];
+    }
+};
+
+// ---------------------------------------------------------------- یادآوری کارها
+
+window.naraNotifyPermission = function () {
+    if (!('Notification' in window)) return 'unsupported';
+    return Notification.permission;
+};
+
+window.naraRequestNotify = async function () {
+    if (!('Notification' in window)) return 'unsupported';
+    try {
+        return await Notification.requestPermission();
+    } catch (e) {
+        return Notification.permission;
+    }
+};
+
+// صدای کوتاه و ملایم با Web Audio (فایل صوتی لازم نیست). اگر مرورگر به‌خاطر
+// نبودِ تعامل کاربر اجازه‌ی پخش ندهد، بی‌صدا رد می‌شود.
+window.naraChime = function () {
+    try {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return;
+        const ctx = window.__naraAudio || (window.__naraAudio = new Ctx());
+        if (ctx.state === 'suspended') ctx.resume();
+
+        const notes = [880, 1174.66, 1567.98]; // A5, D6, G6
+        const start = ctx.currentTime + 0.02;
+        notes.forEach(function (freq, i) {
+            const t = start + i * 0.16;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.0001, t);
+            gain.gain.exponentialRampToValueAtTime(0.22, t + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
+            osc.connect(gain).connect(ctx.destination);
+            osc.start(t);
+            osc.stop(t + 0.6);
+        });
+    } catch (e) { /* بی‌صدا */ }
+};
+
+// یادآوری: صدا + اعلان سیستم‌عامل. tag با اعلان Firebase یکی است تا اگر هر دو
+// رسیدند فقط یک اعلان دیده شود.
+window.naraTaskAlarm = function (data) {
+    window.naraChime();
+
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
+    try {
+        const n = new Notification(data.title, {
+            body: data.body,
+            tag: data.tag,
+            renotify: true,
+            requireInteraction: true,
+            dir: 'rtl',
+            lang: 'fa',
+            icon: '/icon-192.png'
+        });
+        n.onclick = function () {
+            window.focus();
+            n.close();
+        };
+    } catch (e) {
+        // روی بعضی موبایل‌ها new Notification مجاز نیست؛ اعلان داخل برنامه کافی است.
+    }
+};

@@ -1217,11 +1217,17 @@
     private bool _channelAssetsInitialized;
 
     [Parameter] public List<UserDto> AllUsers { get; set; } = new();
+
+    /// <summary>
+    /// AllUsers همان فهرست ستون چت‌هاست و کانال‌ها و گروه‌ها را هم دارد؛ برای
+    /// افزودن عضو و انتخاب ادمین فقط آدم‌ها معنا دارند.
+    /// </summary>
+    private IEnumerable<UserDto> People => (AllUsers ?? new()).Where(u => !u.IsChannel && !u.IsGroup);
     public bool isAdmin() => SelectedChannel.channel.admins.Any(x => x.Id == CurrentUser.Id);
     public bool isAdminGroup() => SelectedGroup.channel.admins.Any(x => x.Id == CurrentUser.Id);
     private async Task OpenManageAdminsDialog()
     {
-        AllChannelUsers = MapUsersToChannelUsers(AllUsers);
+        AllChannelUsers = MapUsersToChannelUsers(People);
         var parameters = new DialogParameters
             {
                 ["AllUsers"] = AllChannelUsers,
@@ -1279,7 +1285,7 @@
     }
     private async Task OpenAddMemberDialog()
     {
-        var availableUsers = MapUsersToChannelUsers(AllUsers.Where(u => !ChannelMembers.Any(m => m.Id == u.Id)));
+        var availableUsers = MapUsersToChannelUsers(People.Where(u => !ChannelMembers.Any(m => m.Id == u.Id)));
 
         if (!availableUsers.Any())
         {
@@ -1314,7 +1320,7 @@
     }
     private async Task OpenAddMemberGroupDialog()
     {
-        var availableUsers = MapUsersToChannelUsers(AllUsers.Where(u => !GroupMembers.Any(m => m.Id == u.Id)));
+        var availableUsers = MapUsersToChannelUsers(People.Where(u => !GroupMembers.Any(m => m.Id == u.Id)));
 
         if (!availableUsers.Any())
         {
@@ -1357,12 +1363,7 @@
 
     private bool HasAvailableUsersForChannel()
     {
-        if (AllUsers is null || !AllUsers.Any())
-        {
-            return false;
-        }
-
-        return AllUsers.Any(u => !ChannelMembers.Any(m => m.Id == u.Id));
+        return People.Any(u => !ChannelMembers.Any(m => m.Id == u.Id));
     }
 
     private async Task AddMemberToChannelAsync(UserChannelDto user)
@@ -1877,13 +1878,6 @@
     public string Changephone { get; set; } = string.Empty;
     bool ChangeCityToInput = false;
     public string ChangeCity { get; set; } = string.Empty;
-    private ContactChecklist? _checklist;   // @ref
-    private bool _checklistOpen = true;     // برای آیکن والد
-    private void ToggleChecklistFromParent()
-    {
-        _checklistOpen = !_checklistOpen;
-
-    }
     public async Task SubmitEmail()
     {
         if (string.IsNullOrWhiteSpace(ChangeEmail))

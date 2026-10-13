@@ -1,0 +1,228 @@
+@inject IJSRuntime JS
+
+@* انتخاب زمان یادآوری. نتیجه: DateTimeOffset? (null یعنی «حذف یادآوری»)؛
+   بستن دیالوگ یعنی انصراف. *@
+
+<MudDialog ContentStyle="padding: 0;" ActionsClass="pa-0">
+    <TitleContent>
+        <div class="trd-title">
+            <span class="trd-badge"><BellIcon Size="20" Ringing="true" /></span>
+            <div class="trd-titles">
+                <span class="trd-h">یادآوری</span>
+                <span class="trd-sub">@(_selected is DateTime s ? TaskDates.ReminderLabel(s) : "زمانی که باید یادتان بیاید")</span>
+            </div>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <div class="trd" dir="rtl">
+            @if (_permission is "denied" or "default" or "unsupported")
+            {
+                <div class="trd-warn">
+                    <span>
+                        @if (_permission == "denied")
+                        {
+                            @:اعلان‌های مرورگر برای ناراگرام بسته است؛ یادآوری فقط وقتی صفحه باز است دیده می‌شود. از نماد قفل کنار آدرس سایت اجازه‌ی «Notifications» را بدهید.
+                        }
+                        else if (_permission == "unsupported")
+                        {
+                            @:این مرورگر اعلان پشتیبانی نمی‌کند؛ یادآوری فقط داخل صفحه دیده می‌شود.
+                        }
+                        else
+                        {
+                            @:برای اینکه یادآوری حتی با بسته بودن صفحه برسد، اجازه‌ی اعلان بدهید.
+                        }
+                    </span>
+                    @if (_permission == "default")
+                    {
+                        <button type="button" class="trd-warn-btn" @onclick="AskPermissionAsync">اجازه دادن</button>
+                    }
+                </div>
+            }
+
+            <div class="trd-quick">
+                @foreach (var option in _options)
+                {
+                    <button type="button" class="@(_selected == option.At ? "trd-option is-on" : "trd-option")" @onclick="() => Choose(option.At)">
+                        <span class="trd-option-title">@option.Title</span>
+                        <span class="trd-option-time">@TaskDates.ReminderLabel(option.At)</span>
+                    </button>
+                }
+            </div>
+
+            <button type="button" class="trd-custom-toggle" aria-expanded="@(_custom ? "true" : "false")" @onclick="() => _custom = !_custom">
+                <MudIcon Icon="@Icons.Material.Outlined.CalendarMonth" Style="font-size: 18px;" />
+                <span>تاریخ و ساعت دلخواه</span>
+                <MudIcon Icon="@Icons.Material.Filled.ExpandMore" Style="@(_custom ? "font-size: 20px; transform: rotate(180deg);" : "font-size: 20px;")" />
+            </button>
+
+            @if (_custom)
+            {
+                <div class="trd-custom">
+                    <PersianMonthGrid Value="_customDate" ValueChanged="OnCustomDate" MinDate="TaskDates.Today" />
+
+                    <div class="trd-time">
+                        <select class="trd-select" aria-label="ساعت" value="@_hour" @onchange="OnHour">
+                            @for (var h = 0; h < 24; h++)
+                            {
+                                <option value="@h">@TaskDates.Fa(h.ToString("00"))</option>
+                            }
+                        </select>
+                        <span class="trd-colon">:</span>
+                        <select class="trd-select" aria-label="دقیقه" value="@_minute" @onchange="OnMinute">
+                            @for (var m = 0; m < 60; m += 5)
+                            {
+                                <option value="@m">@TaskDates.Fa(m.ToString("00"))</option>
+                            }
+                        </select>
+                        <span class="trd-time-label">ساعت</span>
+                    </div>
+
+                    @if (_selected is DateTime chosen && chosen <= DateTime.Now)
+                    {
+                        <span class="trd-error">این زمان گذشته است.</span>
+                    }
+                </div>
+            }
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <div class="trd-actions">
+            @if (Value is not null)
+            {
+                <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="Remove">حذف یادآوری</MudButton>
+            }
+            <MudSpacer />
+            <MudButton Variant="Variant.Text" OnClick="Cancel">انصراف</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" DropShadow="false"
+                       Disabled="@(_selected is not DateTime at || at <= DateTime.Now)" OnClick="Submit">
+                تنظیم
+            </MudButton>
+        </div>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    /// <summary>یادآوری فعلی (اگر هست).</summary>
+    [Parameter] public DateTimeOffset? Value { get; set; }
+
+    /// <summary>سررسید کار؛ گزینه‌ی «روز سررسید» از آن ساخته می‌شود.</summary>
+    [Parameter] public DateTime? DueDate { get; set; }
+
+    private sealed record Option(string Title, DateTime At);
+
+    private readonly List<Option> _options = new();
+    private DateTime? _selected;           // ساعت محلی مرورگر
+    private bool _custom;
+    private DateTime? _customDate;
+    private int _hour = 9;
+    private int _minute;
+    private string _permission = "granted";
+
+    protected override void OnInitialized()
+    {
+        var now = DateTime.Now;
+        var today = now.Date;
+
+        // نیم ساعت بعد، گرد به ۵ دقیقه
+        var soon = RoundUp(now.AddMinutes(30));
+        _options.Add(new Option("نیم ساعت دیگر", soon));
+        _options.Add(new Option("یک ساعت دیگر", RoundUp(now.AddHours(1))));
+
+        if (now.Hour < 16)
+            _options.Add(new Option("امروز عصر", today.AddHours(17)));
+
+        _options.Add(new Option("فردا صبح", today.AddDays(1).AddHours(9)));
+
+        if (DueDate is DateTime due && due.Date > today.AddDays(1))
+            _options.Add(new Option("صبحِ روز سررسید", due.Date.AddHours(9)));
+        else
+            _options.Add(new Option("شنبه‌ی بعد", TaskDates.NextWeek().AddHours(9)));
+
+        if (Value is DateTimeOffset current)
+        {
+            var local = current.ToLocalTime().DateTime;
+            _selected = local;
+
+            if (_options.All(o => o.At != local))
+            {
+                _custom = true;
+                _customDate = local.Date;
+                _hour = local.Hour;
+                _minute = local.Minute - local.Minute % 5;
+            }
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        try
+        {
+            _permission = await JS.InvokeAsync<string>("naraNotifyPermission");
+            StateHasChanged();
+        }
+        catch (Exception) { /* site.js قدیمی در کش */ }
+    }
+
+    private static DateTime RoundUp(DateTime t)
+    {
+        var minutes = (t.Minute + 4) / 5 * 5;
+        return t.Date.AddHours(t.Hour).AddMinutes(minutes);
+    }
+
+    private void Choose(DateTime at)
+    {
+        _selected = at;
+        _custom = false;
+    }
+
+    private void OnCustomDate(DateTime? date)
+    {
+        _customDate = date;
+        ApplyCustom();
+    }
+
+    private void OnHour(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var h)) _hour = h;
+        ApplyCustom();
+    }
+
+    private void OnMinute(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var m)) _minute = m;
+        ApplyCustom();
+    }
+
+    private void ApplyCustom()
+    {
+        var date = _customDate ?? TaskDates.Today;
+        _customDate = date;
+        _selected = date.Date.AddHours(_hour).AddMinutes(_minute);
+    }
+
+    private async Task AskPermissionAsync()
+    {
+        try
+        {
+            _permission = await JS.InvokeAsync<string>("naraRequestNotify");
+        }
+        catch (Exception) { }
+    }
+
+    private void Submit()
+    {
+        if (_selected is not DateTime at || at <= DateTime.Now)
+            return;
+
+        MudDialog.Close(DialogResult.Ok<DateTimeOffset?>(new DateTimeOffset(at)));
+    }
+
+    private void Remove() => MudDialog.Close(DialogResult.Ok<DateTimeOffset?>(null));
+
+    private void Cancel() => MudDialog.Cancel();
+}

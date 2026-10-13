@@ -1,0 +1,215 @@
+@using System.Text.RegularExpressions
+@inject IDialogService DialogService
+
+@* «افزودن به کارها» از روی یک پیام. فقط پیش‌نویس را برمی‌گرداند؛ ساختن
+   کار و پیوند به پیام در ChatDetail انجام می‌شود. *@
+
+<MudDialog ContentStyle="padding: 0;" ActionsClass="pa-0">
+    <TitleContent>
+        <div class="atm-title">
+            <span class="atm-badge">
+                <TasksIcon Size="22" />
+            </span>
+            <div class="atm-titles">
+                <span class="atm-h">افزودن به کارها</span>
+                <span class="atm-sub">در فهرست کارهای شما با @ContactName</span>
+            </div>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <div class="atm" dir="rtl">
+            <div class="atm-quote">
+                <span class="atm-quote-bar"></span>
+                <div class="atm-quote-body">
+                    <span class="atm-quote-who">@SenderName · @TaskDates.Time(SentAt)</span>
+                    <span class="atm-quote-text">@Preview</span>
+                </div>
+            </div>
+
+            <label class="atm-label" for="atm-text">عنوان کار</label>
+            <textarea id="atm-text"
+                      class="atm-text"
+                      rows="3"
+                      maxlength="500"
+                      @ref="_textRef"
+                      value="@_text"
+                      @oninput="e => _text = e.Value?.ToString() ?? string.Empty"
+                      @onkeydown="OnKey"></textarea>
+
+            <span class="atm-label">سررسید</span>
+            <div class="atm-due">
+                <button type="button" class="@DueClass(TaskDates.Today)" @onclick="() => _due = TaskDates.Today">
+                    @if (_due == TaskDates.Today) { <MudIcon Icon="@Icons.Material.Filled.Check" Style="font-size: 16px;" /> }
+                    امروز
+                </button>
+                <button type="button" class="@DueClass(TaskDates.Today.AddDays(1))" @onclick="() => _due = TaskDates.Today.AddDays(1)">
+                    @if (_due == TaskDates.Today.AddDays(1)) { <MudIcon Icon="@Icons.Material.Filled.Check" Style="font-size: 16px;" /> }
+                    فردا
+                </button>
+                <button type="button" class="@CustomClass" @onclick="PickDateAsync">
+                    <MudIcon Icon="@Icons.Material.Outlined.CalendarMonth" Style="font-size: 16px;" />
+                    @(IsCustom ? TaskDates.Label(_due!.Value) : "انتخاب تاریخ")
+                </button>
+                <button type="button" class="@(_due is null ? "atm-chip is-on" : "atm-chip")" @onclick="() => _due = null">
+                    بدون تاریخ
+                </button>
+            </div>
+
+            <span class="atm-label">یادآوری</span>
+            <button type="button" class="@(_remindAt is null ? "atm-remind" : "atm-remind is-on")" @onclick="PickReminderAsync">
+                <BellIcon Size="18" Ringing="@(_remindAt is not null)" />
+                <span>@(_remindAt is DateTimeOffset r ? TaskDates.ReminderLabel(r) : "بدون یادآوری")</span>
+                @if (_remindAt is not null)
+                {
+                    <span class="atm-remind-clear" role="button" aria-label="حذف یادآوری" @onclick="() => _remindAt = null" @onclick:stopPropagation="true">×</span>
+                }
+            </button>
+
+            <span class="atm-help">
+                <MudIcon Icon="@Icons.Material.Filled.Link" Style="font-size: 15px;" />
+                پیام به این کار پیوند می‌خورد؛ از داخل فهرست با یک کلیک به همین پیام برمی‌گردید.
+            </span>
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <div class="atm-actions">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" DropShadow="false" Size="Size.Large"
+                       Class="atm-primary" Disabled="@(_text.Trim().Length == 0)" OnClick="Submit">
+                افزودن
+            </MudButton>
+            <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Large" Class="atm-secondary" OnClick="Cancel">
+                انصراف
+            </MudButton>
+        </div>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public string ContactName { get; set; } = string.Empty;
+    [Parameter] public string SenderName { get; set; } = string.Empty;
+    [Parameter] public DateTime SentAt { get; set; }
+    [Parameter] public string Preview { get; set; } = string.Empty;
+    [Parameter] public bool IsMobile { get; set; }
+
+    public sealed record Draft(string Text, DateTime? DueDate, DateTimeOffset? RemindAt);
+
+    private string _text = string.Empty;
+    private DateTime? _due = TaskDates.Today;
+    private DateTimeOffset? _remindAt;
+    private ElementReference _textRef;
+
+    private bool IsCustom => _due is DateTime d && d != TaskDates.Today && d != TaskDates.Today.AddDays(1);
+
+    private string CustomClass => IsCustom ? "atm-chip is-on" : "atm-chip";
+
+    private string DueClass(DateTime date) => _due == date ? "atm-chip is-on" : "atm-chip";
+
+    protected override void OnInitialized()
+    {
+        // پیش‌فرض: خود متن پیام. کاربر معمولاً کوتاهش می‌کند.
+        _text = Preview.Length > 200 ? Preview[..200].TrimEnd() + "…" : Preview;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !IsMobile)
+        {
+            try { await _textRef.FocusAsync(); }
+            catch (Exception) { }
+        }
+    }
+
+    private void OnKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && (e.CtrlKey || e.MetaKey))
+            Submit();
+    }
+
+    private async Task PickDateAsync()
+    {
+        var parameters = new DialogParameters<TaskDatePickerDialog> { { x => x.Value, _due } };
+        var options = new DialogOptions
+        {
+            CloseButton = false,
+            CloseOnEscapeKey = true,
+            BackdropClick = true,
+            MaxWidth = MaxWidth.ExtraSmall,
+            Position = IsMobile ? DialogPosition.BottomCenter : DialogPosition.Center,
+        };
+
+        var dialog = await DialogService.ShowAsync<TaskDatePickerDialog>(null, parameters, options);
+        var result = await dialog.Result;
+        if (result is null || result.Canceled)
+            return;
+
+        _due = result.Data as DateTime?;
+        StateHasChanged();
+    }
+
+    private async Task PickReminderAsync()
+    {
+        var parameters = new DialogParameters<TaskReminderDialog>
+        {
+            { x => x.Value, _remindAt },
+            { x => x.DueDate, _due },
+        };
+        var options = new DialogOptions
+        {
+            CloseButton = false,
+            CloseOnEscapeKey = true,
+            BackdropClick = true,
+            MaxWidth = MaxWidth.ExtraSmall,
+            Position = IsMobile ? DialogPosition.BottomCenter : DialogPosition.Center,
+        };
+
+        var dialog = await DialogService.ShowAsync<TaskReminderDialog>(null, parameters, options);
+        var result = await dialog.Result;
+        if (result is null || result.Canceled)
+            return;
+
+        _remindAt = result.Data as DateTimeOffset?;
+        StateHasChanged();
+    }
+
+    private void Submit()
+    {
+        var text = _text.Trim();
+        if (text.Length == 0)
+            return;
+
+        MudDialog.Close(DialogResult.Ok(new Draft(text, _due, _remindAt)));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    /// <summary>متن کوتاه و ساده‌ی پیام برای نقل‌قول و پیش‌فرض عنوان کار.</summary>
+    public static string PreviewOf(ChatMessageDto message)
+    {
+        switch (message.Type)
+        {
+            case MessageType.Image: return Named("تصویر", message);
+            case MessageType.Document: return Named("فایل", message);
+            case MessageType.Audio: return "پیام صوتی";
+            case MessageType.Video: return Named("ویدیو", message);
+            case MessageType.Location: return "موقعیت مکانی";
+        }
+
+        var text = Regex.Replace(message.Content ?? string.Empty, "<[^>]+>", " ");
+        text = System.Net.WebUtility.HtmlDecode(text);
+        text = Regex.Replace(text, @"\s+", " ").Trim();
+        return text.Length == 0 ? "پیام" : text;
+    }
+
+    private static string Named(string kind, ChatMessageDto message)
+    {
+        var name = message.FileContent?.FileName;
+        var caption = Regex.Replace(message.Content ?? string.Empty, @"\s+", " ").Trim();
+
+        if (!string.IsNullOrWhiteSpace(caption) && caption != name)
+            return $"{kind}: {caption}";
+
+        return string.IsNullOrWhiteSpace(name) ? kind : $"{kind}: {name}";
+    }
+}

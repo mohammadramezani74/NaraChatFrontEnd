@@ -161,6 +161,12 @@
                             <MudTooltip Text="فوروارد">
                                 <span class="emoji" @onclick="()=>ForwardMessage(message)">↪️</span>
                             </MudTooltip>
+                            @if (AddToTasksEvent.HasDelegate)
+                            {
+                                <MudTooltip Text="افزودن به کارها">
+                                    <span class="emoji" @onclick="AddToTasks">✅</span>
+                                </MudTooltip>
+                            }
                             <MudTooltip Text="ویرایش">
                                 <span class="emoji" @onclick="()=>EditMessage(message.Id,message.Content)">✏️</span>
                             </MudTooltip>
@@ -192,6 +198,12 @@
                             <MudTooltip Text="فوروارد">
                                 <span class="emoji" @onclick="()=>ForwardMessage(message)">↪️</span>
                             </MudTooltip>
+                            @if (AddToTasksEvent.HasDelegate)
+                            {
+                                <MudTooltip Text="افزودن به کارها">
+                                    <span class="emoji" @onclick="AddToTasks">✅</span>
+                                </MudTooltip>
+                            }
                             <MudTooltip Text="رونوشت">
                                 <span class="emoji" @onclick="()=>copyMessage(message)">📝</span>
                             </MudTooltip>
@@ -206,6 +218,14 @@
                 }
 
 
+                @* داخل حباب، چون MudChat چیدمان grid دارد و فرزند اضافه جایش را به هم می‌زند. *@
+                @if (InTasks)
+                {
+                    <span class="in-tasks-label" title="این پیام در فهرست کارهای شماست">
+                        <TasksIcon Size="14" StrokeWidth="2.1" />
+                        در کارهای شما
+                    </span>
+                }
             </MudChatBubble>
 
 
@@ -221,6 +241,15 @@
 </MudItem>
 
 <style>
+    .in-tasks-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        margin-top: 4px;
+        font-size: 11.5px;
+        font-weight: 500;
+        color: var(--mud-palette-primary);
+    }
     .reply-preview {
     border-radius: 8px;
     }
@@ -307,6 +336,21 @@
     /// <summary>فوروارد این پیام؛ انتخاب مقصد در ChatDetail انجام می‌شود.</summary>
     [Parameter]
     public EventCallback<ChatMessageDto> ForwardMessageEvent { get; set; }
+
+    /// <summary>«افزودن به کارها» — فقط در چت خصوصی مقدار دارد.</summary>
+    [Parameter]
+    public EventCallback<ChatMessageDto> AddToTasksEvent { get; set; }
+
+    /// <summary>این پیام به یکی از کارهای باز شما با این مخاطب پیوند خورده است.</summary>
+    [Parameter]
+    public bool InTasks { get; set; }
+
+    private async Task AddToTasks()
+    {
+        _paperHovering = false;
+        _bubbleHovering = false;
+        await AddToTasksEvent.InvokeAsync(message);
+    }
     [Parameter]
     public EventCallback<Guid> DeletedMessageevent { get; set; }
     [Parameter]

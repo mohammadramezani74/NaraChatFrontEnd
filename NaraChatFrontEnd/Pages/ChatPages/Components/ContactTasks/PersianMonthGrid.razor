@@ -1,0 +1,84 @@
+@* تقویم ماهانه‌ی جلالی (هفته از شنبه). مستقل از فرهنگ مرورگر. *@
+
+<div class="pmg" dir="rtl">
+    <div class="pmg-month">
+        <button type="button" class="pmg-nav" aria-label="ماه قبل" @onclick="() => Shift(-1)">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg>
+        </button>
+        <span class="pmg-title">@TaskDates.MonthTitle(_year, _month)</span>
+        <button type="button" class="pmg-nav" aria-label="ماه بعد" @onclick="() => Shift(1)">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6"></path></svg>
+        </button>
+    </div>
+
+    <div class="pmg-grid" role="grid">
+        @foreach (var head in TaskDates.WeekHeader)
+        {
+            <span class="pmg-head">@head</span>
+        }
+
+        @for (var i = 0; i < TaskDates.LeadingBlanks(_year, _month); i++)
+        {
+            <span></span>
+        }
+
+        @for (var day = 1; day <= TaskDates.DaysInMonth(_year, _month); day++)
+        {
+            var date = TaskDates.FromPersian(_year, _month, day);
+            var disabled = MinDate is DateTime min && date < min.Date;
+            <button type="button"
+                    class="@DayClass(date)"
+                    disabled="@disabled"
+                    aria-label="@TaskDates.Full(date)"
+                    aria-pressed="@(Value?.Date == date ? "true" : "false")"
+                    @onclick="() => Pick(date)">
+                @TaskDates.Fa(day)
+            </button>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public DateTime? Value { get; set; }
+    [Parameter] public EventCallback<DateTime?> ValueChanged { get; set; }
+
+    /// <summary>روزهای قبل از این تاریخ غیرفعال‌اند (برای یادآوری).</summary>
+    [Parameter] public DateTime? MinDate { get; set; }
+
+    private int _year;
+    private int _month;
+    private DateTime? _shownFor;
+
+    protected override void OnParametersSet()
+    {
+        // ماهِ نمایش فقط وقتی مقدار از بیرون عوض شد جابه‌جا می‌شود، نه با هر رندر.
+        if (_year == 0 || Value?.Date != _shownFor)
+        {
+            (_year, _month) = TaskDates.YearMonth(Value ?? TaskDates.Today);
+            _shownFor = Value?.Date;
+        }
+    }
+
+    private void Shift(int delta)
+    {
+        _month += delta;
+        if (_month < 1) { _month = 12; _year--; }
+        if (_month > 12) { _month = 1; _year++; }
+    }
+
+    private async Task Pick(DateTime date)
+    {
+        _shownFor = date.Date;
+        await ValueChanged.InvokeAsync(date.Date);
+    }
+
+    private string DayClass(DateTime date)
+    {
+        var css = "pmg-day";
+        if (date == TaskDates.Today) css += " is-today";
+        if (date < TaskDates.Today) css += " is-past";
+        if (Value?.Date == date) css += " is-on";
+        if (date.DayOfWeek == DayOfWeek.Friday) css += " is-holiday";
+        return css;
+    }
+}

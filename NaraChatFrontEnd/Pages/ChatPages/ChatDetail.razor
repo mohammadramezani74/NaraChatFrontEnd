@@ -2,6 +2,7 @@
 @using System.Text.Json
 @using static NaraChatFrontEnd.Pages.ChatPages.Components.DialogComponents.UploadDialogComponent
 @using NaraChat.Application.Services.ChatServices.Channels;
+@using NaraChatFrontEnd.Pages.ChatPages.Components.ContactTasks
 @inject IJSRuntime js
 @inject IConversationService chatService
 @inject IChannelService _channelservice
@@ -340,7 +341,10 @@ else if (SelectedGroup != null)
 }
 else
 {
-    <MudCard Class="d-flex flex-column h-100 w-100" >
+    @* روی دسکتاپ کارها در ستون کناری (کنار «مشخصات») است و Chat.razor آن را می‌کشد؛
+       اینجا فقط برگه‌ی پایینِ موبایل رسم می‌شود. *@
+    <div class="ct-host">
+    <MudCard Class="d-flex flex-column h-100 w-100" Style="flex: 1 1 auto; min-width: 0;">
 
     <MudCardHeader @onclick="()=>gotoDetailForMobile(OtherUser)" Class="border-bottom" Style="flex-shrink:0;">
         <div class="d-flex justify-content-between align-items-center w-100">
@@ -380,6 +384,12 @@ else
                 }
             </div>
                 <div class="d-flex align-items-center flex-shrink-0" @onclick:stopPropagation="true">
+
+                    @* روی دسکتاپ کارها تبِ ستون کناری است؛ دکمه فقط برای برگه‌ی موبایل. *@
+                    @if (OtherUser is not null && IsMobile)
+                    {
+                        @TasksButton
+                    }
 
                     <MudIconButton Icon="@Icons.Material.Filled.Search"
                                    Color="@(_searchOpen ? Color.Primary : Color.Default)"
@@ -518,6 +528,17 @@ else
     </MudCardActions>
 
 </MudCard>
+
+    @if (OtherUser is not null && IsMobile)
+    {
+        <ContactTasksPanel ContactId="OtherUser.Id"
+                           ContactName="@OtherUser.Name"
+                           Open="TasksOpen"
+                           IsMobile="IsMobile"
+                           OnClose="CloseTasks"
+                           OnOpenMessage="OpenTaskMessage" />
+    }
+    </div>
 }
 
 
@@ -700,6 +721,8 @@ else
         {
         <MessageComponent DeletedMessageevent="DeleteTargetMessage" IsMine="message.IsMine" CurrentUser="CurrentUser" message="message"
                           ReplyMessageEvent="HandleReplyMessage" ForwardMessageEvent="HandleForwardMessage" Conversation="Conversation" EditMessageEvent="OnEditMessageHandler"
+                          AddToTasksEvent="AddMessageToTasks"
+                          InTasks="@IsMessageInTasks(message)"
                           ParentMessage="@HandelParentMessage(message)"
                           ParentSenderName="@HandelParentSender(message)"
                           OnParentClick="JumpToMessage"
@@ -713,6 +736,8 @@ else
         {
             <FileMessageComponent DeletedMessageevent="DeleteTargetMessage" IsMine="message.IsMine" CurrentUser="CurrentUser" message="message"
                               CanPin="@CanPin"
+                              AddToTasksEvent="AddMessageToTasks"
+                              InTasks="@IsMessageInTasks(message)"
                               TogglePinEvent="OnTogglePinRequested"
                               ReplyMessageEvent="HandleReplyMessage" ForwardMessageEvent="HandleForwardMessage" Conversation="Conversation" EditMessageEvent="OnEditMessageHandler"
                                   ParentMessage="@HandelParentMessage(message)"></FileMessageComponent>
@@ -752,6 +777,27 @@ else
                                        GroupId="@SelectedGroup.Id"></FileGroupMessageComponent>
         }
     </div>;
+    // -------------------------------------------------- دکمه‌ی «کارها» در سربرگ
+
+    private RenderFragment TasksButton =>
+    @<MudTooltip Text="@(TasksOpen ? "بستن کارها" : "کارهای شما با این مخاطب")" Arrow="true">
+        <button type="button"
+                class="ct-header-btn @(TasksOpen ? "is-active" : "")"
+                aria-pressed="@(TasksOpen ? "true" : "false")"
+                aria-label="کارها"
+                @onclick="ToggleTasks">
+            <TasksIcon Size="21" Filled="TasksOpen" />
+            @if (!IsMobile)
+            {
+                <span class="ct-header-label">کارها</span>
+            }
+            @if (OpenTaskCount > 0)
+            {
+                <span class="ct-header-badge @(OverdueTaskCount > 0 ? "is-overdue" : "")">@OpenTaskCountText</span>
+            }
+        </button>
+    </MudTooltip>;
+
     private bool ShowChatActions =>
            SelectedChannel is not null || SelectedGroup is not null || Conversation is not null;
     private RenderFragment ChatActionsMenu =>

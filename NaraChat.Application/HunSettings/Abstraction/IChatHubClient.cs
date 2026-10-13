@@ -33,5 +33,11 @@ namespace NaraChat.Application.HunSettings.Abstraction
         Task ChatHistoryCleared(Guid conversationOrChannelId);
         Task MessagePinChanged(Guid scopeId, Guid messageId, bool pinned);
 
+        /// <summary>کارهای شخصی کاربر درباره‌ی یک مخاطب از دستگاه یا تب دیگری عوض شد.</summary>
+        Task ContactTasksChanged(Guid contactId);
+
+        /// <summary>زمان یادآوری یکی از کارهای کاربر رسید.</summary>
+        Task TaskReminder(NaraChat.Contract.Models.ContactTasks.TaskReminderDto reminder);
+
     }
 }

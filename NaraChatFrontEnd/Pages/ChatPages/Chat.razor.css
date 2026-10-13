@@ -6,3 +6,108 @@
     border: 1px solid #5e10d2;
     padding: 2px 5px;
 }
+
+/* ---------------- ستون کناری: مشخصات / کارها ---------------- */
+
+.side-bar {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px 8px;
+    border-bottom: 1px solid var(--mud-palette-lines-default);
+    background: var(--mud-palette-surface);
+}
+
+.side-tabs {
+    flex: 1;
+    display: flex;
+    gap: 2px;
+    padding: 3px;
+    border-radius: 14px;
+    background: var(--mud-palette-background-gray);
+}
+
+.side-tab {
+    flex: 1 1 0;
+    height: 36px;
+    border: 0;
+    border-radius: 11px;
+    background: transparent;
+    color: var(--mud-palette-text-secondary);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background-color .18s ease, color .18s ease, box-shadow .18s ease;
+}
+
+    .side-tab:hover {
+        color: var(--mud-palette-text-primary);
+    }
+
+    .side-tab.is-active {
+        background: var(--mud-palette-surface);
+        color: var(--mud-palette-primary);
+        box-shadow: 0 1px 2px rgba(20, 26, 35, .08), 0 1px 6px rgba(20, 26, 35, .06);
+    }
+
+    .side-tab:focus-visible {
+        outline: 2px solid var(--mud-palette-primary);
+        outline-offset: 1px;
+    }
+
+.side-tab-badge {
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: var(--mud-palette-primary);
+    color: var(--mud-palette-primary-text);
+    font-size: 10.5px;
+    font-weight: 700;
+    line-height: 18px;
+    text-align: center;
+}
+
+    .side-tab-badge.is-overdue {
+        background: #B4470F;
+        color: #fff;
+    }
+
+.side-close {
+    flex-shrink: 0;
+    width: 38px;
+    height: 38px;
+    border: 0;
+    border-radius: 12px;
+    background: transparent;
+    color: var(--mud-palette-text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+    .side-close:hover {
+        background: var(--mud-palette-action-default-hover);
+        color: var(--mud-palette-text-primary);
+    }
+
+.side-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+    .side-body.is-hidden {
+        display: none;
+    }

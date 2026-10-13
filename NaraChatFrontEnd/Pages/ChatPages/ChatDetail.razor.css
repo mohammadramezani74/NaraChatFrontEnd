@@ -416,3 +416,68 @@
         transition: none;
     }
 }
+/* ---------------- کارها با مخاطب ---------------- */
+
+/* ظرف چت خصوصی و پنل کارها، کنار هم. container-type به پنل اجازه می‌دهد
+   وقتی ستون باریک است روی چت بنشیند (ContactTasksPanel.razor.css). */
+.ct-host {
+    position: relative;
+    display: flex;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    overflow: hidden;
+}
+
+
+.ct-header-btn {
+    position: relative;
+    height: 38px;
+    padding: 0 10px;
+    margin-inline-end: 4px;
+    border: 0;
+    border-radius: 12px;
+    background: transparent;
+    color: var(--mud-palette-text-secondary);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: background-color .15s, color .15s;
+}
+
+    .ct-header-btn:hover {
+        background: var(--mud-palette-action-default-hover);
+        color: var(--mud-palette-text-primary);
+    }
+
+    .ct-header-btn.is-active {
+        background: color-mix(in srgb, var(--mud-palette-primary) 12%, transparent);
+        color: var(--mud-palette-primary);
+    }
+
+    .ct-header-btn:focus-visible {
+        outline: 2px solid var(--mud-palette-primary);
+        outline-offset: 2px;
+    }
+
+.ct-header-badge {
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: var(--mud-palette-primary);
+    color: var(--mud-palette-primary-text);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 20px;
+    text-align: center;
+}
+
+    .ct-header-badge.is-overdue {
+        background: #B4470F;
+        color: #fff;
+    }

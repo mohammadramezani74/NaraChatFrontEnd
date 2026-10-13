@@ -1,0 +1,789 @@
+/* ==========================================================================
+   پنل کارها با مخاطب
+   رنگ‌ها از پالت MudBlazor می‌آیند تا تم تیره هم درست شود.
+   ========================================================================== */
+
+.ct-panel {
+    --ct-accent: var(--mud-palette-primary);
+    --ct-accent-soft: color-mix(in srgb, var(--mud-palette-primary) 12%, transparent);
+    --ct-overdue: #B4470F;
+    --ct-overdue-soft: color-mix(in srgb, #B4470F 12%, transparent);
+    --ct-line: var(--mud-palette-lines-default);
+    --ct-muted: var(--mud-palette-text-secondary);
+    --ct-ink: var(--mud-palette-text-primary);
+    --ct-surface: var(--mud-palette-surface);
+    --ct-soft: var(--mud-palette-background-gray);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    background: var(--ct-surface);
+    color: var(--ct-ink);
+    font-family: inherit;
+    box-sizing: border-box;
+}
+
+    .ct-panel *,
+    .ct-panel *::before,
+    .ct-panel *::after {
+        box-sizing: border-box;
+    }
+
+/* ---------------------------------------------------- کنار چت (دسکتاپ) */
+
+.ct-panel.is-side {
+    flex: 0 0 344px;
+    width: 344px;
+    height: 100%;
+    border-inline-start: 1px solid var(--ct-line);
+    animation: ct-side-in .22s cubic-bezier(.2, .8, .2, 1);
+}
+
+/* داخل ستون کناری دسکتاپ، کنار تب «مشخصات» */
+.ct-panel.is-embedded {
+    flex: 1 1 auto;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    animation: ct-fade .18s ease-out;
+}
+
+    .ct-panel.is-embedded .ct-head {
+        padding-top: 14px;
+    }
+
+@keyframes ct-side-in {
+    from { opacity: 0; transform: translateX(-12px); }
+    to { opacity: 1; transform: none; }
+}
+
+/* ------------------------------------------------- برگه‌ی پایین (موبایل) */
+
+.ct-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 1150;
+    background: rgba(20, 26, 35, .42);
+    animation: ct-fade .2s ease-out;
+}
+
+.ct-panel.is-sheet {
+    position: fixed;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: 1151;
+    height: min(82dvh, 720px);
+    border-radius: 24px 24px 0 0;
+    box-shadow: 0 -12px 40px rgba(20, 26, 35, .18);
+    padding-bottom: env(safe-area-inset-bottom);
+    animation: ct-sheet-in .28s cubic-bezier(.2, .8, .2, 1);
+}
+
+@keyframes ct-sheet-in {
+    from { transform: translateY(100%); }
+    to { transform: none; }
+}
+
+@keyframes ct-fade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.ct-grabber {
+    flex-shrink: 0;
+    height: 22px;
+    border: 0;
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+    .ct-grabber span {
+        width: 40px;
+        height: 5px;
+        border-radius: 999px;
+        background: var(--ct-line);
+    }
+
+/* ------------------------------------------------------------- سربرگ */
+
+.ct-head {
+    flex-shrink: 0;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 18px 20px 12px;
+}
+
+.is-sheet .ct-head {
+    padding-top: 4px;
+}
+
+.ct-titles {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.ct-title {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 700;
+    line-height: 1.5;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ct-private {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    color: var(--ct-muted);
+}
+
+.ct-head-count {
+    flex-shrink: 0;
+    padding-top: 4px;
+    font-size: 12px;
+    color: var(--ct-muted);
+    white-space: nowrap;
+}
+
+.ct-icon-btn {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border: 0;
+    border-radius: 12px;
+    background: var(--ct-soft);
+    color: var(--ct-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color .15s, color .15s;
+}
+
+    .ct-icon-btn:hover {
+        background: var(--mud-palette-action-default-hover);
+        color: var(--ct-ink);
+    }
+
+/* ---------------------------------------------------------- پیشرفت */
+
+.ct-progress {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 0 20px 14px;
+    border-bottom: 1px solid var(--ct-line);
+}
+
+.ct-progress-text {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--ct-muted);
+}
+
+.ct-progress-track {
+    height: 6px;
+    border-radius: 999px;
+    background: var(--ct-soft);
+    overflow: hidden;
+}
+
+.ct-progress-bar {
+    height: 100%;
+    border-radius: 999px;
+    background: var(--ct-accent);
+    transition: width .35s cubic-bezier(.2, .8, .2, 1);
+}
+
+/* ------------------------------------------------------------ نوشتن */
+
+.ct-composer {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px 20px 10px;
+}
+
+.is-sheet .ct-composer {
+    flex-direction: column-reverse;
+    padding: 10px 16px 14px;
+    border-top: 1px solid var(--ct-line);
+    background: var(--ct-surface);
+}
+
+.ct-input {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 48px;
+    padding: 0 6px 0 14px;
+    padding-inline: 14px 6px;
+    border: 1.5px solid var(--ct-line);
+    border-radius: 14px;
+    background: var(--ct-surface);
+    transition: border-color .15s, box-shadow .15s;
+}
+
+    .ct-input:focus-within,
+    .ct-input.has-text {
+        border-color: var(--ct-accent);
+        box-shadow: 0 0 0 3px var(--ct-accent-soft);
+    }
+
+    .ct-input ::deep .ct-input-icon {
+        flex-shrink: 0;
+        font-size: 20px;
+        color: var(--ct-accent);
+    }
+
+    .ct-input input {
+        flex: 1;
+        min-width: 0;
+        height: 100%;
+        border: 0;
+        outline: none;
+        background: transparent;
+        font: inherit;
+        font-size: 14px;
+        color: var(--ct-ink);
+    }
+
+        .ct-input input::placeholder {
+            color: var(--ct-muted);
+            opacity: .85;
+        }
+
+.ct-send {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border: 0;
+    border-radius: 11px;
+    background: var(--ct-accent);
+    color: var(--mud-palette-primary-text);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: opacity .15s, transform .1s;
+}
+
+    .ct-send:active {
+        transform: scale(.94);
+    }
+
+    .ct-send:disabled {
+        opacity: .35;
+        cursor: default;
+    }
+
+.ct-chips {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.ct-chips-label {
+    font-size: 12px;
+    color: var(--ct-muted);
+    margin-inline-end: 2px;
+}
+
+.ct-chip {
+    height: 30px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--ct-soft);
+    color: var(--ct-muted);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    transition: background-color .15s, color .15s;
+}
+
+    .ct-chip:hover {
+        background: var(--mud-palette-action-default-hover);
+        color: var(--ct-ink);
+    }
+
+    .ct-chip.is-on {
+        background: var(--ct-accent);
+        color: var(--mud-palette-primary-text);
+        font-weight: 600;
+    }
+
+.ct-chips-sep {
+    width: 1px;
+    height: 18px;
+    margin: 0 2px;
+    background: var(--ct-line);
+}
+
+.ct-chip.is-remind {
+    background: var(--ct-accent-soft);
+    color: var(--ct-accent);
+    font-weight: 600;
+}
+
+/* ------------------------------------------------------------ فهرست */
+
+.ct-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 2px 10px 12px;
+    scrollbar-width: thin;
+}
+
+.ct-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.ct-group-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 10px 4px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ct-muted);
+}
+
+    .ct-group-head.is-overdue {
+        color: var(--ct-overdue);
+    }
+
+    .ct-group-head.is-today {
+        color: var(--ct-accent);
+    }
+
+.ct-group-count {
+    min-width: 22px;
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: var(--ct-soft);
+    text-align: center;
+}
+
+.is-overdue .ct-group-count {
+    background: var(--ct-overdue-soft);
+}
+
+.is-today .ct-group-count {
+    background: var(--ct-accent-soft);
+}
+
+/* ---------------------------------------------------------- ردیف کار */
+
+.ct-item {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 2px 2px 2px 6px;
+    padding-inline: 2px 6px;
+    border-radius: 14px;
+    transition: background-color .15s, opacity .3s, transform .3s;
+}
+
+    .ct-item:hover,
+    .ct-item.is-editing {
+        background: var(--mud-palette-action-default-hover);
+    }
+
+    .ct-item.is-pending {
+        opacity: .55;
+    }
+
+    .ct-item.is-completing {
+        opacity: .5;
+    }
+
+        .ct-item.is-completing .ct-text {
+            text-decoration: line-through;
+            color: var(--ct-muted);
+        }
+
+.ct-check {
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.ct-ring {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid color-mix(in srgb, var(--ct-muted) 70%, transparent);
+    color: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color .18s, border-color .18s, color .18s, transform .18s;
+}
+
+.ct-check:hover .ct-ring {
+    border-color: var(--ct-accent);
+    color: var(--ct-accent);
+}
+
+.ct-check.is-overdue .ct-ring {
+    border-color: var(--ct-overdue);
+}
+
+.ct-check.is-checked .ct-ring {
+    background: var(--ct-accent);
+    border-color: var(--ct-accent);
+    color: var(--mud-palette-primary-text);
+    transform: scale(1.08);
+}
+
+.ct-check:focus-visible .ct-ring {
+    box-shadow: 0 0 0 3px var(--ct-accent-soft);
+}
+
+.ct-body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 0 8px;
+}
+
+.ct-text {
+    font-size: 14px;
+    line-height: 1.75;
+    color: var(--ct-ink);
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+    cursor: text;
+}
+
+.ct-edit {
+    width: 100%;
+    min-height: 52px;
+    resize: vertical;
+    border: 1.5px solid var(--ct-accent);
+    border-radius: 10px;
+    padding: 6px 10px;
+    font: inherit;
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--ct-ink);
+    background: var(--ct-surface);
+    outline: none;
+    box-shadow: 0 0 0 3px var(--ct-accent-soft);
+}
+
+.ct-edit-hint {
+    font-size: 11px;
+    color: var(--ct-muted);
+}
+
+.ct-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+}
+
+.ct-due {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ct-muted);
+    cursor: pointer;
+    border-radius: 6px;
+    padding: 1px 2px;
+}
+
+    .ct-due:hover {
+        background: var(--ct-soft);
+    }
+
+    .ct-due.is-overdue {
+        color: var(--ct-overdue);
+        font-weight: 600;
+    }
+
+    .ct-due.is-today {
+        color: var(--ct-accent);
+        font-weight: 600;
+    }
+
+.ct-remind {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 1px 2px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ct-accent);
+    cursor: pointer;
+}
+
+    .ct-remind:hover {
+        background: var(--ct-soft);
+    }
+
+    .ct-remind.is-sent {
+        color: var(--ct-muted);
+        font-weight: 500;
+        text-decoration: line-through;
+        text-decoration-thickness: 1px;
+    }
+
+.ct-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 1px 2px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ct-accent);
+    cursor: pointer;
+}
+
+    .ct-link:hover {
+        text-decoration: underline;
+    }
+
+.ct-more {
+    flex-shrink: 0;
+    padding-top: 6px;
+    opacity: 0;
+    transition: opacity .15s;
+}
+
+.ct-item:hover .ct-more,
+.ct-item:focus-within .ct-more,
+.is-sheet .ct-more {
+    opacity: 1;
+}
+
+.ct-offline {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 10px 6px 4px;
+    padding: 8px 12px;
+    border-radius: 12px;
+    background: var(--ct-soft);
+    font-size: 12.5px;
+    color: var(--ct-muted);
+}
+
+.ct-text-btn.is-accent {
+    color: var(--ct-accent);
+}
+
+    .ct-text-btn.is-accent:hover {
+        background: var(--ct-accent-soft);
+    }
+
+/* ------------------------------------------------------ حالت‌های خالی */
+
+.ct-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 40px 20px;
+    text-align: center;
+}
+
+.ct-empty-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: var(--ct-accent-soft);
+    color: var(--ct-accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ct-empty-title {
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.ct-empty-text {
+    max-width: 260px;
+    font-size: 13px;
+    line-height: 1.8;
+    color: var(--ct-muted);
+}
+
+.ct-skeleton {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 16px 6px;
+}
+
+.ct-skel-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    height: 44px;
+    padding-inline: 12px;
+}
+
+.ct-skel-dot,
+.ct-skel-line {
+    background: linear-gradient(90deg, var(--ct-soft) 0%, var(--mud-palette-action-default-hover) 50%, var(--ct-soft) 100%);
+    background-size: 200% 100%;
+    animation: ct-shimmer 1.2s linear infinite;
+}
+
+.ct-skel-dot {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.ct-skel-line {
+    height: 12px;
+    border-radius: 6px;
+}
+
+@keyframes ct-shimmer {
+    from { background-position: 200% 0; }
+    to { background-position: -200% 0; }
+}
+
+/* ---------------------------------------------------------- انجام‌شده */
+
+.ct-done {
+    flex-shrink: 0;
+    border-top: 1px solid var(--ct-line);
+    padding: 6px 10px 8px;
+}
+
+.ct-done-head {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.ct-done-toggle {
+    flex: 1;
+    min-height: 44px;
+    border: 0;
+    border-radius: 12px;
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 10px;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ct-muted);
+    cursor: pointer;
+}
+
+    .ct-done-toggle:hover {
+        background: var(--mud-palette-action-default-hover);
+    }
+
+    .ct-done-toggle ::deep .ct-chev {
+        transition: transform .2s;
+    }
+
+        .ct-done-toggle ::deep .ct-chev.is-open {
+            transform: rotate(180deg);
+        }
+
+.ct-text-btn {
+    flex-shrink: 0;
+    height: 36px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--mud-palette-error);
+    cursor: pointer;
+}
+
+    .ct-text-btn:hover {
+        background: color-mix(in srgb, var(--mud-palette-error) 10%, transparent);
+    }
+
+.ct-done-list {
+    max-height: 220px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.ct-item.is-done {
+    align-items: center;
+}
+
+    .ct-item.is-done .ct-text {
+        font-size: 13.5px;
+        color: var(--ct-muted);
+        text-decoration: line-through;
+        cursor: default;
+    }
+
+.ct-done-more {
+    padding: 6px 12px;
+    font-size: 12px;
+    color: var(--ct-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ct-panel,
+    .ct-scrim,
+    .ct-progress-bar,
+    .ct-ring,
+    .ct-item {
+        animation: none !important;
+        transition: none !important;
+    }
+}

@@ -12,6 +12,9 @@
 @inject NavigationManager nm
 @inject AuthenticationStateProvider stateprovider
 @inject IDialogService dialogService
+@inject NaraChat.Application.Services.ContactTasks.ContactTaskStore TaskStore
+@using NaraChat.Contract.Models.ContactTasks
+@using NaraChatFrontEnd.Pages.ChatPages.Components.ContactTasks
 @implements IAsyncDisposable
 
 
@@ -75,6 +78,8 @@
                             FalseScroll="FalsingScrol"
                             trueScroll="trueingScrol"
                             GoToSettingInMobile="GoToSettingInMobile"
+                            OnToggleTasks="ToggleTasksSide"
+                            OnShowInfo="ShowInfoSide"
                             SelectedChannel="SelectedChannel"
                             SelectedGroup="SelectedGroup"
                             channelcount="ChannelCount"
@@ -148,6 +153,8 @@
                         FalseScroll="FalsingScrol"
                         trueScroll="trueingScrol"
                         GoToSettingInMobile="GoToSettingInMobile" 
+                        OnToggleTasks="ToggleTasksSide"
+                        OnShowInfo="ShowInfoSide"
                         SelectedChannel="SelectedChannel"
                         SelectedGroup="SelectedGroup"
                         channelcount="ChannelCount"
@@ -158,19 +165,65 @@
                     @if (ThemeChanging.IsShowSetting)
                     {
                         <MudItem xs="12" sm="3" Class="h-100 d-flex flex-column" Style="padding:0; position:relative; overflow:hidden;">
-                            <MudIconButton Icon="@Icons.Material.Filled.Close"
-                            Color="Color.Default"
-                            Class="ma-2"
-                            Style="position:absolute; right:0; z-index:1000;"
-                            OnClick="ToggleUserInfo" />
-                            <UserInfo MyAvatar="@myAvatar"
-                            ChosenUser="_selectedUser"
-                            OnPictureChanged="OnChanedPicture"
-                            OnClearChosenUser="OnClearUserSelected"
-                            OnBlockedUser="BlockedUser"
-                            SelectedChannel="SelectedChannel"
-                            SelectedGroup="SelectedGroup"
-                            AllUsers="Users.ToList()" />
+                            @* یک ستون، دو تب: مشخصات مخاطب و کارهای شما با او (فقط چت خصوصی).
+                               UserInfo عمداً بیرون از هر if است تا با عوض شدن تب یا رفتن
+                               به کانال/گروه همان نمونه بماند؛ Dispose آن ستون را می‌بندد. *@
+                            @if (CanShowTasksTab)
+                            {
+                                <div class="side-bar">
+                                    <div class="side-tabs" role="tablist" aria-label="ستون کناری">
+                                        <button type="button" role="tab"
+                                                class="side-tab @(TaskStore.SideTab == ContactSideTab.Info ? "is-active" : "")"
+                                                aria-selected="@(TaskStore.SideTab == ContactSideTab.Info ? "true" : "false")"
+                                                @onclick="() => SelectSideTab(ContactSideTab.Info)">
+                                            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8.5" r="3.75"></circle><path d="M4.75 20a7.25 7.25 0 0 1 14.5 0"></path></svg>
+                                            مشخصات
+                                        </button>
+                                        <button type="button" role="tab"
+                                                class="side-tab @(TaskStore.SideTab == ContactSideTab.Tasks ? "is-active" : "")"
+                                                aria-selected="@(TaskStore.SideTab == ContactSideTab.Tasks ? "true" : "false")"
+                                                @onclick="() => SelectSideTab(ContactSideTab.Tasks)">
+                                            <TasksIcon Size="17" />
+                                            کارها
+                                            @if (TaskStore.OpenCount(OtherUser!.Id) is > 0 and var openCount)
+                                            {
+                                                <span class="side-tab-badge @(TaskStore.OverdueCount(OtherUser.Id) > 0 ? "is-overdue" : "")">@(openCount > 99 ? "۹۹+" : TaskDates.Fa(openCount))</span>
+                                            }
+                                        </button>
+                                    </div>
+                                    <button type="button" class="side-close" aria-label="بستن ستون" @onclick="ToggleUserInfo">
+                                        <MudIcon Icon="@Icons.Material.Filled.Close" Style="font-size: 20px;" />
+                                    </button>
+                                </div>
+
+                                <div class="side-body @(TaskStore.SideTab == ContactSideTab.Tasks ? "" : "is-hidden")" role="tabpanel">
+                                    <ContactTasksPanel ContactId="OtherUser!.Id"
+                                                       ContactName="@OtherUser.Name"
+                                                       Open="true"
+                                                       Embedded="true"
+                                                       OnClose="ToggleUserInfo"
+                                                       OnOpenMessage="id => TaskStore.RequestJump(id)" />
+                                </div>
+                            }
+                            else
+                            {
+                                <MudIconButton Icon="@Icons.Material.Filled.Close"
+                                Color="Color.Default"
+                                Class="ma-2"
+                                Style="position:absolute; right:0; z-index:1000;"
+                                OnClick="ToggleUserInfo" />
+                            }
+
+                            <div class="side-body @(CanShowTasksTab && TaskStore.SideTab == ContactSideTab.Tasks ? "is-hidden" : "")" role="tabpanel">
+                                <UserInfo MyAvatar="@myAvatar"
+                                ChosenUser="_selectedUser"
+                                OnPictureChanged="OnChanedPicture"
+                                OnClearChosenUser="OnClearUserSelected"
+                                OnBlockedUser="BlockedUser"
+                                SelectedChannel="SelectedChannel"
+                                SelectedGroup="SelectedGroup"
+                                AllUsers="Users.ToList()" />
+                            </div>
                         </MudItem>
                     }
                 }
@@ -319,6 +372,10 @@
                     IsMobile = false;
             }
             _ = LoadDeferredDataAsync();
+
+            // شمارش کارهای باز برای ستون چت‌ها، و انتقال یک‌باره‌ی چک‌لیست
+            // قدیمیِ مرورگر به سرور. هیچ‌کدام نباید باز شدن صفحه را معطل کنند.
+            _ = InitContactTasksAsync();
 
 
         }
@@ -489,6 +546,16 @@
 
   
 
+    // کارهای شخصی از دستگاه یا تب دیگری عوض شد.
+    hubConnection.On<Guid>(nameof(IChatHubClient.ContactTasksChanged), (contactId) =>
+    {
+        TaskStore.NotifyRemote(contactId);
+    });
+    // زمان یادآوری یک کار رسید.
+    hubConnection.On<TaskReminderDto>(nameof(IChatHubClient.TaskReminder), (reminder) =>
+    {
+        _ = InvokeAsync(() => HandleTaskReminderAsync(reminder));
+    });
     hubConnection.On<Guid>(nameof(IChatHubClient.ChatHistoryCleared), (id) =>
 {
     ClearedHistoryId = id;
@@ -915,8 +982,128 @@
             await _hubConnection!.SendAsync("SetUserOffline", Logineduser);
         }
     }
+    private async Task InitContactTasksAsync()
+    {
+        try
+        {
+            TaskStore.Changed += OnTaskStoreChanged;
+            TaskStore.OpenRequested += OnTasksOpenRequested;
+            if (Logineduser is not null)
+                await TaskStore.ImportLegacyAsync(Logineduser.Id);
+            await TaskStore.RefreshCountsAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[tasks] init failed: {ex.Message}");
+        }
+    }
+
+    // ---------------------------------------------- ستون کناری: مشخصات / کارها
+
+    /// <summary>تب «کارها» فقط برای چت خصوصی و فقط روی دسکتاپ.</summary>
+    private bool CanShowTasksTab => !IsMobile
+                                    && OtherUser is not null
+                                    && SelectedChannel is null
+                                    && SelectedGroup is null;
+
+    private void SelectSideTab(ContactSideTab tab)
+    {
+        TaskStore.SideTab = tab;
+        StateHasChanged();
+    }
+
+    /// <summary>دکمه‌ی «کارها» در سربرگ چت.</summary>
+    private void ToggleTasksSide()
+    {
+        if (ThemeChanging.IsShowSetting && TaskStore.SideTab == ContactSideTab.Tasks)
+        {
+            ThemeChanging.IsShowSetting = false;
+        }
+        else
+        {
+            if (OtherUser is not null)
+                _selectedUser = OtherUser;
+            TaskStore.SideTab = ContactSideTab.Tasks;
+            ThemeChanging.IsShowSetting = true;
+        }
+        StateHasChanged();
+    }
+
+    /// <summary>کلیک روی نام مخاطب در سربرگ چت: همیشه «مشخصات».</summary>
+    private void ShowInfoSide()
+    {
+        if (OtherUser is not null && SelectedChannel is null && SelectedGroup is null)
+            _selectedUser = OtherUser;
+        TaskStore.SideTab = ContactSideTab.Info;
+        ThemeChanging.IsShowSetting = true;
+        StateHasChanged();
+    }
+
+    private void OnTaskStoreChanged(Guid? contactId) => _ = InvokeAsync(StateHasChanged);
+
+    private void OnTasksOpenRequested()
+    {
+        if (IsMobile)
+            return; // برگه‌ی موبایل را خود ChatDetail باز می‌کند
+
+        TaskStore.ConsumeOpenRequest();
+        if (OtherUser is not null)
+            _selectedUser = OtherUser;
+        ThemeChanging.IsShowSetting = true;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    // ------------------------------------------------------- یادآوری کارها
+
+    private async Task HandleTaskReminderAsync(TaskReminderDto reminder)
+    {
+        // صدا و اعلان سیستم‌عامل (اگر اجازه داده شده). tag همان tag اعلان Firebase
+        // است تا اگر هر دو رسیدند فقط یکی دیده شود.
+        try
+        {
+            await js.InvokeVoidAsync("naraTaskAlarm", new
+            {
+                title = $"یادآوری · {reminder.ContactName}",
+                body = reminder.Text,
+                tag = $"task-{reminder.TaskId}",
+            });
+        }
+        catch (Exception) { /* site.js قدیمی در کش */ }
+
+        TaskStore.RaiseReminder(reminder);
+
+        snackbar.Add($"⏰ یادآوری: {reminder.Text} — {reminder.ContactName}", Severity.Info, config =>
+        {
+            config.RequireInteraction = true;
+            config.ShowCloseIcon = true;
+            config.Action = "باز کردن";
+            config.ActionColor = Color.Primary;
+            config.OnClick = _ => InvokeAsync(() => OpenContactTasksAsync(reminder.ContactId));
+        });
+    }
+
+    /// <summary>چت مخاطب را باز می‌کند و کارهایش را نشان می‌دهد.</summary>
+    private async Task OpenContactTasksAsync(Guid contactId)
+    {
+        var user = Users.FirstOrDefault(u => u.Id == contactId && !u.IsChannel && !u.IsGroup);
+        if (user is null)
+            return;
+
+        if (OtherUser?.Id != contactId)
+        {
+            user.IsSelected = true;
+            await OnUserSelected(user);
+            await OnOtherUserSelected(user);
+        }
+
+        TaskStore.RequestOpen();
+        StateHasChanged();
+    }
+
     public async ValueTask DisposeAsync()
     {
+        TaskStore.Changed -= OnTaskStoreChanged;
+        TaskStore.OpenRequested -= OnTasksOpenRequested;
         await _hubConnection!.SendAsync("SetUserOffline", Logineduser);
         Console.WriteLine($"{Logineduser.Name} is offlined");
         if (_hubConnection is not null)

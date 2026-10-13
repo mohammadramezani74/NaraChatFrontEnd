@@ -1,0 +1,59 @@
+@* انتخاب سررسید با تقویم جلالی. نتیجه: DateTime? (null یعنی «بدون تاریخ»)؛
+   بستن دیالوگ یعنی انصراف. *@
+
+<MudDialog Class="ct-date-dialog" ContentStyle="padding: 0;">
+    <TitleContent>
+        <div class="ctd-title">
+            <span>انتخاب سررسید</span>
+            @if (_selected is DateTime s)
+            {
+                <span class="ctd-title-sub">@TaskDates.Full(s)</span>
+            }
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <div class="ctd" dir="rtl">
+            <div class="ctd-quick">
+                <button type="button" class="@QuickClass(TaskDates.Today)" @onclick="() => Pick(TaskDates.Today)">امروز</button>
+                <button type="button" class="@QuickClass(TaskDates.Today.AddDays(1))" @onclick="() => Pick(TaskDates.Today.AddDays(1))">فردا</button>
+                <button type="button" class="@QuickClass(TaskDates.NextWeek())" @onclick="() => Pick(TaskDates.NextWeek())">هفته‌ی بعد</button>
+            </div>
+
+            <PersianMonthGrid Value="_selected" ValueChanged="v => _selected = v" />
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <div class="ctd-actions">
+            <MudButton Variant="Variant.Text" Color="Color.Default" OnClick="Clear" StartIcon="@Icons.Material.Outlined.EventBusy">بدون تاریخ</MudButton>
+            <MudSpacer />
+            <MudButton Variant="Variant.Text" OnClick="Cancel">انصراف</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" DropShadow="false" Disabled="@(_selected is null)" OnClick="Submit">تأیید</MudButton>
+        </div>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public DateTime? Value { get; set; }
+
+    private DateTime? _selected;
+
+    protected override void OnInitialized()
+    {
+        _selected = Value?.Date;
+    }
+
+    private void Pick(DateTime date)
+    {
+        _selected = date.Date;
+    }
+
+    private string QuickClass(DateTime date) => _selected == date.Date ? "ctd-chip is-on" : "ctd-chip";
+
+    private void Submit() => MudDialog.Close(DialogResult.Ok<DateTime?>(_selected));
+
+    private void Clear() => MudDialog.Close(DialogResult.Ok<DateTime?>(null));
+
+    private void Cancel() => MudDialog.Cancel();
+}

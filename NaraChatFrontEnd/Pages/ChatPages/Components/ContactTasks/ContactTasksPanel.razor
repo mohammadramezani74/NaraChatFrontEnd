@@ -1,0 +1,933 @@
+@using NaraChat.Application.Services.ContactTasks
+@using NaraChat.Contract.Models.ContactTasks
+@implements IDisposable
+@inject IContactTaskService TaskService
+@inject ContactTaskStore Store
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+@* پنل «کارها با این مخاطب». همیشه برای چت خصوصی mount می‌شود تا شمارش سربرگ
+   و نشانِ «در کارهای شما» روی پیام‌ها درست باشد؛ وقتی بسته است چیزی رسم نمی‌کند. *@
+
+@if (Open)
+{
+    @if (IsMobile)
+    {
+        <div class="ct-scrim" @onclick="Close"></div>
+    }
+
+    <section class="ct-panel @(IsMobile ? "is-sheet" : Embedded ? "is-embedded" : "is-side")"
+             dir="rtl"
+             role="complementary"
+             aria-label="@($"کارها با {ContactName}")"
+             @onkeydown="OnPanelKey">
+
+        @if (IsMobile)
+        {
+            <button type="button" class="ct-grabber" aria-label="بستن" @onclick="Close"><span></span></button>
+        }
+
+        <header class="ct-head">
+            <div class="ct-titles">
+                <h2 class="ct-title">کارها با @ContactName</h2>
+                <span class="ct-private">
+                    <MudIcon Icon="@Icons.Material.Outlined.Lock" Style="font-size: 14px;" />
+                    فقط شما این فهرست را می‌بینید
+                </span>
+            </div>
+            @if (!IsMobile && !Embedded)
+            {
+                <button type="button" class="ct-icon-btn" aria-label="بستن پنل کارها" @onclick="Close">
+                    <MudIcon Icon="@Icons.Material.Filled.Close" Style="font-size: 20px;" />
+                </button>
+            }
+            else if (Total > 0)
+            {
+                <span class="ct-head-count">@TaskDates.Fa(DoneTotal) از @TaskDates.Fa(Total)</span>
+            }
+        </header>
+
+        @if (Total > 0)
+        {
+            <div class="ct-progress">
+                @if (!IsMobile)
+                {
+                    <div class="ct-progress-text">
+                        <span>پیشرفت</span>
+                        <span>@TaskDates.Fa(DoneTotal) از @TaskDates.Fa(Total) انجام شده</span>
+                    </div>
+                }
+                <div class="ct-progress-track"><div class="ct-progress-bar" style="width: @(ProgressPercent)%;"></div></div>
+            </div>
+        }
+
+        @if (!IsMobile)
+        {
+            @Composer
+        }
+
+        <div class="ct-scroll">
+            @if (_loading && _open.Count == 0 && _done.Count == 0)
+            {
+                <div class="ct-skeleton">
+                    @for (var i = 0; i < 4; i++)
+                    {
+                        <div class="ct-skel-row">
+                            <span class="ct-skel-dot"></span>
+                            <span class="ct-skel-line" style="width: @(80 - i * 12)%;"></span>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                @if (_loadFailed)
+                {
+                    <div class="ct-offline" role="status">
+                        <span>ارتباط با سرور برقرار نشد.</span>
+                        <button type="button" class="ct-text-btn is-accent" @onclick="ReloadAsync">تلاش دوباره</button>
+                    </div>
+                }
+
+                @foreach (var group in Groups())
+                {
+                    <div class="ct-group" @key="group.Bucket">
+                        <div class="@($"ct-group-head is-{BucketCss(group.Bucket)}")">
+                            <span>@TaskDates.BucketTitle(group.Bucket)</span>
+                            <span class="ct-group-count">@TaskDates.Fa(group.Items.Count)</span>
+                        </div>
+                        @foreach (var task in group.Items)
+                        {
+                            @OpenRow(task, group.Bucket)
+                        }
+                    </div>
+                }
+
+                @if (_open.Count == 0 && !_loadFailed)
+                {
+                    <div class="ct-empty">
+                        <span class="ct-empty-icon">
+                            <TasksIcon Size="26" />
+                        </span>
+                        @if (Total == 0)
+                        {
+                            <span class="ct-empty-title">فهرست خالی است</span>
+                            <span class="ct-empty-text">هر کاری با @ContactName دارید اینجا بنویسید، یا روی یک پیام «افزودن به کارها» را بزنید.</span>
+                        }
+                        else
+                        {
+                            <span class="ct-empty-title">کاری باقی نمانده</span>
+                            <span class="ct-empty-text">همه‌ی کارهای شما با @ContactName انجام شده.</span>
+                        }
+                    </div>
+                }
+            }
+        </div>
+
+        @if (_doneCount > 0)
+        {
+            <div class="ct-done">
+                <div class="ct-done-head">
+                    <button type="button" class="ct-done-toggle" aria-expanded="@(_doneOpen ? "true" : "false")" @onclick="() => _doneOpen = !_doneOpen">
+                        <span>انجام‌شده (@TaskDates.Fa(_doneCount))</span>
+                        <MudIcon Icon="@Icons.Material.Filled.ExpandMore" Class="@(_doneOpen ? "ct-chev is-open" : "ct-chev")" />
+                    </button>
+                    @if (_doneOpen)
+                    {
+                        <button type="button" class="ct-text-btn" @onclick="ClearDoneAsync">پاک کردن همه</button>
+                    }
+                </div>
+                @if (_doneOpen)
+                {
+                    <div class="ct-done-list">
+                        @foreach (var task in _done)
+                        {
+                            <div class="ct-item is-done" @key="task.Id">
+                                <button type="button" class="ct-check is-checked" aria-label="برگرداندن به کارهای باز" @onclick="() => ToggleAsync(task)">
+                                    <span class="ct-ring">@CheckSvg</span>
+                                </button>
+                                <span class="ct-text">@task.Text</span>
+                            </div>
+                        }
+                        @if (_doneCount > _done.Count)
+                        {
+                            <span class="ct-done-more">و @TaskDates.Fa(_doneCount - _done.Count) مورد قدیمی‌تر</span>
+                        }
+                    </div>
+                }
+            </div>
+        }
+
+        @if (IsMobile)
+        {
+            @Composer
+        }
+    </section>
+}
+
+@code {
+    // ------------------------------------------------------------ پارامترها
+
+    [Parameter, EditorRequired] public Guid ContactId { get; set; }
+    [Parameter] public string ContactName { get; set; } = string.Empty;
+    [Parameter] public bool Open { get; set; }
+    [Parameter] public bool IsMobile { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    /// <summary>داخل ستون کناری دسکتاپ (کنار «مشخصات»)؛ دکمه‌ی بستن را خود ستون دارد.</summary>
+    [Parameter] public bool Embedded { get; set; }
+
+    /// <summary>کلیک روی «از پیام»: شناسه‌ی پیام برای پرش.</summary>
+    [Parameter] public EventCallback<Guid> OnOpenMessage { get; set; }
+
+    // --------------------------------------------------------------- وضعیت
+
+    private enum DueChoice { Today, Tomorrow, None, Custom }
+
+    private readonly List<ContactTaskDto> _open = new();
+    private readonly List<ContactTaskDto> _done = new();
+    private readonly HashSet<Guid> _pending = new();     // هنوز در سرور ثبت نشده
+    private readonly HashSet<Guid> _completing = new();  // در حال انیمیشن تیک
+
+    private int _doneCount;
+    private Guid _loadedFor;
+    private int _loadToken;
+    private bool _loading;
+    private bool _loadFailed;
+    private bool _doneOpen;
+
+    private string _draft = string.Empty;
+    private DueChoice _due = DueChoice.Today;
+    private DateTimeOffset? _draftReminder;
+    private DateTime? _customDue;
+
+    private Guid? _editingId;
+    private string _editText = string.Empty;
+    private ElementReference _editRef;
+    private bool _focusEdit;
+
+    private CancellationTokenSource? _remoteDebounce;
+
+    private int Total => _open.Count + _doneCount;
+    private int DoneTotal => _doneCount;
+    private int ProgressPercent => Total == 0 ? 0 : (int)Math.Round(DoneTotal * 100.0 / Total);
+
+    // -------------------------------------------------------------- چرخه‌ی عمر
+
+    protected override void OnInitialized()
+    {
+        Store.RemoteChanged += OnRemoteChanged;
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (ContactId != Guid.Empty && ContactId != _loadedFor)
+        {
+            _loadedFor = ContactId;
+            _open.Clear();
+            _done.Clear();
+            _doneCount = 0;
+            _editingId = null;
+            _draft = string.Empty;
+            _draftReminder = null;
+            _doneOpen = false;
+            await LoadAsync();
+        }
+    }
+
+    public void Dispose()
+    {
+        Store.RemoteChanged -= OnRemoteChanged;
+        _remoteDebounce?.Cancel();
+        _remoteDebounce?.Dispose();
+    }
+
+    private async Task ReloadAsync() => await LoadAsync();
+
+    private async Task LoadAsync(bool retried = false)
+    {
+        var token = ++_loadToken;
+        var contactId = ContactId;
+
+        _loading = true;
+        _loadFailed = false;
+
+        var list = await TaskService.GetListAsync(contactId);
+
+        // اگر وسط کار مخاطب عوض شد، جواب قدیمی را دور بینداز.
+        if (token != _loadToken || contactId != ContactId)
+            return;
+
+        _loading = false;
+
+        if (list is null)
+        {
+            // یک بار بی‌صدا دوباره؛ قطعی‌های لحظه‌ای شبکه نباید پیام خطا نشان دهند.
+            if (!retried)
+            {
+                await Task.Delay(1500);
+                if (token == _loadToken && contactId == ContactId)
+                    await LoadAsync(retried: true);
+                return;
+            }
+
+            _loadFailed = true;
+            StateHasChanged();
+            return;
+        }
+
+        // کارهایی که هنوز در راه سرورند نباید با بارگذاری دوباره گم شوند.
+        var pending = _open.Where(t => _pending.Contains(t.Id)).ToList();
+
+        _open.Clear();
+        _open.AddRange(list.Open);
+        _open.AddRange(pending.Where(p => _open.All(o => o.Id != p.Id)));
+
+        _done.Clear();
+        _done.AddRange(list.Done);
+        _doneCount = list.DoneCount;
+
+        PublishSnapshot();
+        StateHasChanged();
+    }
+
+    private void OnRemoteChanged(Guid contactId)
+    {
+        if (contactId != ContactId)
+            return;
+
+        // چند تغییر پشت سر هم (مثلاً پاک کردن همه) فقط یک بار بارگذاری می‌شود.
+        _remoteDebounce?.Cancel();
+        _remoteDebounce?.Dispose();
+        _remoteDebounce = new CancellationTokenSource();
+        var ct = _remoteDebounce.Token;
+
+        _ = InvokeAsync(async () =>
+        {
+            try { await Task.Delay(350, ct); }
+            catch (TaskCanceledException) { return; }
+
+            if (_editingId is null)
+                await LoadAsync();
+        });
+    }
+
+    private void PublishSnapshot() => Store.SetSnapshot(ContactId, _open.Where(t => !_pending.Contains(t.Id)));
+
+    private async Task Close() => await OnClose.InvokeAsync();
+
+    private async Task OnPanelKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape" && _editingId is null)
+            await Close();
+    }
+
+    // -------------------------------------------------------------- گروه‌ها
+
+    private sealed record TaskGroup(ContactTaskBucket Bucket, List<ContactTaskDto> Items);
+
+    private IEnumerable<TaskGroup> Groups()
+    {
+        return _open
+            .GroupBy(t => TaskDates.Bucket(t.DueDate))
+            .OrderBy(g => g.Key)
+            .Select(g => new TaskGroup(g.Key, g.Key is ContactTaskBucket.Overdue or ContactTaskBucket.Later
+                ? g.OrderBy(t => t.DueDate).ThenBy(t => t.SortOrder).ThenBy(t => t.CreatedAt).ToList()
+                : g.OrderBy(t => t.SortOrder).ThenBy(t => t.CreatedAt).ToList()));
+    }
+
+    // ------------------------------------------------------------ افزودن
+
+    private DateTime? ChosenDue => _due switch
+    {
+        DueChoice.Today => TaskDates.Today,
+        DueChoice.Tomorrow => TaskDates.Today.AddDays(1),
+        DueChoice.Custom => _customDue,
+        _ => null,
+    };
+
+    private async Task OnComposerKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !e.ShiftKey)
+            await AddAsync();
+    }
+
+    private async Task AddAsync()
+    {
+        var text = _draft.Trim();
+        if (text.Length == 0)
+            return;
+
+        if (text.Length > 500)
+            text = text[..500];
+
+        var contactId = ContactId;
+        var due = ChosenDue;
+        var remindAt = _draftReminder;
+
+        // درج خوش‌بینانه: کاربر بلافاصله کارش را می‌بیند و می‌تواند بعدی را بنویسد.
+        var temp = new ContactTaskDto
+        {
+            Id = Guid.NewGuid(),
+            ContactId = contactId,
+            Text = text,
+            DueDate = due,
+            RemindAt = remindAt,
+            SortOrder = (_open.Count == 0 ? 0 : _open.Max(t => t.SortOrder)) + 1,
+            CreatedAt = DateTime.Now,
+        };
+
+        _pending.Add(temp.Id);
+        _open.Add(temp);
+        _draft = string.Empty;
+        _draftReminder = null;
+        StateHasChanged();
+
+        var result = await TaskService.CreateAsync(contactId, text, due, remindAt: remindAt);
+
+        _pending.Remove(temp.Id);
+        var index = _open.FindIndex(t => t.Id == temp.Id);
+
+        if (!result.Ok)
+        {
+            if (index >= 0) _open.RemoveAt(index);
+            if (contactId == ContactId && string.IsNullOrEmpty(_draft))
+            {
+                _draft = text;
+                _draftReminder ??= remindAt;
+            }
+            Snackbar.Add(result.Message, Severity.Error);
+            StateHasChanged();
+            return;
+        }
+
+        if (contactId != ContactId)
+            return;
+
+        if (index >= 0)
+            _open[index] = result.Task!;
+
+        PublishSnapshot();
+        StateHasChanged();
+    }
+
+    private void SetDue(DueChoice choice)
+    {
+        _due = choice;
+        if (choice != DueChoice.Custom)
+            _customDue = null;
+    }
+
+    private async Task PickCustomDueAsync()
+    {
+        var picked = await PickDateAsync(_customDue ?? TaskDates.Today.AddDays(2));
+        if (picked.Canceled)
+            return;
+
+        if (picked.Date is null)
+        {
+            SetDue(DueChoice.None);
+            return;
+        }
+
+        _customDue = picked.Date;
+        _due = picked.Date == TaskDates.Today ? DueChoice.Today
+             : picked.Date == TaskDates.Today.AddDays(1) ? DueChoice.Tomorrow
+             : DueChoice.Custom;
+    }
+
+    private string ChipClass(DueChoice choice) => _due == choice ? "ct-chip is-on" : "ct-chip";
+
+    // ------------------------------------------------------ تیک / برگشت
+
+    private async Task ToggleAsync(ContactTaskDto task)
+    {
+        if (_pending.Contains(task.Id) || _completing.Contains(task.Id))
+            return;
+
+        var done = !task.IsDone;
+
+        if (done)
+        {
+            // اول تیک و خط‌خوردن دیده شود، بعد ردیف به «انجام‌شده» برود.
+            _completing.Add(task.Id);
+            StateHasChanged();
+            await Task.Delay(420);
+            _completing.Remove(task.Id);
+        }
+
+        ApplyDone(task, done);
+        StateHasChanged();
+
+        var result = await TaskService.SetDoneAsync(task.Id, done);
+        if (!result.Ok)
+        {
+            ApplyDone(task, !done);
+            Snackbar.Add(result.Message, Severity.Error);
+            StateHasChanged();
+            return;
+        }
+
+        if (result.Task is not null)
+            Replace(result.Task);
+
+        if (done)
+        {
+            Snackbar.Add("انجام شد", Severity.Normal, config =>
+            {
+                config.Action = "برگردان";
+                config.ActionColor = Color.Primary;
+                config.VisibleStateDuration = 4000;
+                config.OnClick = _ => InvokeAsync(() => ToggleAsync(Find(task.Id) ?? task));
+            });
+        }
+    }
+
+    private void ApplyDone(ContactTaskDto task, bool done)
+    {
+        _open.RemoveAll(t => t.Id == task.Id);
+        _done.RemoveAll(t => t.Id == task.Id);
+
+        task.IsDone = done;
+        task.DoneAt = done ? DateTime.Now : null;
+
+        if (done)
+        {
+            _done.Insert(0, task);
+            _doneCount++;
+        }
+        else
+        {
+            task.SortOrder = (_open.Count == 0 ? 0 : _open.Max(t => t.SortOrder)) + 1;
+            _open.Add(task);
+            _doneCount = Math.Max(0, _doneCount - 1);
+        }
+
+        PublishSnapshot();
+    }
+
+    private ContactTaskDto? Find(Guid id)
+        => _open.FirstOrDefault(t => t.Id == id) ?? _done.FirstOrDefault(t => t.Id == id);
+
+    private void Replace(ContactTaskDto fresh)
+    {
+        var i = _open.FindIndex(t => t.Id == fresh.Id);
+        if (i >= 0) { _open[i] = fresh; return; }
+
+        i = _done.FindIndex(t => t.Id == fresh.Id);
+        if (i >= 0) _done[i] = fresh;
+    }
+
+    // --------------------------------------------------------- ویرایش متن
+
+    private void StartEdit(ContactTaskDto task)
+    {
+        if (_pending.Contains(task.Id))
+            return;
+
+        _editingId = task.Id;
+        _editText = task.Text;
+        _focusEdit = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusEdit && _editingId is not null)
+        {
+            _focusEdit = false;
+            try { await _editRef.FocusAsync(); }
+            catch (Exception) { /* عنصر هنوز رسم نشده */ }
+        }
+    }
+
+    private async Task OnEditKey(KeyboardEventArgs e, ContactTaskDto task)
+    {
+        if (e.Key == "Enter" && !e.ShiftKey)
+            await SaveEditAsync(task);
+        else if (e.Key == "Escape")
+            _editingId = null;
+    }
+
+    private async Task SaveEditAsync(ContactTaskDto task)
+    {
+        if (_editingId != task.Id)
+            return;
+
+        _editingId = null;
+        var text = _editText.Trim();
+
+        if (text.Length == 0 || text == task.Text)
+            return;
+
+        await UpdateAsync(task, text, task.DueDate, task.RemindAt);
+    }
+
+    // ------------------------------------------------------------ سررسید
+
+    private async Task SetTaskDueAsync(ContactTaskDto task, DateTime? due)
+    {
+        if (task.DueDate?.Date == due?.Date)
+            return;
+
+        await UpdateAsync(task, task.Text, due, task.RemindAt);
+    }
+
+    private async Task PickTaskDueAsync(ContactTaskDto task)
+    {
+        var picked = await PickDateAsync(task.DueDate);
+        if (!picked.Canceled)
+            await SetTaskDueAsync(task, picked.Date);
+    }
+
+    private async Task UpdateAsync(ContactTaskDto task, string text, DateTime? due, DateTimeOffset? remindAt)
+    {
+        var oldText = task.Text;
+        var oldDue = task.DueDate;
+        var oldRemind = task.RemindAt;
+        var oldSent = task.ReminderSent;
+
+        task.Text = text;
+        task.DueDate = due?.Date;
+        if (remindAt != task.RemindAt)
+        {
+            task.RemindAt = remindAt;
+            task.ReminderSent = false;
+        }
+        PublishSnapshot();
+        StateHasChanged();
+
+        var result = await TaskService.UpdateAsync(task.Id, text, due, remindAt);
+        if (!result.Ok)
+        {
+            task.Text = oldText;
+            task.DueDate = oldDue;
+            task.RemindAt = oldRemind;
+            task.ReminderSent = oldSent;
+            PublishSnapshot();
+            Snackbar.Add(result.Message, Severity.Error);
+            StateHasChanged();
+            return;
+        }
+
+        Replace(result.Task!);
+        StateHasChanged();
+    }
+
+    // ------------------------------------------------------------ یادآوری
+
+    private async Task<(bool Canceled, DateTimeOffset? At)> PickReminderAsync(DateTimeOffset? current, DateTime? due)
+    {
+        var parameters = new DialogParameters<TaskReminderDialog>
+        {
+            { x => x.Value, current },
+            { x => x.DueDate, due },
+        };
+
+        var options = new DialogOptions
+        {
+            CloseButton = false,
+            CloseOnEscapeKey = true,
+            BackdropClick = true,
+            MaxWidth = MaxWidth.ExtraSmall,
+            Position = IsMobile ? DialogPosition.BottomCenter : DialogPosition.Center,
+        };
+
+        var dialog = await DialogService.ShowAsync<TaskReminderDialog>(null, parameters, options);
+        var result = await dialog.Result;
+
+        if (result is null || result.Canceled)
+            return (true, null);
+
+        return (false, result.Data as DateTimeOffset?);
+    }
+
+    private async Task PickTaskReminderAsync(ContactTaskDto task)
+    {
+        // یادآوریِ ارسال‌شده دیگر معنایی ندارد؛ دیالوگ از صفر باز می‌شود.
+        var current = task.ReminderSent ? null : task.RemindAt;
+        var picked = await PickReminderAsync(current, task.DueDate);
+        if (picked.Canceled)
+            return;
+
+        await UpdateAsync(task, task.Text, task.DueDate, picked.At);
+    }
+
+    private async Task ClearTaskReminderAsync(ContactTaskDto task)
+        => await UpdateAsync(task, task.Text, task.DueDate, null);
+
+    private async Task PickDraftReminderAsync()
+    {
+        var picked = await PickReminderAsync(_draftReminder, ChosenDue);
+        if (!picked.Canceled)
+            _draftReminder = picked.At;
+    }
+
+    private static bool ReminderPending(ContactTaskDto task)
+        => task.RemindAt is not null && !task.ReminderSent;
+
+    private async Task<(bool Canceled, DateTime? Date)> PickDateAsync(DateTime? current)
+    {
+        var parameters = new DialogParameters<TaskDatePickerDialog>
+        {
+            { x => x.Value, current },
+        };
+
+        var options = new DialogOptions
+        {
+            CloseButton = false,
+            CloseOnEscapeKey = true,
+            BackdropClick = true,
+            MaxWidth = MaxWidth.ExtraSmall,
+            Position = IsMobile ? DialogPosition.BottomCenter : DialogPosition.Center,
+        };
+
+        var dialog = await DialogService.ShowAsync<TaskDatePickerDialog>(null, parameters, options);
+        var result = await dialog.Result;
+
+        if (result is null || result.Canceled)
+            return (true, null);
+
+        return (false, result.Data as DateTime?);
+    }
+
+    // --------------------------------------------------------------- حذف
+
+    private async Task DeleteAsync(ContactTaskDto task)
+    {
+        var wasOpen = _open.Remove(task);
+        if (!wasOpen && _done.Remove(task))
+            _doneCount = Math.Max(0, _doneCount - 1);
+
+        PublishSnapshot();
+        StateHasChanged();
+
+        var (ok, message) = await TaskService.DeleteAsync(task.Id);
+        if (!ok)
+        {
+            if (wasOpen) _open.Add(task);
+            else { _done.Insert(0, task); _doneCount++; }
+            PublishSnapshot();
+            Snackbar.Add(message, Severity.Error);
+            StateHasChanged();
+            return;
+        }
+
+        if (!wasOpen)
+            return;
+
+        // حذف از سرور واقعی است؛ «برگردان» همان کار را دوباره می‌سازد.
+        Snackbar.Add("کار حذف شد", Severity.Normal, config =>
+        {
+            config.Action = "برگردان";
+            config.ActionColor = Color.Primary;
+            config.VisibleStateDuration = 5000;
+            config.OnClick = _ => InvokeAsync(() => RestoreAsync(task));
+        });
+    }
+
+    private async Task RestoreAsync(ContactTaskDto task)
+    {
+        // یادآوری فقط اگر هنوز در آینده است برمی‌گردد؛ سرور زمان گذشته را نمی‌پذیرد.
+        var remindAt = task.RemindAt is DateTimeOffset at && at > DateTimeOffset.Now && !task.ReminderSent ? at : (DateTimeOffset?)null;
+        var result = await TaskService.CreateAsync(task.ContactId, task.Text, task.DueDate, task.SourceMessageId, remindAt);
+        if (!result.Ok)
+        {
+            Snackbar.Add(result.Message, Severity.Error);
+            return;
+        }
+
+        if (task.ContactId != ContactId)
+            return;
+
+        _open.Add(result.Task!);
+        PublishSnapshot();
+        StateHasChanged();
+    }
+
+    private async Task ClearDoneAsync()
+    {
+        var parameters = new DialogParameters<DialogTemplate>
+        {
+            { x => x.ContentText, $"{TaskDates.Fa(_doneCount)} کارِ انجام‌شده برای همیشه پاک شود؟" },
+            { x => x.ButtonText, "پاک شود" },
+            { x => x.Color, Color.Error },
+        };
+
+        var dialog = await DialogService.ShowAsync<DialogTemplate>("پاک کردن انجام‌شده‌ها", parameters,
+            new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall });
+        var confirm = await dialog.Result;
+        if (confirm is null || confirm.Canceled)
+            return;
+
+        var (ok, message) = await TaskService.ClearDoneAsync(ContactId);
+        if (!ok)
+        {
+            Snackbar.Add(message, Severity.Error);
+            return;
+        }
+
+        _done.Clear();
+        _doneCount = 0;
+        _doneOpen = false;
+        StateHasChanged();
+    }
+
+    // ---------------------------------------------------------- پیوند پیام
+
+    private async Task OpenSourceAsync(ContactTaskDto task)
+    {
+        if (task.SourceMessageId is Guid id)
+            await OnOpenMessage.InvokeAsync(id);
+    }
+
+    // ----------------------------------------------------------- قطعه‌ها
+
+    private static string BucketCss(ContactTaskBucket bucket) => bucket.ToString().ToLowerInvariant();
+
+    private RenderFragment CheckSvg =>
+        @<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4 10-10"></path></svg>;
+
+    private RenderFragment Composer =>
+        @<div class="ct-composer">
+            <div class="ct-input @(_draft.Length > 0 ? "has-text" : "")">
+                <MudIcon Icon="@Icons.Material.Filled.Add" Class="ct-input-icon" />
+                <input type="text"
+                       aria-label="کار جدید"
+                       maxlength="500"
+                       placeholder="@(IsMobile ? $"کار جدید با {ContactName}…" : "کار جدید… و Enter")"
+                       value="@_draft"
+                       @oninput="e => _draft = e.Value?.ToString() ?? string.Empty"
+                       @onkeydown="OnComposerKey" />
+                @if (IsMobile || _draft.Length > 0)
+                {
+                    <button type="button" class="ct-send" aria-label="افزودن کار" disabled="@(_draft.Trim().Length == 0)" @onclick="AddAsync">
+                        <MudIcon Icon="@Icons.Material.Filled.ArrowUpward" Style="font-size: 20px;" />
+                    </button>
+                }
+            </div>
+            <div class="ct-chips">
+                <span class="ct-chips-label">سررسید</span>
+                <button type="button" class="@ChipClass(DueChoice.Today)" @onclick="() => SetDue(DueChoice.Today)">امروز</button>
+                <button type="button" class="@ChipClass(DueChoice.Tomorrow)" @onclick="() => SetDue(DueChoice.Tomorrow)">فردا</button>
+                <button type="button" class="@ChipClass(DueChoice.Custom)" aria-label="انتخاب تاریخ" @onclick="PickCustomDueAsync">
+                    <MudIcon Icon="@Icons.Material.Outlined.CalendarMonth" Style="font-size: 15px;" />
+                    @if (_due == DueChoice.Custom && _customDue is DateTime custom)
+                    {
+                        <span>@TaskDates.Label(custom)</span>
+                    }
+                </button>
+                <button type="button" class="@ChipClass(DueChoice.None)" @onclick="() => SetDue(DueChoice.None)">بدون تاریخ</button>
+                <span class="ct-chips-sep"></span>
+                <button type="button" class="@(_draftReminder is null ? "ct-chip" : "ct-chip is-remind")"
+                        aria-label="یادآوری" title="یادآوری" @onclick="PickDraftReminderAsync">
+                    <BellIcon Size="15" />
+                    @if (_draftReminder is DateTimeOffset draftAt)
+                    {
+                        <span>@TaskDates.ReminderLabel(draftAt)</span>
+                    }
+                </button>
+            </div>
+        </div>;
+
+    private RenderFragment OpenRow(ContactTaskDto task, ContactTaskBucket bucket) =>
+        @<div class="ct-item @(_pending.Contains(task.Id) ? "is-pending" : "") @(_completing.Contains(task.Id) ? "is-completing" : "") @(_editingId == task.Id ? "is-editing" : "")" @key="task.Id">
+
+            <button type="button"
+                    class="ct-check @(bucket == ContactTaskBucket.Overdue ? "is-overdue" : "") @(_completing.Contains(task.Id) ? "is-checked" : "")"
+                    aria-label="@($"انجام شد: {task.Text}")"
+                    @onclick="() => ToggleAsync(task)">
+                <span class="ct-ring">@CheckSvg</span>
+            </button>
+
+            <div class="ct-body">
+                @if (_editingId == task.Id)
+                {
+                    <textarea class="ct-edit"
+                              rows="2"
+                              maxlength="500"
+                              aria-label="ویرایش کار"
+                              value="@_editText"
+                              @oninput="e => _editText = e.Value?.ToString() ?? string.Empty"
+                              @ref="_editRef"
+                              @onkeydown="e => OnEditKey(e, task)"
+                              @onkeydown:stopPropagation="true"
+                              @onblur="() => SaveEditAsync(task)"></textarea>
+                    <span class="ct-edit-hint">Enter برای ذخیره · Esc برای انصراف</span>
+                }
+                else
+                {
+                    <span class="ct-text" title="برای ویرایش کلیک کنید" @onclick="() => StartEdit(task)">@task.Text</span>
+                }
+
+                @if (task.DueDate is not null || task.SourceMessageId is not null || task.RemindAt is not null)
+                {
+                    <div class="ct-meta">
+                        @if (task.DueDate is DateTime due)
+                        {
+                            <MudMenu Dense="true" AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
+                                <ActivatorContent>
+                                    <span class="@($"ct-due is-{BucketCss(bucket)}")" title="@TaskDates.Full(due)">
+                                        <MudIcon Icon="@Icons.Material.Outlined.Event" Style="font-size: 14px;" />
+                                        @TaskDates.Label(due)
+                                    </span>
+                                </ActivatorContent>
+                                <ChildContent>
+                                    @DueMenuItems(task)
+                                </ChildContent>
+                            </MudMenu>
+                        }
+                        @if (task.RemindAt is DateTimeOffset remindAt)
+                        {
+                            <button type="button"
+                                    class="@(ReminderPending(task) ? "ct-remind" : "ct-remind is-sent")"
+                                    title="@(ReminderPending(task) ? "یادآوری" : "یادآوری فرستاده شد")"
+                                    @onclick="() => PickTaskReminderAsync(task)">
+                                <BellIcon Size="14" />
+                                @TaskDates.ReminderLabel(remindAt)
+                            </button>
+                        }
+                        @if (task.SourceMessageId is not null)
+                        {
+                            <button type="button" class="ct-link" title="@task.SourcePreview" @onclick="() => OpenSourceAsync(task)">
+                                <MudIcon Icon="@Icons.Material.Filled.Link" Style="font-size: 15px;" />
+                                از پیام@(task.SourceSentAt is DateTime at ? $" · {TaskDates.Time(at)}" : "")
+                            </button>
+                        }
+                    </div>
+                }
+            </div>
+
+            <div class="ct-more">
+                <MudMenu Icon="@Icons.Material.Filled.MoreHoriz" Size="Size.Small" Dense="true"
+                         AriaLabel="گزینه‌های کار"
+                         AnchorOrigin="Origin.BottomLeft" TransformOrigin="Origin.TopLeft">
+                    <MudMenuItem Icon="@Icons.Material.Outlined.Edit" OnClick="() => StartEdit(task)">ویرایش متن</MudMenuItem>
+                    @DueMenuItems(task)
+                    <MudDivider Class="my-1" />
+                    <MudMenuItem Icon="@Icons.Material.Outlined.NotificationsActive" OnClick="() => PickTaskReminderAsync(task)">
+                        @(ReminderPending(task) ? "تغییر یادآوری…" : "یادآوری…")
+                    </MudMenuItem>
+                    @if (task.RemindAt is not null)
+                    {
+                        <MudMenuItem Icon="@Icons.Material.Outlined.NotificationsOff" OnClick="() => ClearTaskReminderAsync(task)">حذف یادآوری</MudMenuItem>
+                    }
+                    <MudDivider Class="my-1" />
+                    <MudMenuItem Icon="@Icons.Material.Outlined.Delete" IconColor="Color.Error" OnClick="() => DeleteAsync(task)">
+                        <span style="color: var(--mud-palette-error);">حذف</span>
+                    </MudMenuItem>
+                </MudMenu>
+            </div>
+        </div>;
+
+    private RenderFragment DueMenuItems(ContactTaskDto task) =>
+        @<text>
+            <MudMenuItem Icon="@Icons.Material.Outlined.Today" OnClick="() => SetTaskDueAsync(task, TaskDates.Today)">امروز</MudMenuItem>
+            <MudMenuItem Icon="@Icons.Material.Outlined.WbSunny" OnClick="() => SetTaskDueAsync(task, TaskDates.Today.AddDays(1))">فردا</MudMenuItem>
+            <MudMenuItem Icon="@Icons.Material.Outlined.DateRange" OnClick="() => SetTaskDueAsync(task, TaskDates.NextWeek())">هفته‌ی بعد</MudMenuItem>
+            <MudMenuItem Icon="@Icons.Material.Outlined.CalendarMonth" OnClick="() => PickTaskDueAsync(task)">انتخاب تاریخ…</MudMenuItem>
+            @if (task.DueDate is not null)
+            {
+                <MudMenuItem Icon="@Icons.Material.Outlined.EventBusy" OnClick="() => SetTaskDueAsync(task, null)">بدون تاریخ</MudMenuItem>
+            }
+        </text>;
+}

@@ -20,9 +20,16 @@ const messaging = firebase.messaging();
 messaging.onBackgroundMessage(function (payload) {
     console.log('[firebase-messaging-sw.js] Received background message ', payload);
     const notificationTitle = payload.notification.title;
+    const data = payload.data || {};
+    const isReminder = data.kind === 'task-reminder';
     const notificationOptions = {
         body: payload.notification.body,
-        icon: '/firebase-logo.png' // یا هر آیکن دیگه
+        icon: isReminder ? '/icon-192.png' : '/firebase-logo.png',
+        // یادآوری کارها: tag یکسان با اعلانی که خود صفحه نشان می‌دهد، تا تکراری نشود.
+        tag: data.tag || undefined,
+        renotify: isReminder,
+        requireInteraction: isReminder,
+        dir: 'rtl'
     };
     console.log(notificationTitle);
     console.log(notificationOptions);
