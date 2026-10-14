@@ -5,6 +5,7 @@ using NaraChat.Application.Services.ChatServices;
 using NaraChat.Application.Services.ChatServices.Channels;
 using NaraChat.Application.Services.ChatServices.Conversation;
 using NaraChat.Application.Services.ContactTasks;
+using NaraChat.Application.Services.Bots;
 using NaraChat.Application.Services.LocalStorage;
 using NaraChat.Application.Services.TokenProvider;
 using NaraChat.Application.Services.Upload;
@@ -59,6 +60,17 @@ namespace NaraChatFrontEnd.IOC.RegisterServices
                 return new ContactTaskService(httpClient);
             });
             services.AddScoped<ContactTaskStore>();
+            services.AddScoped<IBotService, BotService>(sp =>
+            {
+                var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient("apiwithAuth");
+                return new BotService(httpClient);
+            });
+            services.AddScoped<IBotAdminService, BotAdminService>(sp =>
+            {
+                var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient("apiwithAuth");
+                return new BotAdminService(httpClient);
+            });
+            services.AddScoped<BotStore>();
             services.AddScoped<IBrowserUploader, BrowserUploader>();
             return services;
         }

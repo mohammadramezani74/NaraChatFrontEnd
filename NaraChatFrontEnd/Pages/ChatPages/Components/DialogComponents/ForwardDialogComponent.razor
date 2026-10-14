@@ -109,7 +109,7 @@
         // کانال‌هایی که کاربر فقط عضو عادی‌شان است مقصد نیستند؛ آنجا فقط سازنده
         // و مدیران می‌توانند پیام بگذارند (سرور هم همین را بررسی می‌کند).
         if (result is not null)
-            _targets.AddRange(result.Where(t => !t.IsChannel || t.channel?.CurrentUserAdmin == true));
+            _targets.AddRange(result.Where(t => !t.IsBot && (!t.IsChannel || t.channel?.CurrentUserAdmin == true))); // ربات مقصد فوروارد نیست
 
         _loading = false;
         StateHasChanged();

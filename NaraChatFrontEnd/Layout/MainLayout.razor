@@ -24,6 +24,7 @@
 @inject NavigationManager Nav
 @inject IChannelService channelservice
 @inject ISnackbar snackbar
+@inject NaraChat.Application.Services.Bots.IBotService BotService
 @implements IDisposable
 
 
@@ -83,6 +84,11 @@
 
 
                 <MudSpacer />
+                @* پنل ربات‌ها فقط برای ادمین (Admin:UserIds سرور)؛ بقیه حتی لینکش را نمی‌بینند. *@
+                @if (_isBotAdmin)
+                {
+                    <MudIconButton Href="/admin" title="مدیریت ربات‌ها" Icon="@Icons.Material.Filled.SmartToy" Color="Color.Secondary" />
+                }
                 <MudIconButton @onclick="Logout" title="خروج"  Icon="@Icons.Material.Filled.ExitToApp" Color=" Color.Error" />
                 <MudIconButton @onclick="DarkModel" title="@(IsDarkMode?"تم لایت":"تم دارک")" Icon="@(IsDarkMode? @Icons.Material.Filled.LightMode:@Icons.Material.Filled.DarkMode)" Color="@(IsDarkMode?Color.Warning:Color.Default)" />
                @*  <MudIconButton Icon="@Icons.Material.Outlined.Info" *@
@@ -169,9 +175,13 @@ private async Task ShowAbout()
     public UserDto? CurrentUser { get; set; }
     public string? myAvatar { get; set; } = null;
     private bool newVersionAvailable = false;
+    private bool _isBotAdmin;
     protected async override Task OnInitializedAsync()
     {
         newVersionAvailable = await VersionChecker.IsNewVersionAvailableAsync();
+        // فقط وقتی وارد شده، وگرنه 401 باعث رفرش پشت‌سرهمِ صفحه‌ی ورود می‌شود (JwtAuthorizationMessageHandler).
+        stateprovider.AuthenticationStateChanged += OnAuthStateChanged;
+        await RefreshBotAdminAsync(await stateprovider.GetAuthenticationStateAsync());
         CurrentUser = await ((CustomAuthenticationStateProvider)stateprovider).GetUserInfoAsync();
   myAvatar = $"api/v1/chatfiles/{CurrentUser.Id}/{false}/getAvatar";
         var cachedAvatar = await js.InvokeAsync<string>("localStorage.getItem", "userAvatar");
@@ -466,7 +476,25 @@ PaletteLight = new PaletteLight
         };
         public void Dispose()
         {
+            stateprovider.AuthenticationStateChanged -= OnAuthStateChanged;
+        }
 
+        private async Task RefreshBotAdminAsync(AuthenticationState state)
+        {
+            _isBotAdmin = state.User.Identity?.IsAuthenticated == true && await BotService.IsAdminAsync();
+        }
+
+        private async void OnAuthStateChanged(Task<AuthenticationState> task)
+        {
+            try
+            {
+                await RefreshBotAdminAsync(await task);
+                await InvokeAsync(StateHasChanged);
+            }
+            catch (Exception)
+            {
+                // نمایش دکمه‌ی پنل نباید صفحه را بهم بزند.
+            }
         }
 
 

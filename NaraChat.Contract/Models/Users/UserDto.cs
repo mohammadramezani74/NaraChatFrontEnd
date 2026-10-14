@@ -32,6 +32,8 @@ namespace NaraChat.Contract.Models.Users
         public Guid? ConversationId { get; set; }
         public bool IsChannel { get; set; }
         public bool IsGroup { get; set; }
+        /// <summary>این مخاطب یک ربات است.</summary>
+        public bool IsBot { get; set; }
         public ChannelDto? channel { get; set; }
         public UserDto()
         {

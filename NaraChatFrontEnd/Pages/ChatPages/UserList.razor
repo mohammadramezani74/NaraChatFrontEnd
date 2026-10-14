@@ -10,6 +10,16 @@
     <div class="people-header">
 
         <div class="segmented" role="tablist">
+            @* راست‌به‌چپ: ربات‌ها راست، مخاطبین وسط، چت‌های من چپ *@
+            @if (HasBots)
+            {
+                <button type="button"
+                        role="tab"
+                        class="seg-btn @(_activeTab==PeopleTab.Bots ? "is-active" : "")"
+                        @onclick="@(()=>SetTab(PeopleTab.Bots))">
+                    ربات‌ها
+                </button>
+            }
             <button type="button"
                     role="tab"
                     class="seg-btn @(_activeTab==PeopleTab.Contacts ? "is-active" : "")"
@@ -24,10 +34,10 @@
             </button>
         </div>
 
-        @if (_activeTab == PeopleTab.Contacts)
+        @if (_activeTab != PeopleTab.Chats)
         {
             <MudTextField @bind-Value="Search"
-                          Placeholder="جستجوی مخاطب"
+                          Placeholder="@(_activeTab == PeopleTab.Bots ? "جستجوی ربات" : "جستجوی مخاطب")"
                           Variant="Variant.Outlined"
                           Margin="Margin.Dense"
                           Immediate="true"
@@ -73,86 +83,7 @@
         {
             <Virtualize Items="@GetActiveItems()" Context="user" OverscanCount="4" ItemSize="72">
                 <ItemContent>
-                    <div @key="@(user.Id+user.Name)"
-                         class="chat-row @(user.IsSelected ? "is-selected" : "") @(user.messageUnreadedCount > 0 ? "is-unread" : "")"
-                         style="@(user.IsSelected ? $"background-color:{chooseColor()};" : "")"
-                         title="برای سنجاق‌کردن دوبار کلیک کنید"
-                         @onclick="()=>HandleUserClick(user)"
-                         @ondblclick="()=>PinUser(user)">
-
-                        <div class="row-avatar">
-                            <MudAvatar Size="Size.Medium"
-                                       Class="@(user.IsChannel ? "channel-shadow" : user.IsGroup ? "group-shadow" : "")">
-                                @if (user.IsGroup)
-                                {
-                                    <MudImage Src="@(user.avatar != null
-                                                   ? $"{SiteSettings.ApiUrl}{user.avatar}"
-                                                   : "lib/assets/Images/group2.svg")"
-                                              Class="rounded-circle"
-                                              Style="width:100%; height:100%; object-fit:cover;" />
-                                }
-                                else
-                                {
-                                    <MudImage Src="@(user.avatar != null
-                                                   ? $"{SiteSettings.ApiUrl}{user.avatar}"
-                                                   : $"lib/assets/Images/{GetImageName(user.IsChannel)}")"
-                                              Class="rounded-circle"
-                                              Style="width:100%; height:100%; object-fit:cover;" />
-                                }
-                            </MudAvatar>
-
-                            @if (user.IsOnline)
-                            {
-                                <span class="presence-dot"></span>
-                            }
-                        </div>
-
-                        <div class="row-body">
-
-                            <div class="row-line">
-                                <div class="row-name">
-                                    <span class="name-text">@((MarkupString)RenderNameHighlighted(user.Name))</span>
-
-                                    @if (user.IsChannel)
-                                    {
-                                        <MudImage Src="lib/assets/Images/logogo.svg" Alt="کانال" Class="type-badge" />
-                                    }
-                                    else if (user.IsGroup)
-                                    {
-                                        <MudImage Src="lib/assets/Images/group.svg" Alt="گروه" Class="type-badge" />
-                                    }
-
-                                    @if (user.IsPin)
-                                    {
-                                        <MudIcon Icon="@Icons.Material.Filled.PushPin" Class="pin-icon" />
-                                    }
-                                </div>
-
-                                <span class="row-time">@user.LastReceivedMessageSendDate</span>
-                            </div>
-
-                            <div class="row-line">
-                                <p class="row-message" style="@GetLastMessageStyle(user)">
-                                    @((MarkupString)RenderMessageHighlighted(user.LastReceivedMessage))
-                                </p>
-
-                                @if (!user.IsChannel && !user.IsGroup && TaskStore.OpenCount(user.Id) is > 0 and var openTasks)
-                                {
-                                    <span class="task-pill @(TaskStore.OverdueCount(user.Id) > 0 ? "is-overdue" : "")"
-                                          title="@($"{openTasks} کار باز با این مخاطب")">
-                                        <TasksIcon Size="12" StrokeWidth="2.3" />
-                                        @(openTasks > 99 ? "۹۹+" : openTasks.ToString().ToPersianNumber())
-                                    </span>
-                                }
-
-                                @if (user.messageUnreadedCount > 0)
-                                {
-                                    <span class="unread-pill">@GetUnreadCap(user.messageUnreadedCount)</span>
-                                }
-                            </div>
-
-                        </div>
-                    </div>
+                    @UserRow(user)
                 </ItemContent>
 
                 <Placeholder>
@@ -173,11 +104,11 @@
                 <EmptyContent>
                     <div class="empty-state">
                         <div class="empty-icon">
-                            <MudIcon Icon="@(_activeTab == PeopleTab.Chats ? Icons.Material.Outlined.ChatBubbleOutline : Icons.Material.Outlined.PersonSearch)"
+                            <MudIcon Icon="@(_activeTab == PeopleTab.Chats ? Icons.Material.Outlined.ChatBubbleOutline : _activeTab == PeopleTab.Bots ? Icons.Material.Outlined.SmartToy : Icons.Material.Outlined.PersonSearch)"
                                      Size="Size.Large" />
                         </div>
                         <span class="empty-title">
-                            @(_activeTab == PeopleTab.Chats ? "هنوز گفتگویی ندارید" : "مخاطبی پیدا نشد")
+                            @(_activeTab == PeopleTab.Chats ? "هنوز گفتگویی ندارید" : _activeTab == PeopleTab.Bots ? "رباتی پیدا نشد" : "مخاطبی پیدا نشد")
                         </span>
                         <span class="empty-text">
                             @(_activeTab == PeopleTab.Chats
@@ -529,22 +460,165 @@
             transition: none;
         }
     }
+
+    /* ---------- ربات‌ها ---------- */
+    .section-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 14px 4px;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--mud-palette-text-secondary);
+    }
+
+    .section-head.is-bots {
+        color: var(--mud-palette-secondary);
+    }
+
+    .section-count {
+        min-width: 20px;
+        padding: 0 6px;
+        border-radius: 999px;
+        background: var(--mud-palette-background-gray);
+        text-align: center;
+    }
+
+    .bot-badge {
+        flex-shrink: 0;
+        font-size: 10px;
+        font-weight: 700;
+        line-height: 16px;
+        padding: 0 6px;
+        border-radius: 6px;
+        color: var(--mud-palette-secondary);
+        border: 1px solid var(--mud-palette-secondary);
+    }
 </style>
 
 @code {
     // تب‌ها (فقط منطق)
-    private enum PeopleTab { Contacts, Chats }
+    private enum PeopleTab { Contacts, Chats, Bots }
 
     // تب پیش‌فرض: چت‌های من
     private PeopleTab _activeTab = PeopleTab.Chats;
+
+    // ردیف یک مخاطب؛ هم در فهرست اصلی و هم در بخش «ربات‌ها» استفاده می‌شود.
+    private RenderFragment<UserDto> UserRow => user =>
+    @<div @key="@(user.Id+user.Name)"
+                         class="chat-row @(user.IsSelected ? "is-selected" : "") @(user.messageUnreadedCount > 0 ? "is-unread" : "")"
+                         style="@(user.IsSelected ? $"background-color:{chooseColor()};" : "")"
+                         title="برای سنجاق‌کردن دوبار کلیک کنید"
+                         @onclick="()=>HandleUserClick(user)"
+                         @ondblclick="()=>PinUser(user)">
+
+                        <div class="row-avatar">
+                            <MudAvatar Size="Size.Medium"
+                                       Class="@(user.IsChannel ? "channel-shadow" : user.IsGroup ? "group-shadow" : "")">
+                                @if (user.IsBot && user.avatar == null)
+                                {
+                                    <MudIcon Icon="@Icons.Material.Filled.SmartToy" Style="font-size:26px;" />
+                                }
+                                else if (user.IsGroup)
+                                {
+                                    <MudImage Src="@(user.avatar != null
+                                                   ? $"{SiteSettings.ApiUrl}{user.avatar}"
+                                                   : "lib/assets/Images/group2.svg")"
+                                              Class="rounded-circle"
+                                              Style="width:100%; height:100%; object-fit:cover;" />
+                                }
+                                else
+                                {
+                                    <MudImage Src="@(user.avatar != null
+                                                   ? $"{SiteSettings.ApiUrl}{user.avatar}"
+                                                   : $"lib/assets/Images/{GetImageName(user.IsChannel)}")"
+                                              Class="rounded-circle"
+                                              Style="width:100%; height:100%; object-fit:cover;" />
+                                }
+                            </MudAvatar>
+
+                            @if (user.IsOnline)
+                            {
+                                <span class="presence-dot"></span>
+                            }
+                        </div>
+
+                        <div class="row-body">
+
+                            <div class="row-line">
+                                <div class="row-name">
+                                    <span class="name-text">@((MarkupString)RenderNameHighlighted(user.Name))</span>
+
+                                    @if (user.IsChannel)
+                                    {
+                                        <MudImage Src="lib/assets/Images/logogo.svg" Alt="کانال" Class="type-badge" />
+                                    }
+                                    else if (user.IsGroup)
+                                    {
+                                        <MudImage Src="lib/assets/Images/group.svg" Alt="گروه" Class="type-badge" />
+                                    }
+                                    else if (user.IsBot)
+                                    {
+                                        <span class="bot-badge">ربات</span>
+                                    }
+
+                                    @if (user.IsPin)
+                                    {
+                                        <MudIcon Icon="@Icons.Material.Filled.PushPin" Class="pin-icon" />
+                                    }
+                                </div>
+
+                                <span class="row-time">@user.LastReceivedMessageSendDate</span>
+                            </div>
+
+                            <div class="row-line">
+                                <p class="row-message" style="@GetLastMessageStyle(user)">
+                                    @((MarkupString)RenderMessageHighlighted(user.LastReceivedMessage))
+                                </p>
+
+                                @if (!user.IsChannel && !user.IsGroup && TaskStore.OpenCount(user.Id) is > 0 and var openTasks)
+                                {
+                                    <span class="task-pill @(TaskStore.OverdueCount(user.Id) > 0 ? "is-overdue" : "")"
+                                          title="@($"{openTasks} کار باز با این مخاطب")">
+                                        <TasksIcon Size="12" StrokeWidth="2.3" />
+                                        @(openTasks > 99 ? "۹۹+" : openTasks.ToString().ToPersianNumber())
+                                    </span>
+                                }
+
+                                @if (user.messageUnreadedCount > 0)
+                                {
+                                    <span class="unread-pill">@GetUnreadCap(user.messageUnreadedCount)</span>
+                                }
+                            </div>
+
+                        </div>
+                    </div>;
+
+    /// <summary>ربات‌هایی که کاربر اجازه‌ی دیدنشان را دارد (سرور فیلتر کرده)، با جستجوی مخاطبین.</summary>
+    private List<UserDto> GetBotItems()
+    {
+        var list = Users.Where(x => x.IsBot);
+        if (!string.IsNullOrWhiteSpace(Search))
+        {
+            var k = Search.Trim();
+            list = list.Where(x => !string.IsNullOrWhiteSpace(x.Name) && x.Name.Contains(k, StringComparison.OrdinalIgnoreCase));
+        }
+        return list.GroupBy(x => x.Id).Select(g => g.First()).OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase).ToList();
+    }
 
     private void SetTab(PeopleTab t) { _activeTab = t; StateHasChanged(); }
 
     // لیست فعال بر اساس تب
     private List<UserDto> GetActiveItems()
-        => _activeTab == PeopleTab.Contacts
-           ? GetAllUsersView().ToList()
-           : GetMyChatsView().ToList();
+        => _activeTab switch
+        {
+            PeopleTab.Contacts => GetAllUsersView().ToList(),
+            PeopleTab.Bots => GetBotItems(),
+            _ => GetMyChatsView().ToList(),
+        };
+
+    // تب ربات‌ها فقط وقتی دیده می‌شود که رباتی برای این کاربر در دسترس باشد.
+    private bool HasBots => Users.Any(x => x.IsBot);
 
     Guid? selectedUserId = null;
 
@@ -771,7 +845,7 @@
     }
     private IEnumerable<UserDto> GetAllUsersView()
     {
-        var list = Users.AsEnumerable();
+        var list = Users.Where(x => !x.IsBot); // ربات‌ها بخش جدای خودشان را دارند
 
         if (!string.IsNullOrWhiteSpace(Search))
         {
@@ -799,7 +873,7 @@
 
     private string RenderNameHighlighted(string text)
     {
-        var q = _activeTab == PeopleTab.Contacts ? (Search ?? string.Empty) : (ChatsSearch ?? string.Empty);
+        var q = _activeTab != PeopleTab.Chats ? (Search ?? string.Empty) : (ChatsSearch ?? string.Empty);
         return Highlight(text, q);
     }
 

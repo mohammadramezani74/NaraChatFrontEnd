@@ -34,6 +34,7 @@ namespace NaraChat.Contract.Models.Users.ServiceViewModels
         public bool  OtherUserBlocked{ get; set; }
         public bool IsChannel { get; set; }
         public bool IsGroup{ get; set; }
+        public bool IsBot { get; set; }
 
         public ChannelDto? channel { get; set; }
         public DateTime? LastMessageDate { get; set; }

@@ -1,0 +1,759 @@
+﻿@page "/admin"
+@inject IBotService BotService
+@inject IBotAdminService Admin
+@inject ISnackbar Snackbar
+
+@* پنل ربات‌ها. فقط برای حساب‌های Admin:UserIds سرور؛ برای بقیه «صفحه پیدا نشد».
+   سرور هم همه‌ی این مسیرها را برای غیرادمین 404 می‌دهد. *@
+
+@if (_checking)
+{
+    <div class="ba-center"><MudProgressCircular Indeterminate="true" Color="Color.Primary" /></div>
+}
+else if (!_isAdmin)
+{
+    <div class="ba-center ba-muted">صفحه پیدا نشد.</div>
+}
+else
+{
+    <div class="ba-mobile-note">پنل مدیریت ربات‌ها فقط روی دسکتاپ کار می‌کند.</div>
+
+    <div class="ba-page" dir="rtl">
+        <header class="ba-header">
+            <div class="ba-header-title">
+                <h1>مدیریت ربات‌ها</h1>
+                <span class="ba-lock">
+                    <MudIcon Icon="@Icons.Material.Filled.Lock" Style="font-size:14px;" />
+                    فقط حساب شما به این صفحه دسترسی دارد
+                </span>
+            </div>
+            <a class="ba-back" href="/chat">بازگشت به چت</a>
+        </header>
+
+        <div class="ba-body">
+            @* ------------------------------------------------ فهرست ربات‌ها *@
+            <aside class="ba-list">
+                <div class="ba-list-head">
+                    <span>ربات‌ها (@(_bots.Count.ToString().ToPersianNumber()))</span>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                               StartIcon="@Icons.Material.Filled.Add"
+                               OnClick="@(() => _creating = !_creating)">ربات جدید</MudButton>
+                </div>
+
+                @if (_creating)
+                {
+                    <div class="ba-create">
+                        <label>نام نمایشی<input @bind="_newName" @bind:event="oninput" placeholder="مثلاً منابع انسانی" /></label>
+                        <label>شناسه (انگلیسی)<input @bind="_newHandle" @bind:event="oninput" dir="ltr" placeholder="hr_bot" /></label>
+                        <label>توضیح<textarea rows="2" @bind="_newDescription" @bind:event="oninput"></textarea></label>
+                        <div class="ba-row-actions">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                                       Disabled="_busy" OnClick="CreateBotAsync">ساختن</MudButton>
+                            <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => _creating = false)">انصراف</MudButton>
+                        </div>
+                        <span class="ba-hint">ربات خاموش ساخته می‌شود و اول فقط شما آن را می‌بینید.</span>
+                    </div>
+                }
+
+                @foreach (var item in _bots)
+                {
+                    var b = item;
+                    <button type="button" class="ba-bot @(_bot?.Id == b.Id ? "is-active" : string.Empty)" @onclick="() => SelectBotAsync(b.Id)">
+                        <span class="ba-bot-avatar @(b.IsEnabled ? "is-on" : string.Empty)">
+                            <MudIcon Icon="@Icons.Material.Filled.SmartToy" Style="font-size:20px;" />
+                        </span>
+                        <span class="ba-bot-text">
+                            <span class="ba-bot-name">@b.Name</span>
+                            <span class="ba-bot-handle" dir="ltr">@("@" + b.Handle)</span>
+                        </span>
+                        <span class="ba-pill @(b.IsEnabled ? "is-on" : string.Empty)">@(b.IsEnabled ? "فعال" : "خاموش")</span>
+                    </button>
+                }
+
+                @if (_bots.Count == 0)
+                {
+                    <span class="ba-hint">هنوز رباتی نساخته‌اید.</span>
+                }
+            </aside>
+
+            @* ------------------------------------------------ جزئیات *@
+            <main class="ba-main">
+                @if (_bot is null)
+                {
+                    <div class="ba-empty">یک ربات را از فهرست انتخاب کنید یا ربات جدید بسازید.</div>
+                }
+                else
+                {
+                    <div class="ba-tabs" role="tablist">
+                        @foreach (var (index, title) in Tabs)
+                        {
+                            var i = index;
+                            <button type="button" role="tab" class="ba-tab @(_tab == i ? "is-active" : string.Empty)" @onclick="() => _tab = i">
+                                @title
+                                @if (i == 1 && _menuDirty)
+                                {
+                                    <span class="ba-dot" title="تغییر ذخیره‌نشده"></span>
+                                }
+                            </button>
+                        }
+                    </div>
+
+                    @if (_tab == 0)
+                    {
+                        @* ---------------- مشخصات و دسترسی *@
+                        <section class="ba-card">
+                            <div class="ba-card-head">
+                                <h2>مشخصات</h2>
+                                <span class="ba-muted">@(_bot.StartedCount.ToString().ToPersianNumber()) نفر این ربات را شروع کرده‌اند</span>
+                            </div>
+                            <div class="ba-grid">
+                                <label>نام نمایشی<input @bind="_bot.Name" @bind:event="oninput" /></label>
+                                <label>شناسه<input value="@("@" + _bot.Handle)" dir="ltr" readonly class="is-readonly" /></label>
+                                <label class="ba-span">توضیح (در صفحه‌ی «شروع» نمایش داده می‌شود)
+                                    <textarea rows="2" @bind="_bot.Description" @bind:event="oninput"></textarea>
+                                </label>
+                            </div>
+                            <label class="ba-switch">
+                                <input type="checkbox" checked="@_bot.IsEnabled" @onchange="@(e => _bot.IsEnabled = e.Value is bool v && v)" />
+                                <span class="ba-switch-track"><span class="ba-switch-knob"></span></span>
+                                <span>
+                                    <b>ربات فعال است</b>
+                                    <span class="ba-muted">@(_bot.IsEnabled ? "کاربران مجاز ربات را می‌بینند و ربات جواب می‌دهد." : "ربات برای همه جز شما پنهان است و جواب نمی‌دهد.")</span>
+                                </span>
+                            </label>
+                        </section>
+
+                        <section class="ba-card">
+                            <div class="ba-card-head"><h2>چه کسانی ربات را می‌بینند؟</h2></div>
+                            <div class="ba-segment">
+                                @foreach (var mode in AccessModes)
+                                {
+                                    var m = mode;
+                                    <button type="button" class="@(_bot.AccessMode == m.Mode ? "is-active" : string.Empty)" @onclick="() => SetAccessMode(m.Mode)">@m.Title</button>
+                                }
+                            </div>
+
+                            @if (_bot.AccessMode == BotAccessMode.All)
+                            {
+                                <span class="ba-muted">همه‌ی کاربران ناراگرام ربات را در بخش «ربات‌ها» می‌بینند.</span>
+                            }
+                            else if (_bot.AccessMode == BotAccessMode.Roles)
+                            {
+                                <div class="ba-checks">
+                                    @foreach (var role in _roles)
+                                    {
+                                        var r = role;
+                                        <label class="ba-check">
+                                            <input type="checkbox" checked="@_bot.AccessList.Contains(r.Id)" @onchange="@(e => ToggleAccess(r.Id, e.Value is bool v && v))" />
+                                            @r.Name
+                                        </label>
+                                    }
+                                    @if (_roles.Count == 0)
+                                    {
+                                        <span class="ba-muted">نقشی تعریف نشده است.</span>
+                                    }
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="ba-chips">
+                                    @foreach (var id in _bot.AccessList.ToList())
+                                    {
+                                        var uid = id;
+                                        <span class="ba-chip">
+                                            @UserName(uid)
+                                            <button type="button" aria-label="برداشتن" @onclick="() => ToggleAccess(uid, false)">×</button>
+                                        </span>
+                                    }
+                                </div>
+                                <div class="ba-search">
+                                    <input @bind="_userSearch" @bind:event="oninput" placeholder="جستجو و افزودن کاربر…" />
+                                    @if (!string.IsNullOrWhiteSpace(_userSearch))
+                                    {
+                                        <div class="ba-search-results">
+                                            @foreach (var user in UserMatches())
+                                            {
+                                                var u = user;
+                                                <button type="button" @onclick="() => { ToggleAccess(u.Id, true); _userSearch = string.Empty; }">@u.Name</button>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </section>
+
+                        <div class="ba-save">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="_busy" OnClick="SaveSettingsAsync">ذخیره</MudButton>
+                        </div>
+                    }
+                    else if (_tab == 1)
+                    {
+                        @* ---------------- منو *@
+                        <section class="ba-card">
+                            <div class="ba-card-head">
+                                <div>
+                                    <h2>منوی ربات</h2>
+                                    <span class="ba-muted">هر گزینه یا زیرمنو دارد، یا یک «جریان» از کد را شروع می‌کند. «« بازگشت» خودکار اضافه می‌شود.</span>
+                                </div>
+                            </div>
+
+                            <div class="ba-tree">
+                                @foreach (var (node, depth) in Flatten())
+                                {
+                                    var n = node;
+                                    var isRoot = n.ParentId is null;
+                                    <div class="ba-node @(isRoot ? "is-root" : string.Empty)" style="padding-right:@(12 + depth * 28)px;">
+                                        <div class="ba-node-line">
+                                            <span class="ba-node-icon @(n.Kind == BotMenuNodeKind.Menu ? "is-menu" : "is-flow")">
+                                                <MudIcon Icon="@(n.Kind == BotMenuNodeKind.Menu ? Icons.Material.Filled.List : Icons.Material.Filled.PlayArrow)" Style="font-size:16px;" />
+                                            </span>
+
+                                            @if (isRoot)
+                                            {
+                                                <b class="ba-node-root">منوی اصلی</b>
+                                            }
+                                            else
+                                            {
+                                                <input class="ba-node-label" value="@n.Label" placeholder="متن دکمه" @onchange="@(e => { n.Label = e.Value?.ToString() ?? string.Empty; _menuDirty = true; })" />
+                                                <select class="ba-select" value="@((int)n.Kind)" @onchange="@(e => SetKind(n, e.Value))">
+                                                    <option value="0">زیرمنو</option>
+                                                    <option value="1">جریان</option>
+                                                </select>
+                                            }
+
+                                            @if (n.Kind == BotMenuNodeKind.Menu)
+                                            {
+                                                <select class="ba-select" value="@((int)n.Display)" @onchange="@(e => { n.Display = e.Value?.ToString() == "1" ? BotMenuDisplay.Keyboard : BotMenuDisplay.Inline; _menuDirty = true; })" title="نحوه‌ی نمایش گزینه‌ها">
+                                                    <option value="0">شیشه‌ای</option>
+                                                    <option value="1">کیبورد</option>
+                                                </select>
+                                                <button type="button" class="ba-mini" @onclick="() => AddChild(n)">+ گزینه</button>
+                                            }
+                                            else
+                                            {
+                                                <select class="ba-select ba-flow-select" value="@(n.FlowKey ?? string.Empty)" @onchange="@(e => SetFlow(n, e.Value?.ToString()))">
+                                                    <option value="">— جریان را انتخاب کنید —</option>
+                                                    @foreach (var flow in _flows)
+                                                    {
+                                                        <option value="@flow.Key">@flow.Title</option>
+                                                    }
+                                                </select>
+                                            }
+
+                                            @if (!isRoot)
+                                            {
+                                                <span class="ba-node-tools">
+                                                    <button type="button" class="ba-icon" aria-label="بالا" @onclick="() => Move(n, -1)">↑</button>
+                                                    <button type="button" class="ba-icon" aria-label="پایین" @onclick="() => Move(n, 1)">↓</button>
+                                                    <button type="button" class="ba-icon is-danger" aria-label="حذف" @onclick="() => Remove(n)">×</button>
+                                                </span>
+                                            }
+                                        </div>
+
+                                        @if (n.Kind == BotMenuNodeKind.Menu)
+                                        {
+                                            <input class="ba-node-text" value="@n.Text" placeholder="پیامی که بالای گزینه‌ها نمایش داده می‌شود" @onchange="@(e => { n.Text = e.Value?.ToString(); _menuDirty = true; })" />
+                                        }
+                                        else if (FindFlow(n.FlowKey) is { Params.Count: > 0 } flowInfo)
+                                        {
+                                            <div class="ba-params">
+                                                @foreach (var p in flowInfo.Params)
+                                                {
+                                                    var param = p;
+                                                    <label>
+                                                        @param.Title
+                                                        @if (param.Options is { Count: > 0 })
+                                                        {
+                                                            <select class="ba-select" value="@GetParam(n, param.Key)" @onchange="@(e => SetParam(n, param.Key, e.Value?.ToString()))">
+                                                                @foreach (var option in param.Options)
+                                                                {
+                                                                    <option value="@option">@option</option>
+                                                                }
+                                                            </select>
+                                                        }
+                                                        else
+                                                        {
+                                                            <input value="@GetParam(n, param.Key)" @onchange="@(e => SetParam(n, param.Key, e.Value?.ToString()))" />
+                                                        }
+                                                    </label>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        </section>
+
+                        <div class="ba-save">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(_busy || !_menuDirty)" OnClick="SaveMenuAsync">ذخیره‌ی منو</MudButton>
+                            @if (_menuDirty)
+                            {
+                                <MudButton Variant="Variant.Text" OnClick="ResetMenu">برگرداندن تغییرات</MudButton>
+                            }
+                        </div>
+                    }
+                    else if (_tab == 2)
+                    {
+                        @* ---------------- دستورها *@
+                        <section class="ba-card">
+                            <div class="ba-card-head">
+                                <div>
+                                    <h2>دستورهای منوی «/»</h2>
+                                    <span class="ba-muted">«/شروع»، «/راهنما» و «/انصراف» همیشه هستند. هر دستور یکی از گزینه‌های منو را باز می‌کند.</span>
+                                </div>
+                            </div>
+                            <div class="ba-commands">
+                                @foreach (var command in _bot.Commands)
+                                {
+                                    var c = command;
+                                    <div class="ba-command">
+                                        <input class="ba-cmd" value="@c.Command" dir="rtl" placeholder="/دستور" @onchange="@(e => c.Command = e.Value?.ToString() ?? string.Empty)" />
+                                        <input class="ba-cmd-desc" value="@c.Description" placeholder="توضیح کوتاه" @onchange="@(e => c.Description = e.Value?.ToString() ?? string.Empty)" />
+                                        <select class="ba-select" value="@c.NodeId" @onchange="@(e => c.NodeId = Guid.TryParse(e.Value?.ToString(), out var g) ? g : Guid.Empty)">
+                                            @foreach (var (node, depth) in Flatten())
+                                            {
+                                                <option value="@node.Id">@NodePath(node)</option>
+                                            }
+                                        </select>
+                                        <button type="button" class="ba-icon is-danger" aria-label="حذف دستور" @onclick="() => _bot.Commands.Remove(c)">×</button>
+                                    </div>
+                                }
+                                <button type="button" class="ba-mini" @onclick="AddCommand">+ دستور</button>
+                            </div>
+                            @if (_menuDirty)
+                            {
+                                <span class="ba-muted">منو تغییر ذخیره‌نشده دارد؛ اول منو را ذخیره کنید تا گزینه‌های تازه اینجا قابل انتخاب باشند.</span>
+                            }
+                        </section>
+
+                        <div class="ba-save">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="_busy" OnClick="SaveSettingsAsync">ذخیره</MudButton>
+                        </div>
+                    }
+                    else
+                    {
+                        @* ---------------- جریان‌ها و اتصال‌ها *@
+                        <section class="ba-card">
+                            <div class="ba-card-head">
+                                <div>
+                                    <h2>جریان‌ها و اتصال‌ها</h2>
+                                    <span class="ba-muted">در کد C# نوشته می‌شوند؛ اینجا فقط می‌بینید و آزمایش می‌کنید.</span>
+                                </div>
+                            </div>
+                            <div class="ba-two">
+                                <div class="ba-col">
+                                    <b>جریان‌ها</b>
+                                    @foreach (var flow in _flows)
+                                    {
+                                        <div class="ba-item">
+                                            <div class="ba-item-head"><span>@flow.Title</span><code dir="ltr">@flow.Key</code></div>
+                                            @if (!string.IsNullOrWhiteSpace(flow.Description))
+                                            {
+                                                <span class="ba-muted">@flow.Description</span>
+                                            }
+                                            @if (flow.Params.Count > 0)
+                                            {
+                                                <span class="ba-muted">تنظیم‌ها: @(string.Join("، ", flow.Params.Select(x => x.Title)))</span>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                                <div class="ba-col">
+                                    <b>اتصال‌ها</b>
+                                    @foreach (var connector in _connectors)
+                                    {
+                                        var cn = connector;
+                                        <div class="ba-item">
+                                            <div class="ba-item-head"><span>@cn.Title</span><code dir="ltr">@cn.Key</code></div>
+                                            @if (!string.IsNullOrWhiteSpace(cn.Description))
+                                            {
+                                                <span class="ba-muted">@cn.Description</span>
+                                            }
+                                            <div class="ba-item-foot">
+                                                @if (_tests.TryGetValue(cn.Key, out var result))
+                                                {
+                                                    <span class="ba-pill @(result.Ok ? "is-on" : "is-bad")">@(result.Ok ? "سالم" : "خطا"): @result.Message</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="ba-pill">آزمایش نشده</span>
+                                                }
+                                                <button type="button" class="ba-mini" disabled="@(_testing == cn.Key)" @onclick="() => TestConnectorAsync(cn.Key)">
+                                                    @(_testing == cn.Key ? "در حال آزمایش…" : "آزمایش اتصال")
+                                                </button>
+                                            </div>
+                                        </div>
+                                    }
+                                    @if (_connectors.Count == 0)
+                                    {
+                                        <span class="ba-muted">اتصالی ثبت نشده است.</span>
+                                    }
+                                </div>
+                            </div>
+                        </section>
+                    }
+                }
+            </main>
+        </div>
+    </div>
+}
+
+@code {
+    private static readonly (int Index, string Title)[] Tabs =
+    {
+        (0, "مشخصات و دسترسی"),
+        (1, "منو"),
+        (2, "دستورها"),
+        (3, "جریان‌ها و اتصال‌ها"),
+    };
+
+    private static readonly (BotAccessMode Mode, string Title)[] AccessModes =
+    {
+        (BotAccessMode.All, "همه"),
+        (BotAccessMode.Roles, "نقش‌های مشخص"),
+        (BotAccessMode.Users, "کاربران مشخص"),
+    };
+
+    private bool _checking = true;
+    private bool _isAdmin;
+    private bool _busy;
+    private int _tab;
+
+    private List<BotAdminListItem> _bots = new();
+    private BotAdminDetail? _bot;
+    private List<BotMenuNodeDto> _nodes = new();
+    private bool _menuDirty;
+
+    private List<BotFlowInfo> _flows = new();
+    private List<BotConnectorInfo> _connectors = new();
+    private List<BotPickItem> _roles = new();
+    private List<BotPickItem> _users = new();
+    private readonly Dictionary<string, BotConnectorTestResult> _tests = new();
+    private string? _testing;
+
+    private bool _creating;
+    private string _newName = string.Empty;
+    private string _newHandle = string.Empty;
+    private string? _newDescription;
+    private string _userSearch = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _isAdmin = await BotService.IsAdminAsync();
+        if (_isAdmin)
+        {
+            var bots = Admin.ListAsync();
+            var flows = Admin.FlowsAsync();
+            var connectors = Admin.ConnectorsAsync();
+            var roles = Admin.RolesAsync();
+            var users = Admin.SearchUsersAsync(null);
+            await Task.WhenAll(bots, flows, connectors, roles, users);
+
+            _bots = bots.Result ?? new();
+            _flows = flows.Result ?? new();
+            _connectors = connectors.Result ?? new();
+            _roles = roles.Result ?? new();
+            _users = users.Result ?? new();
+
+            if (_bots.Count > 0)
+                await SelectBotAsync(_bots[0].Id);
+        }
+        _checking = false;
+    }
+
+    // ------------------------------------------------------------ ربات‌ها
+
+    private async Task SelectBotAsync(Guid id)
+    {
+        if (_menuDirty && _bot is not null && _bot.Id != id)
+            Snackbar.Add("تغییرات ذخیره‌نشده‌ی منو کنار گذاشته شد.", Severity.Info);
+
+        var bot = await Admin.GetAsync(id);
+        if (bot is null)
+        {
+            Snackbar.Add("ربات خوانده نشد.", Severity.Warning);
+            return;
+        }
+
+        _bot = bot;
+        ResetMenu();
+    }
+
+    private async Task CreateBotAsync()
+    {
+        _busy = true;
+        try
+        {
+            var (ok, id, message) = await Admin.CreateAsync(_newName, _newHandle, _newDescription);
+            if (!ok)
+            {
+                Snackbar.Add(message, Severity.Warning);
+                return;
+            }
+
+            _creating = false;
+            _newName = _newHandle = string.Empty;
+            _newDescription = null;
+            _bots = await Admin.ListAsync() ?? _bots;
+            await SelectBotAsync(id);
+            _tab = 1;
+            Snackbar.Add("ربات ساخته شد. منو را بچینید و بعد روشنش کنید.", Severity.Success);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task SaveSettingsAsync()
+    {
+        if (_bot is null) return;
+        _busy = true;
+        try
+        {
+            var (ok, saved, message) = await Admin.UpdateAsync(_bot);
+            if (!ok || saved is null)
+            {
+                Snackbar.Add(message, Severity.Warning);
+                return;
+            }
+
+            _bot = saved;
+            if (!_menuDirty) ResetMenu();
+            await RefreshListItemAsync();
+            Snackbar.Add("ذخیره شد.", Severity.Success);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task RefreshListItemAsync()
+        => _bots = await Admin.ListAsync() ?? _bots;
+
+    // ------------------------------------------------------------ دسترسی
+
+    private void SetAccessMode(BotAccessMode mode)
+    {
+        if (_bot is null || _bot.AccessMode == mode) return;
+        _bot.AccessMode = mode;
+        _bot.AccessList = new List<Guid>();
+    }
+
+    private void ToggleAccess(Guid id, bool on)
+    {
+        if (_bot is null) return;
+        if (on && !_bot.AccessList.Contains(id)) _bot.AccessList.Add(id);
+        if (!on) _bot.AccessList.Remove(id);
+    }
+
+    private string UserName(Guid id) => _users.FirstOrDefault(u => u.Id == id)?.Name ?? "کاربر";
+
+    private IEnumerable<BotPickItem> UserMatches()
+    {
+        var term = _userSearch.Trim();
+        return _users
+            .Where(u => !string.IsNullOrWhiteSpace(u.Name) && u.Name.Contains(term, StringComparison.OrdinalIgnoreCase))
+            .Where(u => _bot is null || !_bot.AccessList.Contains(u.Id))
+            .Take(8);
+    }
+
+    // ------------------------------------------------------------ منو
+
+    private void ResetMenu()
+    {
+        _nodes = (_bot?.Nodes ?? new List<BotMenuNodeDto>()).Select(Clone).ToList();
+        _menuDirty = false;
+    }
+
+    private static BotMenuNodeDto Clone(BotMenuNodeDto n) => new()
+    {
+        Id = n.Id,
+        ParentId = n.ParentId,
+        SortOrder = n.SortOrder,
+        Label = n.Label,
+        Text = n.Text,
+        Kind = n.Kind,
+        Display = n.Display,
+        FlowKey = n.FlowKey,
+        Params = n.Params is null ? null : new Dictionary<string, string>(n.Params),
+    };
+
+    private List<BotMenuNodeDto> Children(Guid id)
+        => _nodes.Where(n => n.ParentId == id).OrderBy(n => n.SortOrder).ToList();
+
+    private List<(BotMenuNodeDto Node, int Depth)> Flatten()
+    {
+        var result = new List<(BotMenuNodeDto, int)>();
+        var root = _nodes.FirstOrDefault(n => n.ParentId is null);
+        if (root is not null)
+            Walk(root, 0, result);
+        return result;
+    }
+
+    private void Walk(BotMenuNodeDto node, int depth, List<(BotMenuNodeDto, int)> into)
+    {
+        if (depth > 20) return;
+        into.Add((node, depth));
+        foreach (var child in Children(node.Id))
+            Walk(child, depth + 1, into);
+    }
+
+    private string NodePath(BotMenuNodeDto node)
+    {
+        var labels = new List<string>();
+        var current = node;
+        var guard = 0;
+        while (current is not null && current.ParentId is not null && guard++ < 20)
+        {
+            labels.Insert(0, current.Label);
+            current = _nodes.FirstOrDefault(n => n.Id == current.ParentId);
+        }
+        return labels.Count == 0 ? "منوی اصلی" : string.Join(" › ", labels);
+    }
+
+    private BotFlowInfo? FindFlow(string? key)
+        => key is null ? null : _flows.FirstOrDefault(f => f.Key == key);
+
+    private void AddChild(BotMenuNodeDto parent)
+    {
+        var siblings = Children(parent.Id);
+        var node = new BotMenuNodeDto
+        {
+            Id = Guid.NewGuid(),
+            ParentId = parent.Id,
+            SortOrder = siblings.Count == 0 ? 1 : siblings.Max(s => s.SortOrder) + 1,
+            Label = "گزینه‌ی تازه",
+            Kind = BotMenuNodeKind.Flow,
+            Display = BotMenuDisplay.Inline,
+        };
+        SetFlow(node, _flows.FirstOrDefault()?.Key);
+        _nodes.Add(node);
+        _menuDirty = true;
+    }
+
+    private void SetKind(BotMenuNodeDto node, object? value)
+    {
+        var kind = value?.ToString() == "0" ? BotMenuNodeKind.Menu : BotMenuNodeKind.Flow;
+        if (kind == node.Kind) return;
+
+        if (kind == BotMenuNodeKind.Flow && Children(node.Id).Count > 0)
+        {
+            Snackbar.Add("این زیرمنو گزینه دارد؛ اول گزینه‌هایش را حذف کنید.", Severity.Warning);
+            StateHasChanged();
+            return;
+        }
+
+        node.Kind = kind;
+        if (kind == BotMenuNodeKind.Menu)
+        {
+            node.FlowKey = null;
+            node.Params = null;
+            node.Text ??= "یکی از گزینه‌ها را انتخاب کنید:";
+        }
+        else
+        {
+            SetFlow(node, _flows.FirstOrDefault()?.Key);
+        }
+        _menuDirty = true;
+    }
+
+    private void SetFlow(BotMenuNodeDto node, string? key)
+    {
+        node.FlowKey = string.IsNullOrEmpty(key) ? null : key;
+        node.Params = new Dictionary<string, string>();
+        foreach (var p in FindFlow(node.FlowKey)?.Params ?? new List<BotFlowParamInfo>())
+            node.Params[p.Key] = p.Options is { Count: > 0 } ? p.Options[0] : string.Empty;
+        _menuDirty = true;
+    }
+
+    private static string GetParam(BotMenuNodeDto node, string key)
+        => node.Params is not null && node.Params.TryGetValue(key, out var value) ? value : string.Empty;
+
+    private void SetParam(BotMenuNodeDto node, string key, string? value)
+    {
+        node.Params ??= new Dictionary<string, string>();
+        node.Params[key] = value ?? string.Empty;
+        _menuDirty = true;
+    }
+
+    private void Move(BotMenuNodeDto node, int direction)
+    {
+        if (node.ParentId is not Guid parentId) return;
+        var siblings = Children(parentId);
+        var index = siblings.IndexOf(node);
+        var target = index + direction;
+        if (index < 0 || target < 0 || target >= siblings.Count) return;
+
+        (siblings[index], siblings[target]) = (siblings[target], siblings[index]);
+        for (var i = 0; i < siblings.Count; i++)
+            siblings[i].SortOrder = i + 1;
+        _menuDirty = true;
+    }
+
+    private void Remove(BotMenuNodeDto node)
+    {
+        var gone = new HashSet<Guid>();
+        void Collect(Guid id)
+        {
+            gone.Add(id);
+            foreach (var child in Children(id)) Collect(child.Id);
+        }
+        Collect(node.Id);
+        _nodes.RemoveAll(n => gone.Contains(n.Id));
+        _menuDirty = true;
+    }
+
+    private async Task SaveMenuAsync()
+    {
+        if (_bot is null) return;
+        _busy = true;
+        try
+        {
+            var (ok, saved, message) = await Admin.SaveMenuAsync(_bot.Id, _nodes);
+            if (!ok || saved is null)
+            {
+                Snackbar.Add(message, Severity.Warning);
+                return;
+            }
+
+            _bot = saved;
+            ResetMenu();
+            Snackbar.Add("منو ذخیره شد. کاربران با «/شروع» منوی تازه را می‌بینند.", Severity.Success);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    // ------------------------------------------------------------ دستورها و اتصال‌ها
+
+    private void AddCommand()
+    {
+        if (_bot is null) return;
+        var target = Flatten().Select(x => x.Node).FirstOrDefault(n => n.ParentId is not null)
+                     ?? _nodes.FirstOrDefault();
+        _bot.Commands.Add(new BotCommandItem
+        {
+            Command = "/",
+            Description = string.Empty,
+            NodeId = target?.Id ?? Guid.Empty,
+        });
+    }
+
+    private async Task TestConnectorAsync(string key)
+    {
+        _testing = key;
+        StateHasChanged();
+        try
+        {
+            _tests[key] = await Admin.TestConnectorAsync(key);
+        }
+        finally
+        {
+            _testing = null;
+        }
+    }
+}

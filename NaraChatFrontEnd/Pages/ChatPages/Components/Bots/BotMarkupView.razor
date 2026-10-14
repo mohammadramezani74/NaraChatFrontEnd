@@ -1,0 +1,137 @@
+﻿@using NaraChat.Contract.Models.Bots
+@using NaraChat.Application.Services.Bots
+@inject IBotService BotService
+@inject ISnackbar Snackbar
+
+@* زیر متن پیام ربات: کارت خلاصه، یادداشت (مثلاً «تأیید شد») و دکمه‌های شیشه‌ای.
+   با زدن دکمه، تا ربات پیام را عوض کند دکمه‌ها غیرفعال می‌مانند. *@
+@if (_markup is not null)
+{
+    <div class="bot-markup">
+        @if (_markup.Card is { Count: > 0 })
+        {
+            <div class="bot-card">
+                @foreach (var row in _markup.Card)
+                {
+                    <div class="bot-card-row">
+                        <span class="bot-card-label">@row.Label</span>
+                        <span class="bot-card-value">@row.Value</span>
+                    </div>
+                }
+            </div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(_markup.Note))
+        {
+            <div class="bot-note @(_markup.NoteTone == "ok" ? "is-ok" : string.Empty)">
+                @if (_markup.NoteTone == "ok")
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.Check" Style="font-size:16px;" />
+                }
+                <span>@_markup.Note</span>
+            </div>
+        }
+
+        @if (_markup.Rows.Count > 0)
+        {
+            <div class="bot-buttons">
+                @foreach (var row in _markup.Rows)
+                {
+                    <div class="bot-button-row">
+                        @foreach (var button in row)
+                        {
+                            var b = button;
+                            <button type="button"
+                                    class="bot-btn @StyleClass(b)"
+                                    disabled="@(_pending is not null)"
+                                    @onclick="() => PressAsync(b)"
+                                    @onclick:stopPropagation="true">
+                                @if (_pending == b.Data)
+                                {
+                                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Style="width:16px;height:16px;" />
+                                }
+                                else
+                                {
+                                    @b.Text
+                                }
+                            </button>
+                        }
+                    </div>
+                }
+            </div>
+        }
+    </div>
+}
+
+<style>
+    .bot-markup { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; width: 100%; max-width: 370px; }
+    .bot-card { border: 1px solid var(--mud-palette-lines-default); border-radius: 12px; overflow: hidden; background: var(--mud-palette-surface); }
+    .bot-card-row { display: flex; justify-content: space-between; gap: 12px; padding: 7px 12px; font-size: 13px; border-bottom: 1px solid var(--mud-palette-lines-default); }
+    .bot-card-row:last-child { border-bottom: 0; }
+    .bot-card-label { color: var(--mud-palette-text-secondary); }
+    .bot-card-value { font-weight: 600; text-align: left; }
+    .bot-note { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--mud-palette-text-secondary); padding: 0 4px; }
+    .bot-note.is-ok { color: var(--mud-palette-success); font-weight: 600; }
+    .bot-buttons { display: flex; flex-direction: column; gap: 6px; }
+    .bot-button-row { display: flex; gap: 6px; }
+    .bot-btn { flex: 1 1 0; min-width: 0; min-height: 40px; padding: 6px 10px; border-radius: 10px; border: 1px solid var(--mud-palette-primary); background: var(--mud-palette-surface); color: var(--mud-palette-primary); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: background-color .15s ease; }
+    .bot-btn:hover:not(:disabled) { background: var(--mud-palette-action-default-hover); }
+    .bot-btn.is-primary { background: var(--mud-palette-primary); color: var(--mud-palette-primary-text); }
+    .bot-btn.is-back { border-color: var(--mud-palette-lines-inputs); color: var(--mud-palette-text-secondary); }
+    .bot-btn:disabled { opacity: .65; cursor: default; }
+</style>
+
+@code {
+    [Parameter, EditorRequired] public ChatMessageDto Message { get; set; } = default!;
+
+    private BotReplyMarkup? _markup;
+    private string? _parsedFrom;
+    private string? _pending;
+
+    protected override void OnParametersSet()
+    {
+        var current = Message.ReplyMarkup ?? string.Empty;
+        if (_parsedFrom is null || !string.Equals(_parsedFrom, current, StringComparison.Ordinal))
+        {
+            _parsedFrom = current;
+            _markup = BotReplyMarkup.Parse(Message.ReplyMarkup);
+            _pending = null;
+        }
+    }
+
+    private async Task PressAsync(BotButton button)
+    {
+        if (_pending is not null || Message.Id == Guid.Empty)
+            return;
+
+        _pending = button.Data;
+        var (ok, message) = await BotService.PressAsync(Message.Id, button.Data);
+        if (!ok)
+        {
+            _pending = null;
+            Snackbar.Add(message, Severity.Warning);
+            return;
+        }
+
+        // ربات معمولاً در کمتر از یک ثانیه پیام را عوض می‌کند و دکمه‌ها خودشان
+        // تازه می‌شوند؛ اگر جوابی نیامد، بعد از چند ثانیه دوباره فعال می‌شوند.
+        _ = ReleaseLaterAsync(button.Data);
+    }
+
+    private async Task ReleaseLaterAsync(string data)
+    {
+        await Task.Delay(8000);
+        if (_pending == data)
+        {
+            _pending = null;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private static string StyleClass(BotButton button) => button.Style switch
+    {
+        "primary" => "is-primary",
+        "back" => "is-back",
+        _ => string.Empty,
+    };
+}

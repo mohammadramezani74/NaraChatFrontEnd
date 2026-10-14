@@ -13,6 +13,7 @@
 @inject AuthenticationStateProvider stateprovider
 @inject IDialogService dialogService
 @inject NaraChat.Application.Services.ContactTasks.ContactTaskStore TaskStore
+@inject NaraChat.Application.Services.Bots.BotStore BotStore
 @using NaraChat.Contract.Models.ContactTasks
 @using NaraChatFrontEnd.Pages.ChatPages.Components.ContactTasks
 @implements IAsyncDisposable
@@ -551,6 +552,16 @@
     {
         TaskStore.NotifyRemote(contactId);
     });
+    // ربات یکی از پیام‌هایش را عوض کرد (رفتن به زیرمنو، برداشتن دکمه‌ها).
+    hubConnection.On<ChatMessageDto>(nameof(IChatHubClient.BotMessageUpdated), (message) =>
+    {
+        BotStore.PublishMessageUpdate(message);
+    });
+    // کیبورد ربات برای این کاربر عوض شد.
+    hubConnection.On<NaraChat.Contract.Models.Bots.BotStateDto>(nameof(IChatHubClient.BotStateChanged), (state) =>
+    {
+        BotStore.SetState(state);
+    });
     // زمان یادآوری یک کار رسید.
     hubConnection.On<TaskReminderDto>(nameof(IChatHubClient.TaskReminder), (reminder) =>
     {
@@ -1003,6 +1014,7 @@
     /// <summary>تب «کارها» فقط برای چت خصوصی و فقط روی دسکتاپ.</summary>
     private bool CanShowTasksTab => !IsMobile
                                     && OtherUser is not null
+                                    && !OtherUser.IsBot
                                     && SelectedChannel is null
                                     && SelectedGroup is null;
 

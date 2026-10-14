@@ -42,6 +42,9 @@ namespace NaraChat.Contract.Models.Chat.Conversation
         public float? Latitude { get; set; }
         public float? Longitude { get; set; }
         public ConversationType ConversationType { get; set; }
+
+        /// <summary>فقط پیام ربات: دکمه‌ها، کارت و یادداشت زیر پیام (JSON، BotReplyMarkup).</summary>
+        public string? ReplyMarkup { get; set; }
     } public enum ConversationType
         {
             Private = 1,

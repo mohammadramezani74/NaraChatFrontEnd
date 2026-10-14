@@ -39,5 +39,11 @@ namespace NaraChat.Application.HunSettings.Abstraction
         /// <summary>زمان یادآوری یکی از کارهای کاربر رسید.</summary>
         Task TaskReminder(NaraChat.Contract.Models.ContactTasks.TaskReminderDto reminder);
 
+        /// <summary>ربات یکی از پیام‌های خودش را عوض کرد (متن یا دکمه‌ها).</summary>
+        Task BotMessageUpdated(ChatMessageDto message);
+
+        /// <summary>کیبورد ربات برای این کاربر عوض شد.</summary>
+        Task BotStateChanged(NaraChat.Contract.Models.Bots.BotStateDto state);
+
     }
 }

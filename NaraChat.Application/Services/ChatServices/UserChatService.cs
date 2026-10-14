@@ -49,7 +49,7 @@ namespace NaraChat.Application.Services.ChatServices
                    isPinned:x.IsPin,isBlocked:x.IsBlocked,conversationId:x.ConversationId,otherUserBlocked:x.OtherUserBlocked,ischannel: x.IsChannel
                    ,chanel:x.channel,isgroup:x.IsGroup,username:x.UserName,lastmessageDate:x.LastMessageDate,
                    bio:x.Bio,age:x.Age
-                   )).ToList();
+                   ) { IsBot = x.IsBot, Name = x.IsBot ? (x.FirstName ?? string.Empty).Trim() : x.LastName+" "+x.FirstName }).ToList();
                 return users;
             }
             return Enumerable.Empty<UserDto>();

@@ -478,6 +478,7 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
         TaskStore.Changed -= OnTaskStoreChanged;
         TaskStore.OpenRequested -= OnTaskOpenRequested;
         TaskStore.JumpRequested -= OnTaskJumpRequested;
+        UnhookBotStore();
         try
         {
             if (_cancellationTokenSource is not null)
@@ -781,7 +782,13 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
         // اگر در این فاصله چت عوض شده، این بارگذاری دیگر مال چت باز نیست
         if (token != _loadToken) return;
 
-        var other = Conversation!.users.First(c => c.Id != CurrentUser!.Id);
+        if (Conversation is null)
+        {
+            snackbar.Add("باز کردن این گفتگو ممکن نشد. دوباره تلاش کنید.", Severity.Error);
+            return;
+        }
+
+        var other = Conversation.users.First(c => c.Id != CurrentUser!.Id);
 
         var page = await messageService.LoadMessages(Conversation!.id);
 
@@ -1726,6 +1733,7 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
             NewMessage = string.Empty;
 
             await LoadMesages();
+            await LoadBotInfoAsync();
 
 
             if (_drafts.TryGetValue(OtherUser.Id, out var draft))

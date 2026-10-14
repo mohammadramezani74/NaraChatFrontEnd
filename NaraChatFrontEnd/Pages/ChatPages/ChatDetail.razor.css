@@ -481,3 +481,152 @@
         background: #B4470F;
         color: #fff;
     }
+
+
+/* ======================================================================
+   ربات: صفحه‌ی معرفی، نوار پایین، منوی «/» و کیبورد
+   ====================================================================== */
+
+.bot-intro {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 12px;
+}
+
+.bot-intro-card {
+    width: 100%;
+    max-width: 420px;
+    background: var(--mud-palette-surface);
+    border-radius: 20px;
+    padding: 28px 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    text-align: center;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .06);
+}
+
+.bot-intro-avatar {
+    width: 76px;
+    height: 76px;
+    border-radius: 50%;
+    background: var(--mud-palette-secondary);
+    color: var(--mud-palette-secondary-text);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+    .bot-intro-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+.bot-intro-name {
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.bot-intro-handle {
+    font-size: 13px;
+    color: var(--mud-palette-text-secondary);
+}
+
+.bot-intro-desc {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.9;
+}
+
+.bot-intro-hint {
+    font-size: 12px;
+    color: var(--mud-palette-text-secondary);
+}
+
+.bot-composer {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.bot-composer-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.bot-input {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.bot-cmd-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    border: 1px solid var(--mud-palette-lines-inputs);
+    background: var(--mud-palette-surface);
+    color: var(--mud-palette-text-secondary);
+    font: inherit;
+    font-size: 20px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+    .bot-cmd-btn:hover {
+        color: var(--mud-palette-primary);
+        border-color: var(--mud-palette-primary);
+    }
+
+.bot-cmd-name {
+    display: inline-block;
+    min-width: 84px;
+    font-weight: 600;
+    color: var(--mud-palette-primary);
+}
+
+.bot-cmd-desc {
+    color: var(--mud-palette-text-secondary);
+    font-size: 13px;
+}
+
+.bot-keyboard {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-top: 4px;
+}
+
+.bot-keyboard-row {
+    display: flex;
+    gap: 8px;
+}
+
+.bot-key {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 44px;
+    padding: 6px 10px;
+    border-radius: 12px;
+    border: 1px solid var(--mud-palette-lines-inputs);
+    background: var(--mud-palette-background-gray);
+    color: var(--mud-palette-text-primary);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+    .bot-key:hover {
+        border-color: var(--mud-palette-primary);
+    }
+
+    .bot-key.is-muted {
+        background: var(--mud-palette-surface);
+        color: var(--mud-palette-text-secondary);
+    }

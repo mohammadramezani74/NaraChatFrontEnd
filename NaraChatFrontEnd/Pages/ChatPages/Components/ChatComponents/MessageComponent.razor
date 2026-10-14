@@ -169,6 +169,10 @@
                     }
 
                 </MudChatBubble>
+                @if (!string.IsNullOrEmpty(message.ReplyMarkup))
+                {
+                    <BotMarkupView Message="message" />
+                }
 
                 @if (InTasks)
                 {

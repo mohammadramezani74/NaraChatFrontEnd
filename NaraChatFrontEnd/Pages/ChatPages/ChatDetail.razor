@@ -365,7 +365,11 @@ else
 
                     <MudStack Row="false">
                         <MudText Typo="Typo.h1" Class="mr-3">@(OtherUser?.Name ?? Conversation.title)</MudText>
-                        @if (OtherUser.IsOnline)
+                        @if (OtherUser.IsBot)
+                        {
+                            <MudText Style="font-size:10px; color:gray;" Class="mr-3"><b>ربات · پاسخ خودکار</b></MudText>
+                        }
+                        else if (OtherUser.IsOnline)
                         {
                             <MudText Color="Color.Success" Style="font-size:10px" Class="mr-3"><b> آنلاین</b></MudText>
                         }
@@ -386,7 +390,7 @@ else
                 <div class="d-flex align-items-center flex-shrink-0" @onclick:stopPropagation="true">
 
                     @* روی دسکتاپ کارها تبِ ستون کناری است؛ دکمه فقط برای برگه‌ی موبایل. *@
-                    @if (OtherUser is not null && IsMobile)
+                    @if (OtherUser is not null && IsMobile && !OtherUser.IsBot)
                     {
                         @TasksButton
                     }
@@ -438,12 +442,18 @@ else
                     }
                 }
                 else{
-                    <EmptyMessagesComponnent OtherId="@OtherUser"/>
+                    if (IsBotChat) { @BotIntro } else { <EmptyMessagesComponnent OtherId="@OtherUser"/> }
                 }
             </MudStack>
         </div>
     </MudCardContent>
 
+    @if (IsBotChat)
+    {
+        @BotActions
+    }
+    else
+    {
     <MudCardActions Class="border-top pt-2" Style="flex-shrink:0">
         <MudStack Row="false" Class="w-100">
 
@@ -526,10 +536,11 @@ else
             </MudGrid>
         </MudStack>
     </MudCardActions>
+    }
 
 </MudCard>
 
-    @if (OtherUser is not null && IsMobile)
+    @if (OtherUser is not null && IsMobile && !OtherUser.IsBot)
     {
         <ContactTasksPanel ContactId="OtherUser.Id"
                            ContactName="@OtherUser.Name"
@@ -883,4 +894,119 @@ else
         </div>
     }
     </div>;
+
+    // -------------------------------------------------- ربات: صفحه‌ی معرفی و نوار پایین
+
+    private RenderFragment BotIntro =>
+    @<div class="bot-intro">
+        <div class="bot-intro-card">
+            <div class="bot-intro-avatar">
+                @if (!string.IsNullOrEmpty(OtherUser?.avatar))
+                {
+                    <img src="@($"{SiteSettings.ApiUrl}{OtherUser!.avatar}")" alt="" />
+                }
+                else
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.SmartToy" Style="font-size:40px;" />
+                }
+            </div>
+            <div class="bot-intro-name">@(_botInfo?.Name ?? OtherUser?.Name)</div>
+            @if (_botInfo is not null)
+            {
+                <div class="bot-intro-handle" dir="ltr">@("@" + _botInfo.Handle)</div>
+            }
+            @if (!string.IsNullOrWhiteSpace(_botInfo?.Description))
+            {
+                <p class="bot-intro-desc">@_botInfo!.Description</p>
+            }
+            <div class="bot-intro-hint">
+                @(BotStarted ? "برای ادامه، از پایین صفحه پیام یا دستور بفرستید." : "تا «شروع» را نزنید، ربات پیامی برایتان نمی‌فرستد.")
+            </div>
+        </div>
+    </div>;
+
+    private RenderFragment BotActions =>
+    @<MudCardActions Class="border-top pt-2" Style="flex-shrink:0">
+        @if (!BotStarted)
+        {
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       FullWidth="true"
+                       Size="Size.Large"
+                       Disabled="@(_botStarting || _botInfo is null)"
+                       OnClick="StartBotAsync"
+                       Style="min-height:48px; font-weight:700;">
+                @(_botStarting ? "در حال شروع…" : "شروع")
+            </MudButton>
+        }
+        else
+        {
+            <div class="bot-composer">
+                <div class="bot-composer-row">
+                    <MudMenu AnchorOrigin="Origin.TopRight" TransformOrigin="Origin.BottomRight" Dense="true">
+                        <ActivatorContent>
+                            <button type="button" class="bot-cmd-btn" aria-label="دستورهای ربات">/</button>
+                        </ActivatorContent>
+                        <ChildContent>
+                            @foreach (var cmd in _botInfo?.Commands ?? new List<BotCommandInfo>())
+                            {
+                                var c = cmd;
+                                <MudMenuItem OnClick="@(() => SendBotTextAsync(c.Command))">
+                                    <span class="bot-cmd-name">@c.Command</span>
+                                    <span class="bot-cmd-desc">@c.Description</span>
+                                </MudMenuItem>
+                            }
+                        </ChildContent>
+                    </MudMenu>
+
+                    <div class="bot-input">
+                        <MudTextField T="string"
+                                      @ref="messageInput"
+                                      @bind-Value="NewMessage"
+                                      Immediate="true"
+                                      Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
+                                      Placeholder="@BotPlaceholder"
+                                      OnKeyDown="OnBotKeyDown" />
+                    </div>
+
+                    @if (BotKeyboard is { Count: > 0 })
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.Keyboard"
+                                       Color="@(_botKeyboardHidden ? Color.Default : Color.Primary)"
+                                       OnClick="@(() => _botKeyboardHidden = !_botKeyboardHidden)"
+                                       aria-label="نمایش یا پنهان کردن کیبورد ربات" />
+                    }
+
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               EndIcon="@Icons.Custom.Brands.Telegram"
+                               IconSize="Size.Small"
+                               OnClick="@(() => SendBotTextAsync(NewMessage))">
+                        ارسال
+                    </MudButton>
+                </div>
+
+                @if (BotKeyboard is { Count: > 0 } && !_botKeyboardHidden)
+                {
+                    <div class="bot-keyboard">
+                        @foreach (var row in BotKeyboard)
+                        {
+                            <div class="bot-keyboard-row">
+                                @foreach (var key in row)
+                                {
+                                    var k = key;
+                                    <button type="button"
+                                            class="bot-key @(k.StartsWith("/") || k.StartsWith("«") ? "is-muted" : string.Empty)"
+                                            @onclick="@(() => SendBotTextAsync(k))">
+                                        @k
+                                    </button>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        }
+    </MudCardActions>;
 }
