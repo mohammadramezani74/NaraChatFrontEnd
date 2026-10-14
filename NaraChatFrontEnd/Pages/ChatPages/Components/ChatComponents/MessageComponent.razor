@@ -51,11 +51,11 @@
                     <MudText id="@message.Id" Color="Color.Default" >
                         @if (IsMention(message.Content))
                         {
-                            <div @onclick="()=>Routingchannel(message.Content)" style="color:cornflowerblue"> @((MarkupString)message.Content.Replace("\n", "<br />"))</div> 
+                            <div @onclick="()=>Routingchannel(message.Content)" style="color:cornflowerblue"> @((MarkupString)message.Content.ToSafeHtml())</div> 
                         }
                         else
                         {
-                            @((MarkupString)message.Content.Replace("\n", "<br />"))
+                            @((MarkupString)message.Content.ToSafeHtml())
                         }
 
                         @if (message.Type==MessageType.Location)

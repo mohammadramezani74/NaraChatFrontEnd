@@ -141,6 +141,21 @@ namespace NaraChat.Contract.Utilities.PersianUtlities
 
             return $"{day} {MonthNames[month - 1]}";
         }
+        /// <summary>
+        /// متن پیام برای نمایش به‌صورت HTML: اول encode می‌شود تا HTML/اسکریپتی که کاربر
+        /// فرستاده اجرا نشود، بعد خط‌های جدید &lt;br /&gt; می‌شوند. هر جا متن کاربر با
+        /// MarkupString نمایش داده می‌شود باید از این بگذرد.
+        /// </summary>
+        public static string ToSafeHtml(this string? text)
+        {
+            if (string.IsNullOrEmpty(text))
+                return string.Empty;
+
+            return System.Net.WebUtility.HtmlEncode(text)
+                .Replace("\r\n", "<br />")
+                .Replace("\n", "<br />");
+        }
+
         public static string TruncateMessage( this string message)
         {
             if (string.IsNullOrEmpty(message))

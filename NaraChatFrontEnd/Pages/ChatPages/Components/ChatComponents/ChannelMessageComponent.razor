@@ -50,7 +50,7 @@
 
                     <!-- ✅ متن پیام -->
                     <MudText id="@message.Id" Color="Color.Default">
-                        @((MarkupString)LinkifyMentions(message.Content.Replace("\n", "<br />")))
+                        @((MarkupString)LinkifyMentions(message.Content.ToSafeHtml()))
 
                         @if (message.Type == MessageType.Location)
                         {
