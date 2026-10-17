@@ -689,6 +689,105 @@ textarea {
     gap: 8px;
 }
 
+/* ارسال از بیرون */
+.ba-warn {
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: var(--mud-palette-warning-hover);
+    color: var(--mud-palette-warning-darken);
+    font-size: 13px;
+}
+
+.ba-key-create {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+    .ba-key-create input {
+        flex: 1;
+    }
+
+.ba-key-reveal {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid var(--mud-palette-success);
+    background: var(--mud-palette-success-hover);
+    font-size: 13px;
+}
+
+.ba-key-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+    .ba-key-row code {
+        flex: 1;
+        padding: 8px 10px;
+        border-radius: 8px;
+        background: var(--mud-palette-surface);
+        font-size: 13px;
+        word-break: break-all;
+        user-select: all;
+    }
+
+.ba-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+    .ba-table th {
+        text-align: start;
+        font-weight: 600;
+        color: var(--mud-palette-text-secondary);
+        padding: 6px 8px;
+        border-bottom: 1px solid var(--mud-palette-lines-default);
+    }
+
+    .ba-table td {
+        padding: 8px;
+        border-bottom: 1px solid var(--mud-palette-lines-default);
+        vertical-align: middle;
+    }
+
+    .ba-table tr.is-off td {
+        color: var(--mud-palette-text-disabled);
+    }
+
+    .ba-table code {
+        font-size: 12px;
+    }
+
+.ba-clip {
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ba-mini.is-danger {
+    border-color: var(--mud-palette-error);
+    color: var(--mud-palette-error);
+}
+
+.ba-code {
+    margin: 0;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: var(--mud-palette-background-gray);
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 12.5px;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    text-align: left;
+    overflow-x: auto;
+}
+
 @media (max-width: 900px) {
     .ba-mobile-note {
         display: block;

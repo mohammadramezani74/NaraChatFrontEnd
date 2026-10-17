@@ -1,0 +1,237 @@
+﻿@inherits LayoutComponentBase
+@inject NavigationManager Nav
+@inject IBotService BotService
+@inject AuthenticationStateProvider StateProvider
+@inject NaraChat.Application.Services.LocalStorage.ILocalStorageService LocalStorage
+@implements IDisposable
+
+@* قالب پنل ادمین (/admin/*): منوی کنار، نوار بالا و قفل ادمین. فقط برای حساب‌های
+   Admin:UserIds سرور؛ برای بقیه «صفحه پیدا نشد» و سرور هم همه‌ی APIها را 404 می‌دهد. *@
+
+<MudRTLProvider RightToLeft="true">
+    <MudThemeProvider IsDarkMode="@_dark" Theme="AdminTheme" />
+    <MudPopoverProvider />
+    <MudDialogProvider />
+    <MudSnackbarProvider />
+
+    @if (_checking)
+    {
+        <div class="ap-center"><MudProgressCircular Indeterminate="true" Color="Color.Primary" /></div>
+    }
+    else if (!_isAdmin)
+    {
+        <div class="ap-center ap-muted">
+            <span>صفحه پیدا نشد.</span>
+            <a href="/chat">بازگشت به ناراگرام</a>
+        </div>
+    }
+    else
+    {
+        <div class="ap-shell" dir="rtl">
+            <aside class="ap-side">
+                <div class="ap-brand">
+                    <span class="ap-brand-icon"><MudIcon Icon="@Icons.Material.Filled.Forum" /></span>
+                    <span class="ap-brand-text">
+                        <b>ناراگرام</b>
+                        <small>پنل مدیریت</small>
+                    </span>
+                </div>
+
+                <nav class="ap-nav" aria-label="منوی پنل">
+                    @foreach (var item in Menu)
+                    {
+                        if (item.Href is null)
+                        {
+                            <span class="ap-nav-item is-soon" aria-disabled="true">
+                                <MudIcon Icon="@item.Icon" Class="ap-nav-icon" />
+                                <span class="ap-nav-label">@item.Label</span>
+                                <span class="ap-soon">@item.Soon</span>
+                            </span>
+                        }
+                        else
+                        {
+                            <a class="ap-nav-item @(IsActive(item.Href) ? "is-active" : null)" href="@item.Href"
+                               aria-current="@(IsActive(item.Href) ? "page" : null)">
+                                <MudIcon Icon="@item.Icon" Class="ap-nav-icon" />
+                                <span class="ap-nav-label">@item.Label</span>
+                            </a>
+                        }
+                    }
+                </nav>
+
+                <div class="ap-lock">
+                    <b><MudIcon Icon="@Icons.Material.Filled.Lock" Style="font-size:15px;" /> فقط برای ادمین‌ها</b>
+                    <span>بقیه‌ی کاربران این پنل و لینکش را نمی‌بینند.</span>
+                </div>
+            </aside>
+
+            <div class="ap-main">
+                <header class="ap-top">
+                    <span class="ap-top-title">@CurrentTitle</span>
+                    <div class="ap-top-actions">
+                        <MudIconButton Icon="@(_dark ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
+                                       aria-label="@(_dark ? "تم روشن" : "تم تیره")" title="@(_dark ? "تم روشن" : "تم تیره")"
+                                       OnClick="ToggleDark" />
+                        <a class="ap-back" href="/chat">بازگشت به چت</a>
+                        @if (!string.IsNullOrWhiteSpace(_userName))
+                        {
+                            <span class="ap-user">
+                                <span class="ap-user-avatar">@Initials(_userName)</span>
+                                <span class="ap-user-text">
+                                    <b>@_userName</b>
+                                    <small>مدیر سامانه</small>
+                                </span>
+                            </span>
+                        }
+                    </div>
+                </header>
+
+                <div class="ap-content">
+                    <CascadingValue Value="_dark" Name="AdminDark">
+                        @Body
+                    </CascadingValue>
+                </div>
+            </div>
+        </div>
+    }
+</MudRTLProvider>
+
+@code {
+    private sealed record MenuItem(string Label, string Icon, string? Href, string? Soon = null);
+
+    // منوهای بدون Href در فازهای بعد ساخته می‌شوند.
+    private static readonly MenuItem[] Menu =
+    {
+        new("داشبورد", Icons.Material.Outlined.SpaceDashboard, "/admin"),
+        new("کاربران", Icons.Material.Outlined.People, "/admin/users"),
+        new("گروه‌ها", Icons.Material.Outlined.Groups, "/admin/groups"),
+        new("کانال‌ها", Icons.Material.Outlined.Campaign, "/admin/channels"),
+        new("ربات‌ها", Icons.Material.Outlined.SmartToy, "/admin/bots"),
+        new("پیام همگانی", Icons.Material.Outlined.Send, "/admin/broadcast"),
+        new("گزارش‌ها", Icons.Material.Outlined.BarChart, "/admin/reports"),
+        new("تنظیمات", Icons.Material.Outlined.Settings, "/admin/settings"),
+    };
+
+    private bool _checking = true;
+    private bool _isAdmin;
+    private bool _dark;
+    private string? _userName;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Nav.LocationChanged += OnLocationChanged;
+
+        try
+        {
+            var stored = await LocalStorage.GetItemAsync("IsDarkMode");
+            _dark = stored == "True";
+        }
+        catch (Exception)
+        {
+            _dark = false;
+        }
+
+        var state = await StateProvider.GetAuthenticationStateAsync();
+        if (state.User.Identity?.IsAuthenticated == true)
+        {
+            _userName = state.User.Claims.FirstOrDefault(c => c.Type == "name")?.Value;
+            _isAdmin = await BotService.IsAdminAsync();
+        }
+
+        _checking = false;
+    }
+
+    private async Task ToggleDark()
+    {
+        _dark = !_dark;
+        try
+        {
+            await LocalStorage.SetItemAsync("IsDarkMode", _dark.ToString());
+        }
+        catch (Exception)
+        {
+            // ذخیره نشد؛ فقط همین صفحه عوض می‌شود.
+        }
+    }
+
+    private string Path => "/" + Nav.ToBaseRelativePath(Nav.Uri).Split('?', '#')[0].TrimEnd('/');
+
+    private bool IsActive(string href) => string.Equals(Path, href, StringComparison.OrdinalIgnoreCase);
+
+    private string CurrentTitle => Menu.FirstOrDefault(m => m.Href is not null && IsActive(m.Href))?.Label ?? "پنل مدیریت";
+
+    private static string Initials(string name)
+    {
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length switch
+        {
+            0 => "؟",
+            1 => parts[0][..1],
+            _ => parts[0][..1] + "‌" + parts[1][..1],
+        };
+    }
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+        => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Nav.LocationChanged -= OnLocationChanged;
+
+    // همان رنگ‌ها و فونت چت (MainLayout)، تا پنل و برنامه یک‌دست باشند.
+    private static readonly MudTheme AdminTheme = new()
+    {
+        Typography = new Typography
+        {
+            Default = new DefaultTypography { FontFamily = new[] { "iransans-medium" } },
+            H1 = new DefaultTypography { FontFamily = new[] { "iransans-bold" } },
+            H2 = new DefaultTypography { FontFamily = new[] { "iransans-bold" } },
+            H3 = new DefaultTypography { FontFamily = new[] { "iransans-medium" } },
+            Body1 = new DefaultTypography { FontFamily = new[] { "iransans-medium" } },
+        },
+        PaletteLight = new PaletteLight
+        {
+            Primary = "#1D6FD0",
+            Secondary = "#0E7490",
+            Tertiary = "#6D28D9",
+            Info = "#0369A1",
+            Success = "#047857",
+            Warning = "#B45309",
+            Error = "#DC2626",
+            Background = "#F1F5F9",
+            Surface = "#FFFFFF",
+            AppbarBackground = "#FFFFFF",
+            AppbarText = "#0F172A",
+            TextPrimary = "#0F172A",
+            TextSecondary = "#475569",
+            LinesDefault = "#E2E8F0",
+            LinesInputs = "#CBD5E1",
+            TableLines = "#E2E8F0",
+            Divider = "#E2E8F0",
+            ActionDefault = "#1D6FD0",
+            ActionDisabled = "#94A3B8",
+            ActionDisabledBackground = "#E2E8F0",
+        },
+        PaletteDark = new PaletteDark
+        {
+            Primary = "#64B5F6",
+            Secondary = "#22D3EE",
+            Tertiary = "#8B5CF6",
+            Info = "#64B5F6",
+            Success = "#34D399",
+            Warning = "#FBBF24",
+            Error = "#EF5350",
+            Background = "#0B1220",
+            Surface = "#0F172A",
+            AppbarBackground = "#0B1220",
+            AppbarText = "#E5E7EB",
+            TextPrimary = "#E5E7EB",
+            TextSecondary = "#94A3B8",
+            LinesDefault = "#233044",
+            LinesInputs = "#2A3A55",
+            TableLines = "#233044",
+            Divider = "#233044",
+            ActionDefault = "#64B5F6",
+            ActionDisabled = "#64748B",
+            ActionDisabledBackground = "#1E293B",
+        },
+    };
+}

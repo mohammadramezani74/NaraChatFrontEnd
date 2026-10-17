@@ -28,6 +28,12 @@ namespace NaraChat.Application.Services.Bots
         Task<BotConnectorTestResult> TestConnectorAsync(string key, CancellationToken ct = default);
         Task<List<BotPickItem>?> RolesAsync(CancellationToken ct = default);
         Task<List<BotPickItem>?> SearchUsersAsync(string? search, CancellationToken ct = default);
+
+        // ارسال از بیرون
+        Task<BotApiOverview?> ApiAsync(Guid id, CancellationToken ct = default);
+        Task<(bool Ok, CreatedBotApiKey? Key, string Message)> CreateKeyAsync(Guid id, string name, CancellationToken ct = default);
+        Task<(bool Ok, string Message)> RevokeKeyAsync(Guid id, Guid keyId, CancellationToken ct = default);
+        Task<(bool Ok, string Message)> SetOfficialAsync(Guid id, bool isOfficial, CancellationToken ct = default);
     }
 
     /// <summary>پایه‌ی مشترک: درخواست و خواندن BaseResponseDto بدون استثنا.</summary>
@@ -171,6 +177,24 @@ namespace NaraChat.Application.Services.Bots
         public Task<List<BotPickItem>?> SearchUsersAsync(string? search, CancellationToken ct = default)
             => Get<List<BotPickItem>>("/api/v1/users/GetUsersForGroup" +
                                       (string.IsNullOrWhiteSpace(search) ? string.Empty : "?search=" + Uri.EscapeDataString(search)), ct);
+
+        public Task<BotApiOverview?> ApiAsync(Guid id, CancellationToken ct = default)
+            => Get<BotApiOverview>($"{Base}/{id}/api", ct);
+
+        public Task<(bool Ok, CreatedBotApiKey? Key, string Message)> CreateKeyAsync(Guid id, string name, CancellationToken ct = default)
+            => Send<CreatedBotApiKey>(HttpMethod.Post, $"{Base}/{id}/api/keys", new { name }, ct);
+
+        public async Task<(bool Ok, string Message)> RevokeKeyAsync(Guid id, Guid keyId, CancellationToken ct = default)
+        {
+            var (ok, _, message) = await Send<object>(HttpMethod.Delete, $"{Base}/{id}/api/keys/{keyId}", null, ct);
+            return (ok, message);
+        }
+
+        public async Task<(bool Ok, string Message)> SetOfficialAsync(Guid id, bool isOfficial, CancellationToken ct = default)
+        {
+            var (ok, _, message) = await Send<object>(HttpMethod.Put, $"{Base}/{id}/api/official", new { isOfficial }, ct);
+            return (ok, message);
+        }
     }
 
     /// <summary>

@@ -1,0 +1,473 @@
+﻿/* تنظیمات. کیت مشترک ak-* از AdminLayout می‌آید؛ اینجا فقط چیزهای خاص همین صفحه. */
+
+.st-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: flex-start;
+}
+
+.st-main {
+    flex: 999 1 560px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 0;
+}
+
+.st-side {
+    flex: 1 1 300px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 0;
+}
+
+.ak-page .ak-card.st-card {
+    gap: 0;
+    padding: 0;
+    overflow: hidden;
+}
+
+/* ---------------- سر کارت */
+
+.st-card-head {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 18px 22px;
+    border-bottom: 1px solid var(--mud-palette-lines-default);
+}
+
+    .st-card-head h2 {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 800;
+    }
+
+    .st-card-head > .ak-stack {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+.st-card-icon,
+.st-perm-icon {
+    flex-shrink: 0;
+    width: 42px;
+    height: 42px;
+    border-radius: 13px;
+    display: grid;
+    place-items: center;
+}
+
+.st-perm-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 11px;
+}
+
+.is-blue { color: #2A78D6; background: rgba(42, 120, 214, .12); }
+.is-orange { color: #EB6834; background: rgba(235, 104, 52, .12); }
+.is-green { color: #1BAF7A; background: rgba(27, 175, 122, .12); }
+.is-yellow { color: #C98500; background: rgba(237, 161, 0, .14); }
+
+/* ---------------- بدنه */
+
+.st-body {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 18px 22px 20px;
+    transition: opacity .2s ease;
+}
+
+    .st-body.is-off {
+        opacity: .55;
+    }
+
+.st-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px 14px;
+}
+
+.st-label {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--mud-palette-text-secondary);
+    min-width: 52px;
+}
+
+.st-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    position: relative;
+    min-width: 0;
+}
+
+    .st-field .ak-input {
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+.st-text {
+    resize: vertical;
+    min-height: 84px;
+    line-height: 1.8;
+}
+
+.st-count {
+    align-self: flex-end;
+    font-size: 11.5px;
+    color: var(--mud-palette-text-secondary);
+}
+
+    .st-count.is-warn {
+        color: var(--mud-palette-warning);
+        font-weight: 700;
+    }
+
+.st-two {
+    display: grid;
+    grid-template-columns: 1fr 1.6fr;
+    gap: 12px;
+}
+
+/* ---------------- رنگ اعلان */
+
+.st-tones {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.st-tone {
+    --tone: #2A78D6;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 38px;
+    padding: 0 14px;
+    border-radius: 12px;
+    border: 1.5px solid var(--mud-palette-lines-default);
+    background: var(--mud-palette-surface);
+    color: var(--mud-palette-text-primary);
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    transition: border-color .15s, background-color .15s, transform .15s;
+}
+
+    .st-tone ::deep svg {
+        color: var(--tone);
+    }
+
+    .st-tone:hover {
+        transform: translateY(-1px);
+    }
+
+    .st-tone.is-warn { --tone: #E08A00; }
+    .st-tone.is-success { --tone: #1BAF7A; }
+
+    .st-tone.is-on {
+        border-color: var(--tone);
+        background: color-mix(in srgb, var(--tone) 10%, var(--mud-palette-surface));
+        font-weight: 700;
+    }
+
+/* ---------------- سوییچ */
+
+.st-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    cursor: pointer;
+    align-self: center;
+    min-height: 40px;
+    flex-shrink: 0;
+}
+
+    .st-switch.is-small {
+        align-self: flex-start;
+    }
+
+    .st-switch input {
+        position: absolute;
+        opacity: 0;
+        width: 1px;
+        height: 1px;
+    }
+
+.st-switch-label {
+    font-weight: 700;
+    min-width: 34px;
+}
+
+.st-switch-track {
+    width: 44px;
+    height: 26px;
+    border-radius: 999px;
+    background: var(--mud-palette-lines-inputs);
+    padding: 3px;
+    box-sizing: border-box;
+    display: flex;
+    transition: background-color .2s ease;
+}
+
+.st-switch-knob {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #FFFFFF;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .25);
+    transition: transform .2s ease;
+}
+
+.st-switch input:checked + .st-switch-track {
+    background: var(--mud-palette-primary);
+}
+
+    .st-switch input:checked + .st-switch-track .st-switch-knob {
+        transform: translateX(-18px);
+    }
+
+.st-switch input:focus-visible + .st-switch-track {
+    outline: 2px solid var(--mud-palette-primary);
+    outline-offset: 2px;
+}
+
+/* ---------------- پیش‌نمایش */
+
+.st-preview {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.st-preview-label {
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: .02em;
+    color: var(--mud-palette-text-secondary);
+}
+
+.st-mock {
+    border-radius: 16px;
+    border: 1px solid var(--mud-palette-lines-default);
+    overflow: hidden;
+    background:
+        radial-gradient(circle at 15% 0%, rgba(42, 120, 214, .10), transparent 45%),
+        radial-gradient(circle at 90% 100%, rgba(27, 175, 122, .08), transparent 40%),
+        var(--mud-palette-background);
+}
+
+.st-mock-bar {
+    height: 40px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 14px;
+    background: var(--mud-palette-appbar-background);
+    opacity: .92;
+}
+
+.st-mock-dot {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, .55);
+}
+
+.st-mock-line {
+    width: 90px;
+    height: 8px;
+    border-radius: 99px;
+    background: rgba(255, 255, 255, .45);
+}
+
+.st-mock-body {
+    min-height: 92px;
+    padding: 16px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+}
+
+/* ---------------- اجازه‌ی ساخت */
+
+.st-perm {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 18px 22px;
+    border-bottom: 1px solid var(--mud-palette-lines-default);
+}
+
+.st-perm-head {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px 12px;
+}
+
+    .st-perm-head b {
+        flex: 1 1 auto;
+        font-size: 14px;
+    }
+
+.st-picks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.st-pick {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 36px;
+    padding: 0 14px;
+    border: 1.5px solid var(--mud-palette-lines-default);
+    border-radius: 999px;
+    background: var(--mud-palette-surface);
+    color: var(--mud-palette-text-primary);
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    transition: border-color .15s, background-color .15s;
+}
+
+    .st-pick small {
+        color: var(--mud-palette-text-secondary);
+    }
+
+    .st-pick.is-on {
+        border-color: var(--mud-palette-primary);
+        background: var(--mud-palette-primary-hover);
+        color: var(--mud-palette-primary);
+        font-weight: 700;
+    }
+
+.st-reach {
+    margin: 0;
+    font-size: 12.5px;
+    color: var(--mud-palette-text-secondary);
+}
+
+.st-note {
+    margin: 0;
+    padding: 14px 22px 0;
+}
+
+/* ---------------- پایین کارت */
+
+.st-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 22px;
+    background: color-mix(in srgb, var(--mud-palette-background) 60%, transparent);
+    border-top: 1px solid var(--mud-palette-lines-default);
+}
+
+.st-note + .st-foot {
+    margin-top: 14px;
+}
+
+/* ---------------- ادمین‌ها */
+
+.st-admins {
+    display: flex;
+    flex-direction: column;
+    padding: 8px 12px;
+}
+
+.st-admin {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px;
+    border-radius: 12px;
+}
+
+    .st-admin:hover {
+        background: var(--mud-palette-action-default-hover);
+    }
+
+    .st-admin b {
+        flex: 1 1 auto;
+        font-size: 13.5px;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+.st-lock {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    margin: 0;
+    padding: 12px 22px 18px;
+    border-top: 1px dashed var(--mud-palette-lines-default);
+}
+
+    .st-lock code {
+        font-size: 11.5px;
+        padding: 1px 6px;
+        border-radius: 6px;
+        background: var(--mud-palette-action-default-hover);
+    }
+
+.ak-page .ak-card.st-tip {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px 18px;
+    background: linear-gradient(135deg, rgba(42, 120, 214, .08), rgba(27, 175, 122, .06)), var(--mud-palette-surface);
+    color: var(--mud-palette-text-secondary);
+}
+
+    .st-tip ::deep svg {
+        color: #EDA100;
+        flex-shrink: 0;
+    }
+
+    .st-tip p {
+        margin: 0;
+        font-size: 12.5px;
+        line-height: 1.9;
+    }
+
+    .st-tip a {
+        color: var(--mud-palette-primary);
+        font-weight: 700;
+        text-decoration: none;
+    }
+
+/* ---------------- بارگذاری */
+
+.st-skeleton {
+    flex: 1 1 360px;
+    background: linear-gradient(90deg, var(--mud-palette-surface) 25%, var(--mud-palette-action-default-hover) 50%, var(--mud-palette-surface) 75%);
+    background-size: 200% 100%;
+    animation: st-shimmer 1.4s linear infinite;
+}
+
+@keyframes st-shimmer {
+    to { background-position: -200% 0; }
+}
+
+@media (max-width: 600px) {
+    .st-card-head, .st-body, .st-perm, .st-foot { padding-inline: 16px; }
+    .st-two { grid-template-columns: 1fr; }
+    .st-card-head { flex-wrap: wrap; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .st-skeleton { animation: none; }
+}

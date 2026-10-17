@@ -39,6 +39,9 @@ namespace NaraChat.Contract.Models.Bots
 
         /// <summary>null، primary یا back.</summary>
         public string? Style { get; set; }
+
+        /// <summary>دکمه‌ی لینک (پیام همگانی)؛ به‌جای کلیک ربات، لینک در تب تازه باز می‌شود.</summary>
+        public string? Url { get; set; }
     }
 
     public sealed class BotCardRow
@@ -171,6 +174,49 @@ namespace NaraChat.Contract.Models.Bots
     {
         public bool Ok { get; set; }
         public string Message { get; set; } = string.Empty;
+    }
+
+    // ------------------------------------------------ ارسال از بیرون (کلید API)
+
+    public sealed class BotApiKeyItem
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Prefix { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; }
+        public DateTime? LastUsedAt { get; set; }
+        public DateTime? RevokedAt { get; set; }
+    }
+
+    public sealed class BotApiSendItem
+    {
+        public DateTime At { get; set; }
+        public string KeyName { get; set; } = string.Empty;
+        public string Phone { get; set; } = string.Empty;
+
+        /// <summary>sending | sent | failed</summary>
+        public string Status { get; set; } = string.Empty;
+
+        public string? Error { get; set; }
+        public string? ErrorText { get; set; }
+        public string? Reference { get; set; }
+        public string? Preview { get; set; }
+    }
+
+    public sealed class BotApiOverview
+    {
+        public bool IsOfficial { get; set; }
+        public List<BotApiKeyItem> Keys { get; set; } = new();
+        public List<BotApiSendItem> Recent { get; set; } = new();
+        public int SentToday { get; set; }
+        public int FailedToday { get; set; }
+    }
+
+    public sealed class CreatedBotApiKey
+    {
+        public Guid Id { get; set; }
+        public string Key { get; set; } = string.Empty;
+        public string Prefix { get; set; } = string.Empty;
     }
 
     /// <summary>نقش‌ها (api/v1/roles/GetAll) و کاربرها (users/GetUsersForGroup).</summary>

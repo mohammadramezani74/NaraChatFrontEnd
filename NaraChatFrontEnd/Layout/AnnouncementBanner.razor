@@ -1,0 +1,85 @@
+﻿@using NaraChat.Contract.Models.Admin
+@inject IJSRuntime JS
+
+@if (Value is not null && !_hidden)
+{
+    <div class="ann-wrap @(Preview ? "is-inline" : null)" role="status" aria-live="polite">
+        <div class="ann is-@Value.Tone">
+            <span class="ann-icon"><MudIcon Icon="@ToneIcon" Size="Size.Small" /></span>
+            <p class="ann-text">@Value.Text</p>
+            @if (HasLink)
+            {
+                <a class="ann-link" href="@Value.LinkUrl" target="_blank" rel="noopener noreferrer">
+                    @Value.LinkText
+                    <MudIcon Icon="@Icons.Material.Filled.OpenInNew" Style="font-size:14px" />
+                </a>
+            }
+            <button type="button" class="ann-close" title="بستن" aria-label="بستن" @onclick="DismissAsync">
+                <MudIcon Icon="@Icons.Material.Filled.Close" Style="font-size:18px" />
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    private const string StorageKey = "nara-announcement-dismissed";
+
+    /// <summary>اعلان فعال؛ null یعنی چیزی نشان نده.</summary>
+    [Parameter] public AnnouncementSetting? Value { get; set; }
+
+    /// <summary>برای پیش‌نمایش در پنل: بستن فقط پنهان می‌کند و در مرورگر ذخیره نمی‌شود.</summary>
+    [Parameter] public bool Preview { get; set; }
+
+    private bool _hidden;
+    private string? _shownKey;
+
+    private bool HasLink => !string.IsNullOrWhiteSpace(Value?.LinkText)
+        && (Value!.LinkUrl?.StartsWith("https://", StringComparison.OrdinalIgnoreCase) == true
+            || Value!.LinkUrl?.StartsWith("http://", StringComparison.OrdinalIgnoreCase) == true);
+
+    private string ToneIcon => Value?.Tone switch
+    {
+        "warn" => Icons.Material.Filled.WarningAmber,
+        "success" => Icons.Material.Filled.CheckCircle,
+        _ => Icons.Material.Filled.Campaign,
+    };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Value is null || Preview)
+        {
+            _hidden = false;
+            return;
+        }
+        if (_shownKey == StableKey)
+            return;
+        _shownKey = StableKey;
+        try
+        {
+            var dismissed = await JS.InvokeAsync<string?>("localStorage.getItem", StorageKey);
+            _hidden = dismissed == StableKey;
+        }
+        catch
+        {
+            _hidden = false;
+        }
+    }
+
+    // هر اعلان تازه (زمان ویرایش متفاوت) دوباره دیده می‌شود، حتی اگر قبلی بسته شده باشد.
+    private string StableKey => $"{Value?.UpdatedAt:yyyyMMddHHmmss}|{Value?.Text?.Length}|{Value?.Tone}";
+
+    private async Task DismissAsync()
+    {
+        _hidden = true;
+        if (Preview)
+            return;
+        try
+        {
+            await JS.InvokeVoidAsync("localStorage.setItem", StorageKey, StableKey);
+        }
+        catch
+        {
+            // ذخیره نشد: فقط برای همین بار بسته می‌شود.
+        }
+    }
+}

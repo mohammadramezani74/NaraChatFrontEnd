@@ -1,0 +1,467 @@
+﻿@inject IAdminRoomsService RoomsService
+@inject ISnackbar Snackbar
+@implements IDisposable
+
+@* فهرست و جزئیات گروه‌ها یا کانال‌ها (Kind: group | channel). بایگانی قابل برگشت است و حذف نمی‌کند.
+   متن پیام‌ها دیده نمی‌شود؛ فقط آمار و اعضا. *@
+
+<div class="ak-page" dir="rtl">
+    <div class="ak-head">
+        <div class="ak-stack">
+            <h1>@Plural</h1>
+            @if (_page is not null)
+            {
+                <span class="ak-sub">@AdminFormat.Num(_page.AllCount) @Singular · @AdminFormat.Num(_page.ArchivedCount) بایگانی‌شده</span>
+            }
+        </div>
+    </div>
+
+    <div class="ak-card ak-toolbar">
+        <label class="ak-search">
+            <MudIcon Icon="@Icons.Material.Filled.Search" Style="font-size:18px;" />
+            <input aria-label="جستجو" placeholder="@($"نام {Singular}…")" value="@_search" @oninput="OnSearchInput" />
+        </label>
+        <div class="ak-seg" role="group" aria-label="وضعیت">
+            <button type="button" class="@(_status == "all" ? "is-on" : null)" @onclick="@(() => SetStatusAsync("all"))">همه</button>
+            <button type="button" class="@(_status == "active" ? "is-on" : null)" @onclick="@(() => SetStatusAsync("active"))">فعال</button>
+            <button type="button" class="@(_status == "archived" ? "is-on" : null)" @onclick="@(() => SetStatusAsync("archived"))">بایگانی</button>
+        </div>
+    </div>
+
+    <div class="ak-table-wrap">
+        @if (_page is null)
+        {
+            <div class="ak-empty">
+                @if (_loading)
+                {
+                    <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Small" />
+                }
+                else
+                {
+                    <span>@($"لیست {Plural} از سرور نیامد.")</span>
+                }
+            </div>
+        }
+        else if (_page.Items.Count == 0)
+        {
+            <div class="ak-empty">@($"{Singular}ی با این فیلترها پیدا نشد.")</div>
+        }
+        else
+        {
+            <table class="ak-table">
+                <thead>
+                    <tr>
+                        <th>@Singular</th>
+                        <th class="ak-num">اعضا</th>
+                        <th class="ak-num">@(IsChannel ? "پست در ۷ روز" : "پیام در ۷ روز")</th>
+                        <th>آخرین فعالیت</th>
+                        <th>سازنده</th>
+                        <th>ساخته‌شده</th>
+                        <th>وضعیت</th>
+                        <th class="ak-end">عملیات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var r in _page.Items)
+                    {
+                        <tr class="@(r.IsArchived ? "is-dim" : null)">
+                            <td>
+                                <button type="button" class="ak-rowbtn" @onclick="@(() => OpenAsync(r.Id))">
+                                    <span class="ak-avatar @AdminFormat.Tone(r.Id)"><MudIcon Icon="@KindIcon" Style="font-size:18px;" /></span>
+                                    <b>@r.Title</b>
+                                </button>
+                            </td>
+                            <td class="ak-num">@AdminFormat.Num(r.Members)</td>
+                            <td class="ak-num">@AdminFormat.Num(r.Messages7d)</td>
+                            <td>@AdminFormat.Ago(r.LastActivity)</td>
+                            <td>@(r.CreatorName ?? "—")</td>
+                            <td>@AdminFormat.Date(r.CreatedAt)</td>
+                            <td><span class="ak-pill @(r.IsArchived ? "" : "is-ok")">@(r.IsArchived ? "بایگانی" : "فعال")</span></td>
+                            <td class="ak-end">
+                                <span class="ak-actions">
+                                    <button type="button" class="ak-icon" title="جزئیات و ویرایش" aria-label="@($"ویرایش {r.Title}")" @onclick="@(() => OpenAsync(r.Id, edit: true))">
+                                        <MudIcon Icon="@Icons.Material.Outlined.Edit" Style="font-size:18px;" />
+                                    </button>
+                                    @if (r.IsArchived)
+                                    {
+                                        <button type="button" class="ak-icon is-success" title="برگرداندن از بایگانی" aria-label="@($"برگرداندن {r.Title}")" @onclick="@(() => AskRow("restore", r))">
+                                            <MudIcon Icon="@Icons.Material.Outlined.Unarchive" Style="font-size:18px;" />
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <button type="button" class="ak-icon is-danger" title="بایگانی" aria-label="@($"بایگانی {r.Title}")" @onclick="@(() => AskRow("archive", r))">
+                                            <MudIcon Icon="@Icons.Material.Outlined.Archive" Style="font-size:18px;" />
+                                        </button>
+                                    }
+                                </span>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <div class="ak-pager">
+                <span>@AdminFormat.Num(_page.Total) @Singular · صفحه‌ی @AdminFormat.Num(_page.Page) از @AdminFormat.Num(PageCount)</span>
+                <span class="ak-toolbar">
+                    <button type="button" class="ak-btn" disabled="@(_page.Page <= 1)" @onclick="@(() => GoAsync(_page.Page - 1))">‹ قبلی</button>
+                    <button type="button" class="ak-btn" disabled="@(_page.Page >= PageCount)" @onclick="@(() => GoAsync(_page.Page + 1))">بعدی ›</button>
+                </span>
+            </div>
+        }
+    </div>
+</div>
+
+@if (_openId is not null)
+{
+    <div class="ak-overlay" @onclick="Close">
+        <section class="ak-drawer" aria-label="@($"جزئیات {Singular}")" @onclick:stopPropagation="true">
+            @if (_detail is null)
+            {
+                <div class="ak-empty"><MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Small" /></div>
+            }
+            else
+            {
+                var d = _detail;
+                var max = Math.Max(1, d.Daily14.DefaultIfEmpty(0).Max());
+                <div class="ak-drawer-head">
+                    <span class="ak-avatar is-big @AdminFormat.Tone(d.Id)"><MudIcon Icon="@KindIcon" /></span>
+                    <span class="ak-stack" style="flex:1;min-width:0">
+                        <b style="font-size:17px">@d.Title</b>
+                        <span class="ak-muted">ساخته‌ی @(d.CreatorName ?? "نامشخص") · @AdminFormat.Date(d.CreatedAt)</span>
+                    </span>
+                    <MudIconButton Icon="@Icons.Material.Filled.Close" aria-label="بستن" OnClick="Close" />
+                </div>
+
+                <div class="ak-drawer-body">
+                    @if (_editing)
+                    {
+                        <div class="ak-edit">
+                            <b style="font-size:14px">ویرایش @Singular</b>
+                            <label>نام<input class="ak-input" maxlength="100" @bind="_editTitle" @bind:event="oninput" /></label>
+                            <label>توضیح<textarea class="ak-input" rows="3" maxlength="500" @bind="_editDescription" @bind:event="oninput"></textarea></label>
+                            <span class="ak-toolbar">
+                                <button type="button" class="ak-btn is-primary" disabled="@(_busy || string.IsNullOrWhiteSpace(_editTitle))" @onclick="SaveEditAsync">ذخیره</button>
+                                <button type="button" class="ak-btn" @onclick="@(() => _editing = false)">انصراف</button>
+                            </span>
+                        </div>
+                    }
+                    else
+                    {
+                        <button type="button" class="ak-btn is-link" style="align-self:flex-start" @onclick="StartEdit">
+                            <MudIcon Icon="@Icons.Material.Outlined.Edit" Style="font-size:16px;" /> ویرایش نام و توضیح
+                        </button>
+                    }
+
+                    <span class="ak-chips">
+                        @if (d.ArchivedAt is not null)
+                        {
+                            <span class="ak-pill">بایگانی از @AdminFormat.Date(d.ArchivedAt)</span>
+                        }
+                        else
+                        {
+                            <span class="ak-pill is-ok">فعال</span>
+                        }
+                    </span>
+
+                    @if (!string.IsNullOrWhiteSpace(d.Description))
+                    {
+                        <span class="ak-muted">@d.Description</span>
+                    }
+
+                    <div class="ak-grid2">
+                        <span><span class="ak-muted">اعضا</span><b>@AdminFormat.Num(d.Members.Count)</b></span>
+                        <span><span class="ak-muted">آخرین فعالیت</span><b>@AdminFormat.Ago(d.LastActivity)</b></span>
+                        <span><span class="ak-muted">@(IsChannel ? "پست‌ها" : "پیام‌ها")</span><b>@AdminFormat.Num(d.Messages7d) در ۷ روز · @AdminFormat.Num(d.MessagesTotal) در کل</b></span>
+                    </div>
+
+                    <div class="ak-section">
+                        <b>فعالیت ۱۴ روز اخیر</b>
+                        <div class="ak-spark" role="img" aria-label="@($"تعداد {(IsChannel ? "پست" : "پیام")} در ۱۴ روز اخیر، بیشترین {max}")">
+                            @foreach (var v in d.Daily14)
+                            {
+                                <span style="height:@(Math.Max(2, v * 100 / max))%" title="@AdminFormat.Num(v)"></span>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="ak-section">
+                        <b>اعضا</b>
+                        @foreach (var m in d.Members)
+                        {
+                            <span class="ak-list-row">
+                                <span class="ak-toolbar" style="gap:8px">
+                                    <span class="ak-avatar @AdminFormat.Tone(m.UserId)">@AdminFormat.Initials(m.Name)</span>
+                                    <span class="ak-stack">
+                                        <span>@m.Name</span>
+                                        <span class="ak-muted">@MemberRole(m)@(m.IsDisabled ? " · حساب غیرفعال" : "")</span>
+                                    </span>
+                                </span>
+                                @if (!m.IsCreator)
+                                {
+                                    <button type="button" class="ak-btn is-link" disabled="@_busy" @onclick="@(() => Ask("remove-member", m))">بیرون کردن</button>
+                                }
+                            </span>
+                        }
+                    </div>
+
+                    <div class="ak-section">
+                        <b>رویدادها</b>
+                        @if (d.Log.Count == 0)
+                        {
+                            <span class="ak-muted">هنوز کاری از پنل روی آن انجام نشده است.</span>
+                        }
+                        @foreach (var l in d.Log)
+                        {
+                            <span class="ak-list-row">
+                                <span class="ak-stack">
+                                    <span>@l.Text · @l.ActorName</span>
+                                    @if (!string.IsNullOrWhiteSpace(l.Details))
+                                    {
+                                        <span class="ak-muted">@l.Details</span>
+                                    }
+                                </span>
+                                <span class="ak-muted" style="white-space:nowrap">@AdminFormat.Ago(l.At)</span>
+                            </span>
+                        }
+                    </div>
+
+                    <span class="ak-note"><b>پیام‌ها:</b> از پنل متن گفتگوها دیده نمی‌شود؛ فقط تعداد.</span>
+                </div>
+
+                <div class="ak-drawer-foot">
+                    @if (d.ArchivedAt is null)
+                    {
+                        <button type="button" class="ak-btn is-danger is-big" disabled="@_busy" @onclick="@(() => Ask("archive", null))">بایگانی</button>
+                    }
+                    else
+                    {
+                        <button type="button" class="ak-btn is-success is-big" disabled="@_busy" @onclick="@(() => Ask("restore", null))">برگرداندن از بایگانی</button>
+                    }
+                </div>
+            }
+        </section>
+    </div>
+}
+
+@if (_confirm is not null && _targetId is not null)
+{
+    <div class="ak-dialog-wrap">
+        <div class="ak-dialog" role="dialog" aria-modal="true" aria-label="تأیید">
+            <b>@ConfirmTitle</b>
+            <p>@ConfirmText</p>
+            <label class="ak-stack" style="gap:6px;font-size:13px;font-weight:600">
+                دلیل (در رویدادها ثبت می‌شود)
+                <textarea class="ak-input" rows="2" @bind="_reason" @bind:event="oninput"></textarea>
+            </label>
+            <div class="ak-toolbar">
+                <button type="button" class="ak-btn is-big @(_confirm == "restore" ? "is-success" : "is-danger")" disabled="@_busy" @onclick="ConfirmAsync">@ConfirmButton</button>
+                <button type="button" class="ak-btn is-big" @onclick="@(() => { _confirm = null; _targetId = null; })">انصراف</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    /// <summary>group | channel</summary>
+    [Parameter, EditorRequired] public string Kind { get; set; } = "group";
+
+    private const int PageSize = 25;
+
+    private AdminRoomsPage? _page;
+    private bool _loading = true;
+    private bool _busy;
+    private string _search = string.Empty;
+    private string _status = "all";
+    private int _pageNo = 1;
+
+    private Guid? _openId;
+    private AdminRoomDetail? _detail;
+    private string? _confirm;
+    private Guid? _targetId;
+    private string _targetTitle = string.Empty;
+    private AdminRoomMember? _member;
+    private string? _reason;
+    private bool _editing;
+    private string _editTitle = string.Empty;
+    private string? _editDescription;
+
+    private CancellationTokenSource? _searchDelay;
+    private readonly CancellationTokenSource _cts = new();
+
+    private bool IsChannel => Kind == "channel";
+    private string Singular => IsChannel ? "کانال" : "گروه";
+    private string Plural => IsChannel ? "کانال‌ها" : "گروه‌ها";
+    private string KindIcon => IsChannel ? Icons.Material.Outlined.Campaign : Icons.Material.Outlined.Groups;
+    private int PageCount => _page is null ? 1 : Math.Max(1, (int)Math.Ceiling(_page.Total / (double)_page.PageSize));
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _pageNo = 1;
+        _openId = null;
+        _detail = null;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _page = await RoomsService.ListAsync(Kind, _pageNo, PageSize, _search, _status, _cts.Token);
+        _loading = false;
+    }
+
+    private async Task OnSearchInput(ChangeEventArgs e)
+    {
+        _search = e.Value?.ToString() ?? string.Empty;
+        _searchDelay?.Cancel();
+        var delay = _searchDelay = new CancellationTokenSource();
+        try
+        {
+            await Task.Delay(400, delay.Token);
+        }
+        catch (TaskCanceledException)
+        {
+            return;
+        }
+        _pageNo = 1;
+        await LoadAsync();
+    }
+
+    private async Task SetStatusAsync(string status)
+    {
+        _status = status;
+        _pageNo = 1;
+        await LoadAsync();
+    }
+
+    private async Task GoAsync(int page)
+    {
+        _pageNo = Math.Clamp(page, 1, PageCount);
+        await LoadAsync();
+    }
+
+    private async Task OpenAsync(Guid id, bool edit = false)
+    {
+        _openId = id;
+        _detail = null;
+        _confirm = null;
+        _editing = false;
+        StateHasChanged();
+        _detail = await RoomsService.GetAsync(Kind, id, _cts.Token);
+        if (_detail is null)
+        {
+            Snackbar.Add($"جزئیات {Singular} از سرور نیامد.", Severity.Error);
+            _openId = null;
+            return;
+        }
+        if (edit) StartEdit();
+    }
+
+    private void Close()
+    {
+        _openId = null;
+        _detail = null;
+        _editing = false;
+    }
+
+    private void StartEdit()
+    {
+        if (_detail is null) return;
+        _editTitle = _detail.Title;
+        _editDescription = _detail.Description;
+        _editing = true;
+    }
+
+    private async Task SaveEditAsync()
+    {
+        if (_detail is null) return;
+        _busy = true;
+        var (ok, message) = await RoomsService.EditAsync(Kind, _detail.Id, _editTitle, _editDescription, _cts.Token);
+        _busy = false;
+        if (!ok)
+        {
+            Snackbar.Add(message, Severity.Error);
+            return;
+        }
+        Snackbar.Add("ذخیره شد.", Severity.Success);
+        _editing = false;
+        _detail = await RoomsService.GetAsync(Kind, _detail.Id, _cts.Token) ?? _detail;
+        await LoadAsync();
+    }
+
+    /// <summary>از جزئیات: بایگانی/برگرداندن خودِ همین، یا بیرون کردن یک عضو.</summary>
+    private void Ask(string action, AdminRoomMember? member)
+    {
+        if (_detail is null) return;
+        _confirm = action;
+        _targetId = _detail.Id;
+        _targetTitle = _detail.Title;
+        _member = member;
+        _reason = null;
+    }
+
+    /// <summary>از ستون «عملیات» جدول.</summary>
+    private void AskRow(string action, AdminRoomRow row)
+    {
+        _confirm = action;
+        _targetId = row.Id;
+        _targetTitle = row.Title;
+        _member = null;
+        _reason = null;
+    }
+
+    private string ConfirmTitle => _confirm switch
+    {
+        "archive" => $"بایگانی {Singular} «{_targetTitle}»؟",
+        "restore" => $"برگرداندن {Singular} «{_targetTitle}» از بایگانی؟",
+        _ => $"بیرون کردن {_member?.Name} از {Singular}؟",
+    };
+
+    private string ConfirmText => _confirm switch
+    {
+        "archive" => $"از لیست همه‌ی اعضا پنهان می‌شود و پیام تازه نمی‌پذیرد. چیزی پاک نمی‌شود و هر وقت برش گردانید، همه سر جایش است.",
+        "restore" => $"دوباره در لیست اعضا دیده می‌شود و پیام می‌پذیرد.",
+        _ => $"دیگر این {Singular} را نمی‌بیند. اگر لازم شد، ادمین {Singular} می‌تواند دوباره اضافه‌اش کند.",
+    };
+
+    private string ConfirmButton => _confirm switch
+    {
+        "archive" => "بایگانی کن",
+        "restore" => "برگردان",
+        _ => "بیرون کن",
+    };
+
+    private async Task ConfirmAsync()
+    {
+        if (_targetId is not Guid targetId || _confirm is null) return;
+        _busy = true;
+        var (ok, message) = await RoomsService.ActAsync(Kind, targetId, _confirm, _member?.UserId, _reason, _cts.Token);
+        _busy = false;
+        if (!ok)
+        {
+            Snackbar.Add(message, Severity.Error);
+            return;
+        }
+        Snackbar.Add(_confirm switch
+        {
+            "archive" => $"{Singular} بایگانی شد.",
+            "restore" => $"{Singular} از بایگانی برگشت.",
+            _ => "عضو بیرون شد.",
+        }, Severity.Success);
+        _confirm = null;
+        _member = null;
+        _targetId = null;
+        if (_detail is not null)
+            _detail = await RoomsService.GetAsync(Kind, _detail.Id, _cts.Token) ?? _detail;
+        await LoadAsync();
+    }
+
+    private string MemberRole(AdminRoomMember m)
+        => m.IsCreator ? "سازنده" : m.IsAdmin ? "ادمین" : IsChannel ? "دنبال‌کننده" : "عضو";
+
+    public void Dispose()
+    {
+        _searchDelay?.Cancel();
+        _cts.Cancel();
+        _cts.Dispose();
+    }
+}

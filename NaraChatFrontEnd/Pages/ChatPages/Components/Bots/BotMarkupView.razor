@@ -23,10 +23,14 @@
 
         @if (!string.IsNullOrWhiteSpace(_markup.Note))
         {
-            <div class="bot-note @(_markup.NoteTone == "ok" ? "is-ok" : string.Empty)">
+            <div class="bot-note @(_markup.NoteTone == "ok" ? "is-ok" : _markup.NoteTone == "warn" ? "is-warn" : string.Empty)">
                 @if (_markup.NoteTone == "ok")
                 {
                     <MudIcon Icon="@Icons.Material.Filled.Check" Style="font-size:16px;" />
+                }
+                else if (_markup.NoteTone == "warn")
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.PriorityHigh" Style="font-size:16px;" />
                 }
                 <span>@_markup.Note</span>
             </div>
@@ -41,6 +45,14 @@
                         @foreach (var button in row)
                         {
                             var b = button;
+                            if (IsLink(b))
+                            {
+                                <a class="bot-btn is-link" href="@b.Url" target="_blank" rel="noopener noreferrer" @onclick:stopPropagation="true">
+                                    @b.Text <MudIcon Icon="@Icons.Material.Filled.OpenInNew" Style="font-size:15px;" />
+                                </a>
+                            }
+                            else
+                            {
                             <button type="button"
                                     class="bot-btn @StyleClass(b)"
                                     disabled="@(_pending is not null)"
@@ -55,6 +67,7 @@
                                     @b.Text
                                 }
                             </button>
+                            }
                         }
                     </div>
                 }
@@ -72,6 +85,8 @@
     .bot-card-value { font-weight: 600; text-align: left; }
     .bot-note { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--mud-palette-text-secondary); padding: 0 4px; }
     .bot-note.is-ok { color: var(--mud-palette-success); font-weight: 600; }
+    .bot-note.is-warn { color: var(--mud-palette-error); font-weight: 700; }
+    a.bot-btn { text-decoration: none; gap: 6px; }
     .bot-buttons { display: flex; flex-direction: column; gap: 6px; }
     .bot-button-row { display: flex; gap: 6px; }
     .bot-btn { flex: 1 1 0; min-width: 0; min-height: 40px; padding: 6px 10px; border-radius: 10px; border: 1px solid var(--mud-palette-primary); background: var(--mud-palette-surface); color: var(--mud-palette-primary); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: background-color .15s ease; }
@@ -83,6 +98,10 @@
 
 @code {
     [Parameter, EditorRequired] public ChatMessageDto Message { get; set; } = default!;
+
+    // فقط http/https؛ لینک دیگر (javascript: و ...) دکمه‌ی عادی می‌ماند و کاری نمی‌کند.
+    private static bool IsLink(BotButton b)
+        => Uri.TryCreate(b.Url, UriKind.Absolute, out var u) && (u.Scheme == Uri.UriSchemeHttps || u.Scheme == Uri.UriSchemeHttp);
 
     private BotReplyMarkup? _markup;
     private string? _parsedFrom;

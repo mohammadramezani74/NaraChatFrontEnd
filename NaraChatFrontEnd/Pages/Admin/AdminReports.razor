@@ -1,0 +1,521 @@
+﻿@page "/admin/reports"
+@layout AdminLayout
+@inject IAdminReportsService ReportsService
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
+@implements IDisposable
+
+@* گزارش‌ها: استفاده (با بازه)، کاربران کم‌فعال، رویدادهای پنل. هر سه خروجی CSV دارند که Excel باز می‌کند. *@
+
+<PageTitle>گزارش‌ها · پنل مدیریت ناراگرام</PageTitle>
+
+<div class="ak-page" dir="rtl">
+    <div class="ak-head">
+        <div class="ak-stack">
+            <h1>گزارش‌ها</h1>
+            <span class="ak-sub">آمار استفاده، کاربران کم‌فعال و کارهای ادمین‌ها؛ همه با خروجی Excel.</span>
+        </div>
+        <div class="ak-seg" role="tablist" aria-label="نوع گزارش">
+            <button type="button" role="tab" aria-selected="@(_tab == "usage")" class="@(_tab == "usage" ? "is-on" : null)" @onclick="@(() => ShowAsync("usage"))">استفاده</button>
+            <button type="button" role="tab" aria-selected="@(_tab == "inactive")" class="@(_tab == "inactive" ? "is-on" : null)" @onclick="@(() => ShowAsync("inactive"))">کم‌فعال‌ها</button>
+            <button type="button" role="tab" aria-selected="@(_tab == "audit")" class="@(_tab == "audit" ? "is-on" : null)" @onclick="@(() => ShowAsync("audit"))">رویدادهای پنل</button>
+        </div>
+    </div>
+
+    @if (_tab == "usage")
+    {
+        <div class="ak-card ak-toolbar" style="justify-content:space-between">
+            <div class="ak-seg" role="group" aria-label="بازه">
+                @foreach (var (days, label) in Ranges)
+                {
+                    <button type="button" class="@(_range == days ? "is-on" : null)" @onclick="@(() => SetRangeAsync(days))">@label</button>
+                }
+            </div>
+            <span class="ak-toolbar">
+                @if (_usage is not null)
+                {
+                    <span class="ak-muted">از @AdminFormat.Date(_usage.From) تا @AdminFormat.Date(_usage.To)</span>
+                }
+                <button type="button" class="ak-btn" disabled="@(_usage is null)" @onclick="ExportUsageAsync">
+                    <MudIcon Icon="@Icons.Material.Filled.Download" Style="font-size:17px;" /> خروجی Excel
+                </button>
+            </span>
+        </div>
+
+        @if (_usage is null)
+        {
+            <div class="ak-card ak-empty">
+                @if (_loading) { <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Small" /> }
+                else { <span>گزارش از سرور نیامد.</span> }
+            </div>
+        }
+        else
+        {
+            var u = _usage;
+            <section class="rp-tiles" aria-label="خلاصه">
+                <div class="ak-card rp-tile"><span class="ak-muted">کل پیام‌ها</span><b>@AdminFormat.Num(u.TotalMessages)</b><small class="ak-muted">خصوصی @AdminFormat.Num(u.TotalPrivate) · گروه @AdminFormat.Num(u.TotalGroup) · کانال @AdminFormat.Num(u.TotalChannel)</small></div>
+                <div class="ak-card rp-tile"><span class="ak-muted">فرستنده‌ی فعال در روز</span><b>@AdminFormat.Num(u.AvgActiveSenders)</b><small class="ak-muted">میانگین بازه</small></div>
+                <div class="ak-card rp-tile"><span class="ak-muted">فرستنده‌های یکتا</span><b>@AdminFormat.Num(u.ActiveSendersTotal)</b><small class="ak-muted">دست‌کم یک پیام در بازه</small></div>
+                <div class="ak-card rp-tile"><span class="ak-muted">پیام با ربات‌ها</span><b>@AdminFormat.Num(u.BotMessages)</b><small class="ak-muted">رفت و برگشت</small></div>
+                <div class="ak-card rp-tile"><span class="ak-muted">گروه و کانال تازه</span><b>@AdminFormat.Num(u.NewGroups + u.NewChannels)</b><small class="ak-muted">@AdminFormat.Num(u.NewGroups) گروه · @AdminFormat.Num(u.NewChannels) کانال</small></div>
+            </section>
+
+            <section class="rp-row">
+                <div class="ak-card rp-wide">
+                    <div class="rp-card-head"><b>پیام‌ها در روز</b><small class="ak-muted">خصوصی، گروه و کانال</small></div>
+                    <div dir="ltr" class="rp-chart">
+                        <ApexCharts.ApexChart @key="@($"msg-{_range}-{Dark}-{_version}")" TItem="Point" Options="LineOptions(3)" Height="@("290")">
+                            <ApexCharts.ApexPointSeries TItem="Point" Items="Series(u, 0)" Name="خصوصی" SeriesType="ApexCharts.SeriesType.Line" XValue="@(p => p.Label)" YValue="@(p => (decimal?)p.Value)" />
+                            <ApexCharts.ApexPointSeries TItem="Point" Items="Series(u, 1)" Name="گروه" SeriesType="ApexCharts.SeriesType.Line" XValue="@(p => p.Label)" YValue="@(p => (decimal?)p.Value)" />
+                            <ApexCharts.ApexPointSeries TItem="Point" Items="Series(u, 2)" Name="کانال" SeriesType="ApexCharts.SeriesType.Line" XValue="@(p => p.Label)" YValue="@(p => (decimal?)p.Value)" />
+                        </ApexCharts.ApexChart>
+                    </div>
+                </div>
+                <div class="ak-card rp-narrow">
+                    <div class="rp-card-head"><b>فرستنده‌های فعال در روز</b><small class="ak-muted">کاربر واقعی با دست‌کم یک پیام</small></div>
+                    <div dir="ltr" class="rp-chart">
+                        <ApexCharts.ApexChart @key="@($"act-{_range}-{Dark}-{_version}")" TItem="Point" Options="AreaOptions" Height="@("290")">
+                            <ApexCharts.ApexPointSeries TItem="Point" Items="Series(u, 3)" Name="فرستنده‌ی فعال" SeriesType="ApexCharts.SeriesType.Area" XValue="@(p => p.Label)" YValue="@(p => (decimal?)p.Value)" />
+                        </ApexCharts.ApexChart>
+                    </div>
+                </div>
+            </section>
+
+            <section class="rp-row">
+                <div class="ak-card rp-wide">
+                    <div class="rp-card-head"><b>ساعت‌های شلوغ</b><small class="ak-muted">جمع پیام‌ها در هر ساعت شبانه‌روز</small></div>
+                    @{ var hourMax = Math.Max(1, u.ByHour.DefaultIfEmpty(0).Max()); var peak = u.ByHour.IndexOf(u.ByHour.DefaultIfEmpty(0).Max()); }
+                    <div class="rp-hours" role="img" aria-label="@($"بیشترین پیام در ساعت {peak}")">
+                        @for (var h = 0; h < u.ByHour.Count; h++)
+                        {
+                            var v = u.ByHour[h];
+                            <span class="rp-hour @(h == peak && v > 0 ? "is-peak" : null)" title="@($"ساعت {h.ToString().ToPersianNumber()}: {AdminFormat.Num(v)} پیام")">
+                                <span class="rp-hour-bar" style="height:@(Math.Max(3, v * 100 / hourMax))%"></span>
+                                <small>@(h % 3 == 0 ? h.ToString().ToPersianNumber() : "")</small>
+                            </span>
+                        }
+                    </div>
+                    @if (u.TotalMessages > 0)
+                    {
+                        <span class="ak-muted">شلوغ‌ترین ساعت: @peak.ToString().ToPersianNumber() تا @(((peak + 1) % 24).ToString().ToPersianNumber())</span>
+                    }
+                </div>
+                <div class="ak-card rp-narrow">
+                    <div class="rp-card-head"><b>روزهای هفته</b></div>
+                    @{ var wdMax = Math.Max(1, u.ByWeekday.DefaultIfEmpty(0).Max()); }
+                    @for (var i = 0; i < u.ByWeekday.Count && i < WeekNames.Length; i++)
+                    {
+                        <div class="rp-bar-row">
+                            <span class="rp-bar-label">@WeekNames[i]</span>
+                            <span class="rp-bar-track"><span style="width:@BarWidth(u.ByWeekday[i], wdMax)"></span></span>
+                            <span class="rp-bar-value">@AdminFormat.Num(u.ByWeekday[i])</span>
+                        </div>
+                    }
+                </div>
+                <div class="ak-card rp-narrow">
+                    <div class="rp-card-head"><b>شهرها</b><small class="ak-muted">پیام کاربران هر شهر</small></div>
+                    @if (u.ByCity.Count == 0) { <span class="ak-muted">در این بازه پیامی نبوده است.</span> }
+                    @{ var cityMax = Math.Max(1, u.ByCity.Select(x => x.Count).DefaultIfEmpty(0).Max()); }
+                    @foreach (var c in u.ByCity)
+                    {
+                        <div class="rp-bar-row">
+                            <span class="rp-bar-label ak-ellipsis">@c.Label</span>
+                            <span class="rp-bar-track"><span style="width:@BarWidth(c.Count, cityMax)"></span></span>
+                            <span class="rp-bar-value">@AdminFormat.Num(c.Count)</span>
+                        </div>
+                    }
+                </div>
+            </section>
+        }
+    }
+    else if (_tab == "inactive")
+    {
+        <div class="ak-card ak-toolbar" style="justify-content:space-between">
+            <div class="ak-seg" role="group" aria-label="مدت">
+                @foreach (var d in new[] { 30, 60, 90, 180 })
+                {
+                    var days = d;
+                    <button type="button" class="@(_inactiveDays == days ? "is-on" : null)" @onclick="@(() => SetInactiveDaysAsync(days))">@($"{days.ToString().ToPersianNumber()} روز")</button>
+                }
+            </div>
+            <button type="button" class="ak-btn" disabled="@(_inactive is null || _inactive.Items.Count == 0)" @onclick="ExportInactiveAsync">
+                <MudIcon Icon="@Icons.Material.Filled.Download" Style="font-size:17px;" /> خروجی Excel
+            </button>
+        </div>
+        <div class="ak-table-wrap">
+            @if (_inactive is null)
+            {
+                <div class="ak-empty">
+                    @if (_loading) { <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Small" /> }
+                    else { <span>گزارش از سرور نیامد.</span> }
+                </div>
+            }
+            else if (_inactive.Items.Count == 0)
+            {
+                <div class="ak-empty">همه در @(_inactiveDays.ToString().ToPersianNumber()) روز اخیر آمده‌اند.</div>
+            }
+            else
+            {
+                <div class="ak-pager" style="border-top:0;border-bottom:1px solid var(--mud-palette-lines-default)">
+                    <span>@InactiveSummary</span>
+                </div>
+                <table class="ak-table">
+                    <thead>
+                        <tr><th>کاربر</th><th>شهر</th><th>موبایل</th><th>آخرین بازدید</th><th>عضو از</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in _inactive.Items)
+                        {
+                            <tr>
+                                <td>
+                                    <span class="ak-toolbar" style="gap:10px">
+                                        <span class="ak-avatar @AdminFormat.Tone(r.Id)">@AdminFormat.Initials(r.Name)</span>
+                                        <b>@r.Name</b>
+                                    </span>
+                                </td>
+                                <td>@(r.City ?? "—")</td>
+                                <td dir="ltr" style="text-align:right">@AdminFormat.Phone(r.PhoneMasked)</td>
+                                <td>@AdminFormat.Ago(r.LastSeen)</td>
+                                <td>@(r.CreatedAt is null ? "—" : AdminFormat.Date(r.CreatedAt))</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="ak-card ak-toolbar">
+            <label class="ak-search">
+                <MudIcon Icon="@Icons.Material.Filled.Search" Style="font-size:18px;" />
+                <input aria-label="جستجو" placeholder="نام کاربر، گروه یا جزئیات…" value="@_auditSearch" @oninput="OnAuditSearch" />
+            </label>
+            <div class="ak-seg" role="group" aria-label="بخش">
+                @foreach (var (key, label) in Areas)
+                {
+                    <button type="button" class="@(_area == key ? "is-on" : null)" @onclick="@(() => SetAreaAsync(key))">@label</button>
+                }
+            </div>
+            <label class="ak-field">
+                ادمین
+                <select class="ak-select" aria-label="ادمین" value="@(_actorId?.ToString() ?? "")" @onchange="OnActorChanged">
+                    <option value="">همه</option>
+                    @foreach (var a in _audit?.Actors ?? new List<AuditActor>())
+                    {
+                        <option value="@a.Id">@a.Name</option>
+                    }
+                </select>
+            </label>
+            <button type="button" class="ak-btn" disabled="@(_audit is null || _audit.Total == 0)" @onclick="ExportAuditAsync">
+                <MudIcon Icon="@Icons.Material.Filled.Download" Style="font-size:17px;" /> خروجی Excel
+            </button>
+        </div>
+        <div class="ak-table-wrap">
+            @if (_audit is null)
+            {
+                <div class="ak-empty">
+                    @if (_loading) { <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Small" /> }
+                    else { <span>رویدادها از سرور نیامد.</span> }
+                </div>
+            }
+            else if (_audit.Items.Count == 0)
+            {
+                <div class="ak-empty">رویدادی با این فیلترها نیست.</div>
+            }
+            else
+            {
+                <table class="ak-table">
+                    <thead>
+                        <tr><th>زمان</th><th>ادمین</th><th>کار</th><th>روی</th><th>جزئیات</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var a in _audit.Items)
+                        {
+                            <tr>
+                                <td style="white-space:nowrap">@AdminFormat.DateTimeText(a.At)</td>
+                                <td>@a.ActorName</td>
+                                <td><span class="ak-pill @AreaTone(a.Action)">@a.Text</span></td>
+                                <td><span class="ak-stack"><b>@a.TargetName</b><small class="ak-muted">@TargetLabel(a.TargetType)</small></span></td>
+                                <td class="ak-muted">@(a.Details ?? "—")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+                <div class="ak-pager">
+                    <span>@AdminFormat.Num(_audit.Total) رویداد · صفحه‌ی @AdminFormat.Num(_audit.Page) از @AdminFormat.Num(AuditPages)</span>
+                    <span class="ak-toolbar">
+                        <button type="button" class="ak-btn" disabled="@(_audit.Page <= 1)" @onclick="@(() => AuditGoAsync(_audit.Page - 1))">‹ قبلی</button>
+                        <button type="button" class="ak-btn" disabled="@(_audit.Page >= AuditPages)" @onclick="@(() => AuditGoAsync(_audit.Page + 1))">بعدی ›</button>
+                    </span>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [CascadingParameter(Name = "AdminDark")] public bool Dark { get; set; }
+
+    public sealed record Point(string Label, int Value);
+
+    private string _tab = "usage";
+    private bool _loading;
+    private int _version;
+    private readonly CancellationTokenSource _cts = new();
+
+    // ---------------- استفاده
+    private int _range = 30;
+    private UsageReport? _usage;
+
+    private static readonly (int Days, string Label)[] Ranges = { (7, "۷ روز"), (30, "۳۰ روز"), (90, "۹۰ روز"), (365, "یک سال") };
+    private static readonly string[] WeekNames = { "شنبه", "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنج‌شنبه", "جمعه" };
+
+    // ---------------- کم‌فعال‌ها
+    private int _inactiveDays = 30;
+    private InactiveUsersPage? _inactive;
+
+    // ---------------- رویدادها
+    private AuditPage? _audit;
+    private string _area = "all";
+    private Guid? _actorId;
+    private string _auditSearch = string.Empty;
+    private int _auditPage = 1;
+    private CancellationTokenSource? _searchDelay;
+
+    private static readonly (string Key, string Label)[] Areas =
+        { ("all", "همه"), ("user", "کاربران"), ("room", "گروه و کانال"), ("role", "نقش‌ها"), ("broadcast", "پیام همگانی") };
+
+    private int AuditPages => _audit is null ? 1 : Math.Max(1, (int)Math.Ceiling(_audit.Total / (double)_audit.PageSize));
+
+    protected override Task OnInitializedAsync() => LoadUsageAsync();
+
+    private async Task ShowAsync(string tab)
+    {
+        _tab = tab;
+        if (tab == "usage" && _usage is null) await LoadUsageAsync();
+        if (tab == "inactive" && _inactive is null) await LoadInactiveAsync();
+        if (tab == "audit" && _audit is null) await LoadAuditAsync();
+    }
+
+    private async Task LoadUsageAsync()
+    {
+        _loading = true;
+        _usage = await ReportsService.UsageAsync(DateTime.Today.AddDays(-(_range - 1)), DateTime.Today, _cts.Token);
+        _version++;
+        _loading = false;
+    }
+
+    private async Task SetRangeAsync(int days)
+    {
+        if (_range == days) return;
+        _range = days;
+        _usage = null;
+        await LoadUsageAsync();
+    }
+
+    private async Task LoadInactiveAsync()
+    {
+        _loading = true;
+        _inactive = await ReportsService.InactiveAsync(_inactiveDays, 500, _cts.Token);
+        _loading = false;
+    }
+
+    private async Task SetInactiveDaysAsync(int days)
+    {
+        _inactiveDays = days;
+        _inactive = null;
+        await LoadInactiveAsync();
+    }
+
+    private async Task LoadAuditAsync()
+    {
+        _loading = true;
+        _audit = await ReportsService.AuditAsync(_auditPage, 25, _area, _actorId, null, null, _auditSearch, _cts.Token);
+        _loading = false;
+    }
+
+    private async Task SetAreaAsync(string area)
+    {
+        _area = area;
+        _auditPage = 1;
+        await LoadAuditAsync();
+    }
+
+    private async Task OnActorChanged(ChangeEventArgs e)
+    {
+        _actorId = Guid.TryParse(e.Value?.ToString(), out var g) ? g : null;
+        _auditPage = 1;
+        await LoadAuditAsync();
+    }
+
+    private async Task OnAuditSearch(ChangeEventArgs e)
+    {
+        _auditSearch = e.Value?.ToString() ?? string.Empty;
+        _searchDelay?.Cancel();
+        var delay = _searchDelay = new CancellationTokenSource();
+        try
+        {
+            await Task.Delay(400, delay.Token);
+        }
+        catch (TaskCanceledException)
+        {
+            return;
+        }
+        _auditPage = 1;
+        await LoadAuditAsync();
+    }
+
+    private async Task AuditGoAsync(int page)
+    {
+        _auditPage = Math.Clamp(page, 1, AuditPages);
+        await LoadAuditAsync();
+    }
+
+    // ---------------- نمودارها
+
+    private string[] SeriesPalette => Dark ? new[] { "#3987E5", "#D95926", "#199E70" } : new[] { "#2A78D6", "#EB6834", "#1BAF7A" };
+
+    private List<Point> Series(UsageReport u, int kind)
+        => u.Days.Select(d => new Point(Label(d.Day, u.Days.Count), kind switch
+        {
+            0 => d.Private,
+            1 => d.Group,
+            2 => d.Channel,
+            _ => d.ActiveSenders,
+        })).ToList();
+
+    private static string Label(DateTime day, int count)
+    {
+        var pc = new System.Globalization.PersianCalendar();
+        return count > 40
+            ? pc.GetDayOfMonth(day).ToString().ToPersianNumber() + "/" + pc.GetMonth(day).ToString().ToPersianNumber()
+            : AdminFormat.Date(day).Replace(" " + pc.GetYear(day).ToString().ToPersianNumber(), "");
+    }
+
+    private ApexCharts.ApexChartOptions<Point> LineOptions(int series) => new()
+    {
+        Chart = new ApexCharts.Chart
+        {
+            Toolbar = new ApexCharts.Toolbar { Show = false },
+            Zoom = new ApexCharts.Zoom { Enabled = false },
+            FontFamily = "iransans-medium, sans-serif",
+            Background = "transparent",
+        },
+        Theme = new ApexCharts.Theme { Mode = Dark ? ApexCharts.Mode.Dark : ApexCharts.Mode.Light },
+        Colors = SeriesPalette.Take(series).ToList(),
+        Stroke = new ApexCharts.Stroke { Curve = ApexCharts.Curve.Smooth, Width = 2 },
+        DataLabels = new ApexCharts.DataLabels { Enabled = false },
+        Legend = new ApexCharts.Legend { Position = ApexCharts.LegendPosition.Top, HorizontalAlign = ApexCharts.Align.Right },
+        Grid = new ApexCharts.Grid { BorderColor = Dark ? "#233044" : "#E9EDF3" },
+        Markers = new ApexCharts.Markers { Size = 0 },
+    };
+
+    private ApexCharts.ApexChartOptions<Point> AreaOptions => new()
+    {
+        Chart = new ApexCharts.Chart
+        {
+            Toolbar = new ApexCharts.Toolbar { Show = false },
+            Zoom = new ApexCharts.Zoom { Enabled = false },
+            FontFamily = "iransans-medium, sans-serif",
+            Background = "transparent",
+        },
+        Theme = new ApexCharts.Theme { Mode = Dark ? ApexCharts.Mode.Dark : ApexCharts.Mode.Light },
+        Colors = new List<string> { Dark ? "#9085E9" : "#6250D6" },
+        Stroke = new ApexCharts.Stroke { Curve = ApexCharts.Curve.Smooth, Width = 2 },
+        DataLabels = new ApexCharts.DataLabels { Enabled = false },
+        Legend = new ApexCharts.Legend { Show = false },
+        Grid = new ApexCharts.Grid { BorderColor = Dark ? "#233044" : "#E9EDF3" },
+        Markers = new ApexCharts.Markers { Size = 0 },
+    };
+
+    private string InactiveSummary => _inactive is null ? string.Empty
+        : $"{AdminFormat.Num(_inactive.Total)} کاربر {_inactiveDays.ToString().ToPersianNumber()} روز یا بیشتر آنلاین نشده‌اند"
+          + (_inactive.Total > _inactive.Items.Count ? $" (نمایش {AdminFormat.Num(_inactive.Items.Count)} مورد قدیمی‌تر)" : string.Empty);
+
+    private static string BarWidth(int value, int max)
+        => Math.Max(value > 0 ? 2 : 0, value * 100.0 / max).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + "%";
+
+    // ---------------- خروجی
+
+    private async Task DownloadAsync(string fileName, IEnumerable<IEnumerable<string?>> rows)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("triggerDownload", AdminFormat.CsvBase64(rows), fileName, "text/csv;charset=utf-8");
+        }
+        catch (Exception)
+        {
+            Snackbar.Add("دانلود انجام نشد.", Severity.Error);
+        }
+    }
+
+    private Task ExportUsageAsync()
+    {
+        if (_usage is null) return Task.CompletedTask;
+        var rows = new List<IEnumerable<string?>>
+        {
+            new[] { "تاریخ", "خصوصی", "گروه", "کانال", "کل", "فرستنده‌ی فعال", "پیام با ربات", "گروه تازه", "کانال تازه" },
+        };
+        rows.AddRange(_usage.Days.Select(d => new string?[]
+        {
+            AdminFormat.Date(d.Day), d.Private.ToString(), d.Group.ToString(), d.Channel.ToString(), d.Total.ToString(),
+            d.ActiveSenders.ToString(), d.BotMessages.ToString(), d.NewGroups.ToString(), d.NewChannels.ToString(),
+        }));
+        return DownloadAsync($"naragram-usage-{_range}d.csv", rows);
+    }
+
+    private Task ExportInactiveAsync()
+    {
+        if (_inactive is null) return Task.CompletedTask;
+        var rows = new List<IEnumerable<string?>> { new[] { "نام", "شهر", "موبایل", "آخرین بازدید", "عضو از" } };
+        rows.AddRange(_inactive.Items.Select(r => new string?[]
+        {
+            r.Name, r.City, r.PhoneMasked, r.LastSeen is null ? "هرگز" : AdminFormat.DateTimeText(r.LastSeen), r.CreatedAt is null ? "" : AdminFormat.Date(r.CreatedAt),
+        }));
+        return DownloadAsync($"naragram-inactive-{_inactiveDays}d.csv", rows);
+    }
+
+    private async Task ExportAuditAsync()
+    {
+        var all = await ReportsService.AuditAsync(1, 2000, _area, _actorId, null, null, _auditSearch, _cts.Token);
+        if (all is null)
+        {
+            Snackbar.Add("رویدادها از سرور نیامد.", Severity.Error);
+            return;
+        }
+        var rows = new List<IEnumerable<string?>> { new[] { "زمان", "ادمین", "کار", "نوع", "روی", "جزئیات" } };
+        rows.AddRange(all.Items.Select(a => new string?[]
+        {
+            AdminFormat.DateTimeText(a.At), a.ActorName, a.Text, TargetLabel(a.TargetType), a.TargetName, a.Details,
+        }));
+        await DownloadAsync("naragram-admin-audit.csv", rows);
+    }
+
+    // ---------------- نمایش
+
+    private static string AreaTone(string action) => action.Split('.')[0] switch
+    {
+        "user" => action is "user.disable" or "user.sessions" ? "is-bad" : "is-info",
+        "room" => action == "room.archive" || action == "room.remove-member" ? "is-warn" : "is-ok",
+        "broadcast" => "is-ok",
+        _ => "",
+    };
+
+    private static string TargetLabel(string type) => type switch
+    {
+        "user" => "کاربر",
+        "group" => "گروه",
+        "channel" => "کانال",
+        "role" => "نقش",
+        "broadcast" => "پیام همگانی",
+        _ => type,
+    };
+
+    public void Dispose()
+    {
+        _searchDelay?.Cancel();
+        _cts.Cancel();
+        _cts.Dispose();
+    }
+}

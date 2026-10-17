@@ -1,0 +1,865 @@
+﻿/* قالب پنل ادمین — هم‌سبک ماکت داشبورد. منوی کنار در هر دو تم سرمه‌ای می‌ماند؛
+   بقیه از پالت MudBlazor می‌آید تا تم تیره خودکار درست باشد. */
+
+.ap-center {
+    min-height: 70vh;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+    justify-content: center;
+}
+
+.ap-muted {
+    color: var(--mud-palette-text-secondary);
+}
+
+.ap-shell {
+    min-height: 100vh;
+    display: flex;
+    align-items: stretch;
+    background: var(--mud-palette-background);
+    color: var(--mud-palette-text-primary);
+}
+
+/* ---------------- منوی کنار */
+
+.ap-side {
+    flex: 0 0 248px;
+    background: #0E1A36;
+    color: #E6EBF5;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 22px 14px;
+    box-sizing: border-box;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+}
+
+.ap-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 4px 8px 22px;
+}
+
+.ap-brand-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    background: #2A78D6;
+    color: #FFFFFF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.ap-brand-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+    .ap-brand-text b {
+        font-size: 18px;
+        color: #FFFFFF;
+    }
+
+    .ap-brand-text small {
+        font-size: 12px;
+        color: #A9B5CC;
+    }
+
+.ap-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.ap-nav-item {
+    min-height: 46px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 12px;
+    border-radius: 12px;
+    color: #E6EBF5;
+    text-decoration: none;
+    font-size: 14px;
+    white-space: nowrap;
+}
+
+    a.ap-nav-item:hover {
+        background: #16244A;
+        color: #FFFFFF;
+    }
+
+    .ap-nav-item.is-active {
+        background: #2A78D6;
+        color: #FFFFFF;
+        font-weight: 700;
+    }
+
+    .ap-nav-item.is-soon {
+        color: #9AA6BE;
+        cursor: default;
+    }
+
+    .ap-nav-item ::deep .ap-nav-icon {
+        font-size: 20px;
+    }
+
+.ap-nav-label {
+    flex: 1;
+}
+
+.ap-soon {
+    font-size: 11px;
+    color: #A9B5CC;
+    border: 1px solid #3A4766;
+    border-radius: 999px;
+    padding: 1px 8px;
+}
+
+.ap-lock {
+    margin-top: auto;
+    padding: 14px 12px;
+    border-radius: 14px;
+    background: #16244A;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+    .ap-lock b {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        color: #FFFFFF;
+    }
+
+    .ap-lock span {
+        font-size: 12px;
+        line-height: 1.8;
+        color: #A9B5CC;
+    }
+
+/* ---------------- نوار بالا و محتوا */
+
+.ap-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.ap-top {
+    min-height: 68px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 28px;
+    background: var(--mud-palette-surface);
+    border-bottom: 1px solid var(--mud-palette-lines-default);
+    box-sizing: border-box;
+}
+
+.ap-top-title {
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.ap-top-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.ap-back {
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 12px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    color: var(--mud-palette-primary);
+}
+
+    .ap-back:hover {
+        background: var(--mud-palette-primary-hover);
+    }
+
+.ap-user {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-right: 12px;
+    border-right: 1px solid var(--mud-palette-lines-default);
+}
+
+.ap-user-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--mud-palette-primary-hover);
+    color: var(--mud-palette-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.ap-user-text {
+    display: flex;
+    flex-direction: column;
+}
+
+    .ap-user-text b {
+        font-size: 14px;
+    }
+
+    .ap-user-text small {
+        font-size: 12px;
+        color: var(--mud-palette-text-secondary);
+    }
+
+.ap-content {
+    flex: 1;
+    min-width: 0;
+}
+
+/* ---------------- موبایل: منو بالای صفحه و افقی */
+
+@media (max-width: 900px) {
+    .ap-shell {
+        flex-direction: column;
+    }
+
+    .ap-side {
+        position: static;
+        height: auto;
+        flex: none;
+        padding: 12px;
+    }
+
+    .ap-brand {
+        padding: 0 4px 8px;
+    }
+
+    .ap-nav {
+        flex-direction: row;
+        overflow-x: auto;
+        padding-bottom: 4px;
+    }
+
+    .ap-nav-item.is-soon,
+    .ap-lock {
+        display: none;
+    }
+
+    .ap-top {
+        padding: 10px 16px;
+    }
+
+    .ap-user-text {
+        display: none;
+    }
+}
+
+
+/* ================================================================
+   کیت مشترک صفحه‌های پنل (کاربران، گروه‌ها، کانال‌ها). با ::deep زیر
+   .ap-content تا صفحه‌ها بدون CSS جدا همین کلاس‌ها را داشته باشند.
+   ================================================================ */
+
+.ap-content ::deep .ak-page {
+    padding: 24px 28px 36px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    box-sizing: border-box;
+}
+
+.ap-content ::deep .ak-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+    .ap-content ::deep .ak-head h1 {
+        margin: 0;
+        font-size: 24px;
+        font-weight: 800;
+    }
+
+.ap-content ::deep .ak-sub,
+.ap-content ::deep .ak-muted {
+    font-size: 13px;
+    color: var(--mud-palette-text-secondary);
+}
+
+.ap-content ::deep .ak-card {
+    background: var(--mud-palette-surface);
+    border-radius: 18px;
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+.ap-content ::deep .ak-toolbar {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+}
+
+.ap-content ::deep .ak-search {
+    flex: 1 1 240px;
+    max-width: 420px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 0 12px;
+    border-radius: 12px;
+    background: var(--mud-palette-background);
+    color: var(--mud-palette-text-secondary);
+}
+
+    .ap-content ::deep .ak-search input {
+        border: 0;
+        outline: none;
+        background: transparent;
+        font: inherit;
+        font-size: 14px;
+        width: 100%;
+        color: var(--mud-palette-text-primary);
+    }
+
+.ap-content ::deep .ak-seg {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 4px;
+    background: var(--mud-palette-background);
+    border-radius: 12px;
+}
+
+    .ap-content ::deep .ak-seg button {
+        min-height: 36px;
+        padding: 0 12px;
+        border: 0;
+        border-radius: 9px;
+        font: inherit;
+        font-size: 13px;
+        cursor: pointer;
+        background: transparent;
+        color: var(--mud-palette-text-secondary);
+    }
+
+        .ap-content ::deep .ak-seg button.is-on {
+            background: var(--mud-palette-primary);
+            color: var(--mud-palette-primary-text);
+            font-weight: 700;
+        }
+
+.ap-content ::deep .ak-field {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+}
+
+.ap-content ::deep .ak-select,
+.ap-content ::deep .ak-input {
+    min-height: 40px;
+    border: 1px solid var(--mud-palette-lines-inputs);
+    border-radius: 10px;
+    padding: 0 10px;
+    font: inherit;
+    font-size: 13px;
+    background: var(--mud-palette-surface);
+    color: var(--mud-palette-text-primary);
+    box-sizing: border-box;
+}
+
+.ap-content ::deep textarea.ak-input {
+    padding: 8px 10px;
+    min-height: 64px;
+    resize: vertical;
+    width: 100%;
+}
+
+.ap-content ::deep .ak-btn {
+    min-height: 40px;
+    padding: 0 14px;
+    border: 1px solid var(--mud-palette-lines-inputs);
+    border-radius: 10px;
+    background: var(--mud-palette-surface);
+    color: var(--mud-palette-text-primary);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+    .ap-content ::deep .ak-btn:disabled {
+        opacity: .55;
+        cursor: default;
+    }
+
+    .ap-content ::deep .ak-btn.is-primary {
+        border-color: transparent;
+        background: var(--mud-palette-primary);
+        color: var(--mud-palette-primary-text);
+    }
+
+    .ap-content ::deep .ak-btn.is-danger {
+        border-color: transparent;
+        background: #C62828;
+        color: #FFFFFF;
+    }
+
+    .ap-content ::deep .ak-btn.is-success {
+        border-color: transparent;
+        background: #0B6B49;
+        color: #FFFFFF;
+    }
+
+    .ap-content ::deep .ak-btn.is-link {
+        border-color: transparent;
+        background: transparent;
+        color: var(--mud-palette-primary);
+        padding: 0 6px;
+        min-height: 32px;
+    }
+
+    .ap-content ::deep .ak-btn.is-big {
+        min-height: 44px;
+        font-size: 14px;
+    }
+
+.ap-content ::deep .ak-table-wrap {
+    background: var(--mud-palette-surface);
+    border-radius: 18px;
+    overflow-x: auto;
+}
+
+.ap-content ::deep .ak-table {
+    width: 100%;
+    min-width: 820px;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+    .ap-content ::deep .ak-table th {
+        padding: 12px 10px;
+        font-weight: 600;
+        text-align: right;
+        color: var(--mud-palette-text-secondary);
+        background: var(--mud-palette-background);
+        white-space: nowrap;
+    }
+
+    .ap-content ::deep .ak-table td {
+        padding: 8px 10px;
+        border-top: 1px solid var(--mud-palette-lines-default);
+        vertical-align: middle;
+    }
+
+    .ap-content ::deep .ak-table tr.is-dim td {
+        opacity: .65;
+    }
+
+    .ap-content ::deep .ak-table th:first-child,
+    .ap-content ::deep .ak-table td:first-child {
+        padding-right: 16px;
+    }
+
+.ap-content ::deep .ak-rowbtn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border: 0;
+    background: transparent;
+    padding: 0;
+    cursor: pointer;
+    font: inherit;
+    color: inherit;
+    text-align: right;
+    min-height: 44px;
+}
+
+    .ap-content ::deep .ak-rowbtn b {
+        font-size: 14px;
+    }
+
+.ap-content ::deep .ak-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.ap-content ::deep .ak-avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+    .ap-content ::deep .ak-avatar.is-big {
+        width: 52px;
+        height: 52px;
+        font-size: 16px;
+    }
+
+    .ap-content ::deep .ak-avatar.is-online {
+        box-shadow: 0 0 0 2px var(--mud-palette-surface), 0 0 0 4px var(--mud-palette-success);
+    }
+
+.ap-content ::deep .is-blue {
+    background: rgba(42, 120, 214, .14);
+    color: #1F63C2;
+}
+
+.ap-content ::deep .is-orange {
+    background: rgba(235, 104, 52, .14);
+    color: #B4461C;
+}
+
+.ap-content ::deep .is-green {
+    background: rgba(27, 175, 122, .14);
+    color: #0B6B49;
+}
+
+.ap-content ::deep .is-yellow {
+    background: rgba(237, 161, 0, .16);
+    color: #8A5A00;
+}
+
+.ap-content ::deep .ak-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    font-weight: 700;
+    border-radius: 999px;
+    padding: 3px 10px;
+    white-space: nowrap;
+    background: var(--mud-palette-background);
+    color: var(--mud-palette-text-secondary);
+}
+
+    .ap-content ::deep .ak-pill.is-ok {
+        background: rgba(27, 175, 122, .16);
+        color: #0B6B49;
+    }
+
+    .ap-content ::deep .ak-pill.is-warn {
+        background: rgba(237, 161, 0, .18);
+        color: #8A5A00;
+    }
+
+    .ap-content ::deep .ak-pill.is-bad {
+        background: rgba(198, 40, 40, .12);
+        color: #9B1C1C;
+    }
+
+    .ap-content ::deep .ak-pill.is-info {
+        background: rgba(42, 120, 214, .14);
+        color: #1F63C2;
+    }
+
+.ap-content ::deep .ak-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+}
+
+.ap-content ::deep .ak-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--mud-palette-primary);
+    background: var(--mud-palette-primary-hover);
+    border-radius: 999px;
+    padding: 2px 4px 2px 10px;
+}
+
+    .ap-content ::deep .ak-chip button {
+        width: 24px;
+        height: 24px;
+        border: 0;
+        border-radius: 50%;
+        background: transparent;
+        color: inherit;
+        cursor: pointer;
+        font-size: 15px;
+    }
+
+.ap-content ::deep .ak-pager {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 12px 16px;
+    border-top: 1px solid var(--mud-palette-lines-default);
+    font-size: 13px;
+    color: var(--mud-palette-text-secondary);
+}
+
+.ap-content ::deep .ak-empty {
+    padding: 28px 16px;
+    text-align: center;
+    color: var(--mud-palette-text-secondary);
+    font-size: 14px;
+}
+
+/* کشوی جزئیات از کنار و پنجره‌ی تأیید */
+.ap-content ::deep .ak-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1300;
+    background: rgba(14, 26, 54, .35);
+    display: flex;
+    justify-content: flex-end;
+}
+
+.ap-content ::deep .ak-drawer {
+    width: 460px;
+    max-width: 100%;
+    height: 100%;
+    background: var(--mud-palette-surface);
+    color: var(--mud-palette-text-primary);
+    box-shadow: -8px 0 32px rgba(15, 26, 54, .18);
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+}
+
+[dir="rtl"] .ap-content ::deep .ak-overlay {
+    justify-content: flex-end;
+}
+
+.ap-content ::deep .ak-drawer-head {
+    padding: 18px 22px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid var(--mud-palette-lines-default);
+}
+
+.ap-content ::deep .ak-drawer-body {
+    padding: 16px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.ap-content ::deep .ak-drawer-foot {
+    padding: 14px 22px;
+    border-top: 1px solid var(--mud-palette-lines-default);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.ap-content ::deep .ak-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+    .ap-content ::deep .ak-section > b {
+        font-size: 14px;
+    }
+
+.ap-content ::deep .ak-grid2 {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px 16px;
+    font-size: 13px;
+}
+
+    .ap-content ::deep .ak-grid2 > span {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+.ap-content ::deep .ak-list-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 13px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--mud-palette-lines-default);
+}
+
+.ap-content ::deep .ak-note {
+    font-size: 12px;
+    line-height: 1.8;
+    color: var(--mud-palette-text-secondary);
+    background: var(--mud-palette-background);
+    border-radius: 12px;
+    padding: 10px 12px;
+}
+
+.ap-content ::deep .ak-dialog-wrap {
+    position: fixed;
+    inset: 0;
+    z-index: 1400;
+    background: rgba(14, 26, 54, .5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+}
+
+.ap-content ::deep .ak-dialog {
+    width: 460px;
+    max-width: 100%;
+    background: var(--mud-palette-surface);
+    color: var(--mud-palette-text-primary);
+    border-radius: 18px;
+    padding: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    box-sizing: border-box;
+}
+
+    .ap-content ::deep .ak-dialog > b {
+        font-size: 17px;
+    }
+
+    .ap-content ::deep .ak-dialog p {
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.9;
+        color: var(--mud-palette-text-secondary);
+    }
+
+.ap-content ::deep .ak-spark {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 56px;
+}
+
+    .ap-content ::deep .ak-spark span {
+        flex: 1;
+        min-height: 2px;
+        border-radius: 3px 3px 0 0;
+        background: var(--mud-palette-primary);
+    }
+
+@media (max-width: 900px) {
+    .ap-content ::deep .ak-page {
+        padding: 16px;
+    }
+}
+
+/* دکمه‌های آیکنی ستون «عملیات» */
+.ap-content ::deep .ak-actions {
+    display: inline-flex;
+    gap: 4px;
+    justify-content: flex-end;
+}
+
+.ap-content ::deep .ak-icon {
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--mud-palette-lines-default);
+    border-radius: 10px;
+    background: var(--mud-palette-surface);
+    color: var(--mud-palette-text-secondary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+}
+
+    .ap-content ::deep .ak-icon:hover {
+        color: var(--mud-palette-primary);
+        border-color: var(--mud-palette-primary);
+    }
+
+    .ap-content ::deep .ak-icon.is-danger:hover {
+        color: #C62828;
+        border-color: #C62828;
+    }
+
+    .ap-content ::deep .ak-icon.is-success {
+        color: #0B6B49;
+    }
+
+.ap-content ::deep .ak-table td.ak-num,
+.ap-content ::deep .ak-table th.ak-num {
+    text-align: center;
+}
+
+.ap-content ::deep .ak-table td.ak-end,
+.ap-content ::deep .ak-table th.ak-end {
+    text-align: left;
+    padding-left: 16px;
+    width: 1%;
+    white-space: nowrap;
+}
+
+.ap-content ::deep .ak-edit {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: var(--mud-palette-background);
+    border-radius: 12px;
+    padding: 12px;
+}
+
+    .ap-content ::deep .ak-edit label {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--mud-palette-text-secondary);
+    }
+
+    .ap-content ::deep .ak-edit .ak-input {
+        width: 100%;
+    }

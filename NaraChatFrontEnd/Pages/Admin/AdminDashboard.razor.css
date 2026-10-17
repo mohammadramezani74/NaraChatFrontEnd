@@ -1,0 +1,516 @@
+﻿/* داشبورد پنل ادمین — هم‌سبک ماکت. همه‌ی رنگ‌های سطح از پالت MudBlazor می‌آیند تا تم تیره درست باشد. */
+
+.ad-page {
+    padding: 24px 28px 36px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    box-sizing: border-box;
+}
+
+.ad-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.ad-head-text {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+    .ad-head-text h1 {
+        margin: 0;
+        font-size: 24px;
+        font-weight: 800;
+    }
+
+    .ad-head-text span {
+        font-size: 14px;
+        color: var(--mud-palette-text-secondary);
+    }
+
+.ad-head-tools {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ad-date {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    background: var(--mud-palette-surface);
+    border-radius: 12px;
+    padding: 8px 12px;
+}
+
+.ad-card {
+    background: var(--mud-palette-surface);
+    border-radius: 18px;
+    padding: 20px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+.ad-state {
+    min-height: 240px;
+    align-items: center;
+    justify-content: center;
+    color: var(--mud-palette-text-secondary);
+}
+
+.ad-card-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+    .ad-card-head h2 {
+        margin: 0 0 4px;
+        font-size: 16px;
+        font-weight: 700;
+    }
+
+    .ad-card-head span {
+        font-size: 13px;
+        color: var(--mud-palette-text-secondary);
+    }
+
+.ad-muted {
+    color: var(--mud-palette-text-secondary);
+}
+
+.ad-hint {
+    font-size: 12px;
+    line-height: 1.8;
+    color: var(--mud-palette-text-secondary);
+}
+
+.ad-empty {
+    font-size: 13px;
+    color: var(--mud-palette-text-secondary);
+    padding: 8px 0;
+}
+
+.ad-ellipsis {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+/* ---------------- کارت‌های بالا */
+
+.ad-kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 16px;
+}
+
+.ad-kpi {
+    gap: 10px;
+}
+
+.ad-kpi-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.ad-kpi-label {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.ad-kpi-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 11px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+    .ad-kpi-icon.is-blue {
+        background: rgba(42, 120, 214, .14);
+        color: #1F63C2;
+    }
+
+    .ad-kpi-icon.is-orange {
+        background: rgba(235, 104, 52, .14);
+        color: #B4461C;
+    }
+
+    .ad-kpi-icon.is-green {
+        background: rgba(27, 175, 122, .14);
+        color: #0B6B49;
+    }
+
+    .ad-kpi-icon.is-yellow {
+        background: rgba(237, 161, 0, .16);
+        color: #8A5A00;
+    }
+
+.ad-kpi-value {
+    font-size: 30px;
+    font-weight: 800;
+}
+
+.ad-kpi-note {
+    font-size: 12px;
+    color: var(--mud-palette-text-secondary);
+}
+
+    .ad-kpi-note b.is-up {
+        color: var(--mud-palette-success);
+    }
+
+    .ad-kpi-note b.is-down {
+        color: var(--mud-palette-error);
+    }
+
+    .ad-kpi-note b.is-flat {
+        color: var(--mud-palette-text-secondary);
+    }
+
+/* ---------------- ردیف نمودارها */
+
+.ad-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: stretch;
+}
+
+.ad-trend {
+    flex: 999 1 520px;
+}
+
+.ad-users {
+    flex: 1 1 300px;
+}
+
+.ad-chart {
+    width: 100%;
+    min-height: 300px;
+}
+
+.ad-seg {
+    display: inline-flex;
+    gap: 4px;
+    padding: 4px;
+    background: var(--mud-palette-background);
+    border-radius: 12px;
+}
+
+    .ad-seg button {
+        min-height: 36px;
+        padding: 0 12px;
+        border: 0;
+        border-radius: 9px;
+        font: inherit;
+        font-size: 13px;
+        cursor: pointer;
+        background: transparent;
+        color: var(--mud-palette-text-secondary);
+    }
+
+        .ad-seg button.is-on {
+            background: var(--mud-palette-surface);
+            color: var(--mud-palette-text-primary);
+            font-weight: 700;
+            box-shadow: 0 1px 2px rgba(15, 26, 54, .12);
+        }
+
+.ad-seg-full {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.ad-donut {
+    position: relative;
+    display: flex;
+    justify-content: center;
+}
+
+.ad-donut-center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+}
+
+    .ad-donut-center b {
+        font-size: 24px;
+        font-weight: 800;
+    }
+
+    .ad-donut-center small {
+        font-size: 12px;
+        color: var(--mud-palette-text-secondary);
+    }
+
+.ad-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.ad-legend-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+}
+
+    .ad-legend-row b {
+        min-width: 40px;
+        text-align: left;
+    }
+
+.ad-legend-name {
+    flex: 1;
+}
+
+.ad-swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+/* ---------------- ردیف پایین */
+
+.ad-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+    align-items: start;
+}
+
+.ad-col {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.ad-bar-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.ad-bar-text {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 13px;
+}
+
+.ad-bar-track {
+    height: 10px;
+    border-radius: 999px;
+    background: var(--mud-palette-background);
+    display: flex;
+}
+
+    .ad-bar-track.is-thin {
+        height: 6px;
+    }
+
+.ad-bar {
+    height: 100%;
+    border-radius: 999px;
+    background: var(--mud-palette-primary);
+}
+
+.ad-top-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 40px;
+}
+
+.ad-rank {
+    width: 24px;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--mud-palette-text-secondary);
+}
+
+.ad-top-body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.ad-activity {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--mud-palette-lines-default);
+}
+
+    .ad-activity:last-child {
+        border-bottom: 0;
+    }
+
+.ad-activity-body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 13px;
+}
+
+    .ad-activity-body .ad-muted {
+        font-size: 12px;
+    }
+
+.ad-time {
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+/* کارت ربات‌ها در هر دو تم سرمه‌ای، مثل منوی کنار */
+.ad-bots {
+    background: #0E1A36;
+    color: #FFFFFF;
+}
+
+.ad-bots-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.ad-bots-nums {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+}
+
+    .ad-bots-nums span {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .ad-bots-nums b {
+        font-size: 22px;
+    }
+
+    .ad-bots-nums small {
+        font-size: 12px;
+        color: #C4CDDE;
+    }
+
+.ad-bots-link {
+    align-self: flex-start;
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 14px;
+    border-radius: 10px;
+    background: #2A78D6;
+    color: #FFFFFF;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+    .ad-bots-link:hover {
+        background: #1F63C2;
+        color: #FFFFFF;
+    }
+
+.ad-online-count {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--mud-palette-success) !important;
+}
+
+.ad-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--mud-palette-success);
+}
+
+.ad-online {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+}
+
+.ad-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    background: var(--mud-palette-primary-hover);
+    color: var(--mud-palette-primary);
+    box-shadow: 0 0 0 2px var(--mud-palette-surface), 0 0 0 4px var(--mud-palette-success);
+}
+
+.ad-status {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 18px;
+    font-size: 13px;
+}
+
+.ad-status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 700;
+    color: var(--mud-palette-success);
+    background: var(--mud-palette-success-hover);
+    border-radius: 999px;
+    padding: 5px 12px;
+}
+
+    .ad-status-pill.is-bad {
+        color: var(--mud-palette-error);
+        background: var(--mud-palette-error-hover);
+    }
+
+@media (max-width: 900px) {
+    .ad-page {
+        padding: 16px;
+    }
+}

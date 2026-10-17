@@ -14,6 +14,7 @@
 @inject IDialogService dialogService
 @inject NaraChat.Application.Services.ContactTasks.ContactTaskStore TaskStore
 @inject NaraChat.Application.Services.Bots.BotStore BotStore
+@inject NaraChat.Application.Services.Auth.IAuthService ForceAuth
 @using NaraChat.Contract.Models.ContactTasks
 @using NaraChatFrontEnd.Pages.ChatPages.Components.ContactTasks
 @implements IAsyncDisposable
@@ -547,6 +548,16 @@
 
   
 
+    // ادمین حساب را غیرفعال کرد یا از همه‌ی دستگاه‌ها خارج کرد: پیام را نشان بده و خارج شو.
+    hubConnection.On<string>(nameof(IChatHubClient.ForceLogout), (message) =>
+    {
+        _ = InvokeAsync(async () =>
+        {
+            snackbar.Add(message, Severity.Warning);
+            try { await ForceAuth.LogoutAsync(); } catch (Exception) { /* توکن‌ها به هر حال باطل‌اند */ }
+            nm.NavigateTo("/", true);
+        });
+    });
     // کارهای شخصی از دستگاه یا تب دیگری عوض شد.
     hubConnection.On<Guid>(nameof(IChatHubClient.ContactTasksChanged), (contactId) =>
     {

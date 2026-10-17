@@ -1,0 +1,120 @@
+﻿.ann-wrap {
+    position: fixed;
+    top: 72px;
+    inset-inline: 0;
+    display: flex;
+    justify-content: center;
+    padding: 0 16px;
+    z-index: 1250;
+    pointer-events: none;
+}
+
+.ann-wrap.is-inline {
+    position: static;
+    padding: 0;
+    z-index: auto;
+}
+
+.ann {
+    --ann-accent: #2A78D6;
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    max-width: 720px;
+    padding: 10px 12px 10px 10px;
+    border-radius: 16px;
+    background: color-mix(in srgb, var(--mud-palette-surface) 82%, transparent);
+    backdrop-filter: blur(14px) saturate(1.4);
+    -webkit-backdrop-filter: blur(14px) saturate(1.4);
+    border: 1px solid color-mix(in srgb, var(--ann-accent) 28%, transparent);
+    box-shadow: 0 10px 30px -12px color-mix(in srgb, var(--ann-accent) 45%, rgba(0,0,0,.35)),
+                0 2px 6px rgba(0,0,0,.06);
+    color: var(--mud-palette-text-primary);
+    animation: ann-in .38s cubic-bezier(.2,.9,.3,1.2) both;
+    position: relative;
+    overflow: hidden;
+}
+
+    .ann::before {
+        content: "";
+        position: absolute;
+        inset-block: 0;
+        inset-inline-start: 0;
+        width: 4px;
+        background: var(--ann-accent);
+    }
+
+    .ann.is-warn { --ann-accent: #E08A00; }
+    .ann.is-success { --ann-accent: #1BAF7A; }
+
+.ann-icon {
+    flex: 0 0 auto;
+    width: 34px;
+    height: 34px;
+    border-radius: 11px;
+    display: grid;
+    place-items: center;
+    margin-inline-start: 6px;
+    color: var(--ann-accent);
+    background: color-mix(in srgb, var(--ann-accent) 14%, transparent);
+}
+
+.ann-text {
+    flex: 1 1 auto;
+    margin: 0;
+    font-size: .9rem;
+    line-height: 1.7;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+}
+
+.ann-link {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 10px;
+    font-size: .82rem;
+    font-weight: 600;
+    text-decoration: none;
+    color: #fff;
+    background: var(--ann-accent);
+    transition: filter .15s, transform .15s;
+}
+
+    .ann-link:hover { filter: brightness(1.08); transform: translateY(-1px); }
+
+.ann-close {
+    flex: 0 0 auto;
+    width: 30px;
+    height: 30px;
+    border: 0;
+    border-radius: 9px;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    color: var(--mud-palette-text-secondary);
+    background: transparent;
+    transition: background .15s;
+}
+
+    .ann-close:hover { background: color-mix(in srgb, var(--mud-palette-text-primary) 8%, transparent); }
+
+@keyframes ann-in {
+    from { opacity: 0; transform: translateY(-12px) scale(.98); }
+    to { opacity: 1; transform: none; }
+}
+
+@media (max-width: 600px) {
+    .ann-wrap { top: 64px; padding: 0 10px; }
+    .ann { flex-wrap: wrap; border-radius: 14px; }
+    .ann-text { flex-basis: calc(100% - 90px); font-size: .85rem; }
+    .ann-link { margin-inline-start: 52px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ann { animation: none; }
+}

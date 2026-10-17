@@ -71,6 +71,41 @@ namespace NaraChatFrontEnd.IOC.RegisterServices
                 return new BotAdminService(httpClient);
             });
             services.AddScoped<BotStore>();
+            services.AddScoped<NaraChat.Application.Services.Admin.IAdminDashboardService, NaraChat.Application.Services.Admin.AdminDashboardService>(sp =>
+            {
+                var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient("apiwithAuth");
+                return new NaraChat.Application.Services.Admin.AdminDashboardService(httpClient);
+            });
+            services.AddScoped<NaraChat.Application.Services.Admin.IAdminUsersService, NaraChat.Application.Services.Admin.AdminUsersService>(sp =>
+            {
+                var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient("apiwithAuth");
+                return new NaraChat.Application.Services.Admin.AdminUsersService(httpClient);
+            });
+            services.AddScoped<NaraChat.Application.Services.Admin.IAdminRoomsService, NaraChat.Application.Services.Admin.AdminRoomsService>(sp =>
+            {
+                var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient("apiwithAuth");
+                return new NaraChat.Application.Services.Admin.AdminRoomsService(httpClient);
+            });
+            services.AddScoped<NaraChat.Application.Services.Admin.IAdminBroadcastService, NaraChat.Application.Services.Admin.AdminBroadcastService>(sp =>
+            {
+                var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient("apiwithAuth");
+                return new NaraChat.Application.Services.Admin.AdminBroadcastService(httpClient);
+            });
+            services.AddScoped<NaraChat.Application.Services.Admin.IAdminReportsService, NaraChat.Application.Services.Admin.AdminReportsService>(sp =>
+            {
+                var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient("apiwithAuth");
+                return new NaraChat.Application.Services.Admin.AdminReportsService(httpClient);
+            });
+            services.AddScoped<NaraChat.Application.Services.Admin.IAdminSettingsService, NaraChat.Application.Services.Admin.AdminSettingsService>(sp =>
+            {
+                var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient("apiwithAuth");
+                return new NaraChat.Application.Services.Admin.AdminSettingsService(httpClient);
+            });
+            services.AddScoped<NaraChat.Application.Services.Admin.IAppInfoService, NaraChat.Application.Services.Admin.AppInfoService>(sp =>
+            {
+                var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient("apiwithAuth");
+                return new NaraChat.Application.Services.Admin.AppInfoService(httpClient);
+            });
             services.AddScoped<IBrowserUploader, BrowserUploader>();
             return services;
         }

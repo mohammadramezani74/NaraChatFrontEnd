@@ -1,0 +1,470 @@
+﻿@page "/admin"
+@layout AdminLayout
+@inject IAdminDashboardService DashboardService
+@implements IDisposable
+
+@* داشبورد پنل ادمین. دسترسی را AdminLayout چک می‌کند و سرور هم برای غیرادمین 404 می‌دهد.
+   آمار سنگین در سرور یک دقیقه کش می‌شود؛ صفحه هم هر دقیقه خودش تازه می‌شود. *@
+
+<PageTitle>داشبورد · پنل مدیریت ناراگرام</PageTitle>
+
+<div class="ad-page" dir="rtl">
+    <div class="ad-head">
+        <div class="ad-head-text">
+            <h1>داشبورد</h1>
+            <span>وضعیت کلی ناراگرام در یک نگاه</span>
+        </div>
+        <div class="ad-head-tools">
+            <span class="ad-date"><MudIcon Icon="@Icons.Material.Outlined.CalendarMonth" Style="font-size:18px;" /> @TodayFa</span>
+            <MudIconButton Icon="@Icons.Material.Filled.Refresh" aria-label="تازه کردن" title="تازه کردن"
+                           Disabled="_loading" OnClick="@(() => LoadAsync(true))" />
+        </div>
+    </div>
+
+    @if (_data is null)
+    {
+        <div class="ad-card ad-state">
+            @if (_loading)
+            {
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            }
+            else
+            {
+                <span>آمار از سرور نیامد.</span>
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="@(() => LoadAsync(true))">دوباره تلاش کن</MudButton>
+            }
+        </div>
+    }
+    else
+    {
+        var d = _data;
+
+        @* ------------------------------------------------ کارت‌ها *@
+        <section class="ad-kpis" aria-label="آمار کلی">
+            @foreach (var k in Kpis(d))
+            {
+                <div class="ad-card ad-kpi">
+                    <div class="ad-kpi-top">
+                        <span class="ad-kpi-label">@k.Label</span>
+                        <span class="ad-kpi-icon @k.Tone"><MudIcon Icon="@k.Icon" Style="font-size:20px;" /></span>
+                    </div>
+                    <span class="ad-kpi-value">@k.Value</span>
+                    <span class="ad-kpi-note"><b class="@k.DeltaTone">@k.Delta</b> @k.Note</span>
+                </div>
+            }
+        </section>
+
+        <section class="ad-row">
+            @* ------------------------------------------------ روند پیام‌ها *@
+            <div class="ad-card ad-trend">
+                <div class="ad-card-head">
+                    <div>
+                        <h2>روند پیام‌ها</h2>
+                        <span>تعداد پیام در روز، جدا برای چت خصوصی، گروه و کانال</span>
+                    </div>
+                    <div class="ad-seg" role="group" aria-label="بازه‌ی زمانی">
+                        <button type="button" class="@(_days == 7 ? "is-on" : null)" @onclick="@(() => SetDaysAsync(7))">۷ روز</button>
+                        <button type="button" class="@(_days == 30 ? "is-on" : null)" @onclick="@(() => SetDaysAsync(30))">۳۰ روز</button>
+                    </div>
+                </div>
+                <div class="ad-chart" dir="ltr">
+                    <ApexCharts.ApexChart @key="@($"trend-{_days}-{Dark}-{_version}")" TItem="TrendPoint" Options="TrendOptions" Height="@("300")">
+                        <ApexCharts.ApexPointSeries TItem="TrendPoint" Items="TrendPoints(d, 0)" Name="خصوصی"
+                                                    SeriesType="ApexCharts.SeriesType.Line"
+                                                    XValue="@(p => p.Label)" YValue="@(p => (decimal?)p.Value)" />
+                        <ApexCharts.ApexPointSeries TItem="TrendPoint" Items="TrendPoints(d, 1)" Name="گروه"
+                                                    SeriesType="ApexCharts.SeriesType.Line"
+                                                    XValue="@(p => p.Label)" YValue="@(p => (decimal?)p.Value)" />
+                        <ApexCharts.ApexPointSeries TItem="TrendPoint" Items="TrendPoints(d, 2)" Name="کانال"
+                                                    SeriesType="ApexCharts.SeriesType.Line"
+                                                    XValue="@(p => p.Label)" YValue="@(p => (decimal?)p.Value)" />
+                    </ApexCharts.ApexChart>
+                </div>
+            </div>
+
+            @* ------------------------------------------------ کاربران *@
+            <div class="ad-card ad-users">
+                <div class="ad-card-head">
+                    <h2>کاربران</h2>
+                    <div class="ad-seg" role="group" aria-label="نوع تفکیک">
+                        <button type="button" class="@(_split == "city" ? "is-on" : null)" @onclick="@(() => _split = "city")">شهر</button>
+                        <button type="button" class="@(_split == "active" ? "is-on" : null)" @onclick="@(() => _split = "active")">فعالیت</button>
+                    </div>
+                </div>
+                @{ var slices = Slices(d); }
+                <div class="ad-donut">
+                    <ApexCharts.ApexChart @key="@($"donut-{_split}-{Dark}-{_version}")" TItem="SlicePoint" Options="DonutOptions(slices)" Height="@("230")">
+                        <ApexCharts.ApexPointSeries TItem="SlicePoint" Items="slices" Name="کاربران"
+                                                    SeriesType="ApexCharts.SeriesType.Donut"
+                                                    XValue="@(p => p.Label)" YValue="@(p => (decimal?)p.Count)" />
+                    </ApexCharts.ApexChart>
+                    <span class="ad-donut-center">
+                        <b>@Num(slices.Sum(x => x.Count))</b>
+                        <small>کاربر</small>
+                    </span>
+                </div>
+                <div class="ad-legend">
+                    @foreach (var s in slices)
+                    {
+                        <span class="ad-legend-row">
+                            <span class="ad-swatch" style="background:@s.Color"></span>
+                            <span class="ad-legend-name">@s.Label</span>
+                            <span class="ad-muted">@Num(s.Count)</span>
+                            <b>@Pct(s.Count, slices.Sum(x => x.Count))</b>
+                        </span>
+                    }
+                </div>
+                <span class="ad-hint">
+                    @(_split == "city"
+                        ? "شهر از اطلاعات INTS می‌آید که هر کاربر با آن وارد شده."
+                        : "فعال یعنی دست‌کم یک بار در ۷ روز اخیر در ناراگرام آنلاین بوده.")
+                </span>
+            </div>
+        </section>
+
+        <section class="ad-grid">
+            @* ------------------------------------------------ نوع پیام‌ها *@
+            <div class="ad-card">
+                <div class="ad-card-head">
+                    <div>
+                        <h2>نوع پیام‌ها</h2>
+                        <span>@Num(d.MessageTypes.Sum(x => x.Count)) پیام در ۷ روز گذشته</span>
+                    </div>
+                </div>
+                @{ var typeMax = Math.Max(1, d.MessageTypes.Max(x => (int?)x.Count) ?? 1); var typeTotal = Math.Max(1, d.MessageTypes.Sum(x => x.Count)); }
+                @foreach (var t in d.MessageTypes)
+                {
+                    <div class="ad-bar-row">
+                        <span class="ad-bar-text">
+                            <span>@t.Label</span>
+                            <span class="ad-muted">@Num(t.Count) · <b>@Pct(t.Count, typeTotal)</b></span>
+                        </span>
+                        <span class="ad-bar-track"><span class="ad-bar" style="width:@BarWidth(t.Count, typeMax)"></span></span>
+                    </div>
+                }
+            </div>
+
+            @* ------------------------------------------------ فعال‌ترین‌ها *@
+            <div class="ad-card">
+                <div class="ad-card-head">
+                    <div>
+                        <h2>فعال‌ترین‌ها در این هفته</h2>
+                        <span>بر اساس تعداد پیام</span>
+                    </div>
+                </div>
+                <div class="ad-seg ad-seg-full" role="tablist" aria-label="نوع فهرست">
+                    <button type="button" role="tab" aria-selected="@(_top == "users")" class="@(_top == "users" ? "is-on" : null)" @onclick="@(() => _top = "users")">کاربران</button>
+                    <button type="button" role="tab" aria-selected="@(_top == "groups")" class="@(_top == "groups" ? "is-on" : null)" @onclick="@(() => _top = "groups")">گروه‌ها</button>
+                    <button type="button" role="tab" aria-selected="@(_top == "channels")" class="@(_top == "channels" ? "is-on" : null)" @onclick="@(() => _top = "channels")">کانال‌ها</button>
+                </div>
+                @{ var tops = _top == "groups" ? d.TopGroups : _top == "channels" ? d.TopChannels : d.TopUsers; var topMax = Math.Max(1, tops.Max(x => (int?)x.Count) ?? 1); }
+                @if (tops.Count == 0)
+                {
+                    <span class="ad-empty">در ۷ روز گذشته پیامی نبوده است.</span>
+                }
+                @for (var i = 0; i < tops.Count; i++)
+                {
+                    var item = tops[i];
+                    <div class="ad-top-row">
+                        <span class="ad-rank">@((i + 1).ToString().ToPersianNumber())</span>
+                        <span class="ad-top-body">
+                            <span class="ad-bar-text">
+                                <b class="ad-ellipsis">@item.Name</b>
+                                <span class="ad-muted">@Num(item.Count) @(_top == "channels" ? "پست" : "پیام")</span>
+                            </span>
+                            <span class="ad-bar-track is-thin"><span class="ad-bar" style="width:@BarWidth(item.Count, topMax)"></span></span>
+                        </span>
+                    </div>
+                }
+            </div>
+
+            @* ------------------------------------------------ فعالیت‌های اخیر *@
+            <div class="ad-card">
+                <div class="ad-card-head"><h2>فعالیت‌های اخیر</h2></div>
+                @if (d.Recent.Count == 0)
+                {
+                    <span class="ad-empty">هنوز فعالیتی ثبت نشده است.</span>
+                }
+                @foreach (var a in d.Recent)
+                {
+                    <div class="ad-activity">
+                        <span class="ad-kpi-icon @ActivityTone(a.Kind)"><MudIcon Icon="@ActivityIcon(a.Kind)" Style="font-size:18px;" /></span>
+                        <span class="ad-activity-body">
+                            <b>@a.Title</b>
+                            <span class="ad-muted ad-ellipsis">@a.Detail</span>
+                        </span>
+                        <span class="ad-muted ad-time">@When(a.At)</span>
+                    </div>
+                }
+            </div>
+
+            @* ------------------------------------------------ ربات‌ها و آنلاین‌ها *@
+            <div class="ad-col">
+                <div class="ad-card ad-bots">
+                    <span class="ad-bots-title"><MudIcon Icon="@Icons.Material.Outlined.SmartToy" Style="font-size:20px;" /> ربات‌ها</span>
+                    <div class="ad-bots-nums">
+                        <span><b>@Num(d.Bots.Count)</b><small>ربات (@Num(d.Bots.Enabled) روشن)</small></span>
+                        <span><b>@Num(d.Bots.StartedUsers)</b><small>کاربر شروع‌کرده</small></span>
+                        <span><b>@Num(d.Bots.MessagesToday)</b><small>پیام امروز</small></span>
+                    </div>
+                    <a class="ad-bots-link" href="/admin/bots">مدیریت ربات‌ها</a>
+                </div>
+
+                <div class="ad-card">
+                    <div class="ad-card-head">
+                        <h2>آنلاین الان</h2>
+                        <span class="ad-online-count"><span class="ad-dot"></span>@Num(d.Online.Count) نفر</span>
+                    </div>
+                    @if (d.Online.Users.Count == 0)
+                    {
+                        <span class="ad-empty">الان کسی آنلاین نیست.</span>
+                    }
+                    @foreach (var u in d.Online.Users)
+                    {
+                        <div class="ad-online">
+                            <span class="ad-avatar">@Initials(u.Name)</span>
+                            <b class="ad-ellipsis">@u.Name</b>
+                        </div>
+                    }
+                    @if (d.Online.Count > d.Online.Users.Count)
+                    {
+                        <span class="ad-muted">و @Num(d.Online.Count - d.Online.Users.Count) نفر دیگر</span>
+                    }
+                </div>
+            </div>
+        </section>
+
+        <div class="ad-card ad-status">
+            @if (_failed)
+            {
+                <span class="ad-status-pill is-bad"><MudIcon Icon="@Icons.Material.Filled.ErrorOutline" Style="font-size:16px;" /> آخرین تلاش برای تازه کردن ناموفق بود</span>
+            }
+            else
+            {
+                <span class="ad-status-pill"><MudIcon Icon="@Icons.Material.Filled.Check" Style="font-size:16px;" /> سرور و دیتابیس پاسخ دادند</span>
+            }
+            <span class="ad-muted">آمار ساعت @Clock(d.GeneratedAt) · هر دقیقه خودکار تازه می‌شود</span>
+        </div>
+    }
+</div>
+
+@code {
+    [CascadingParameter(Name = "AdminDark")] public bool Dark { get; set; }
+
+    private AdminDashboardDto? _data;
+    private bool _loading = true;
+    private bool _failed;
+    private int _days = 7;
+    private int _version;
+    private string _split = "city";
+    private string _top = "users";
+    private PeriodicTimer? _timer;
+    private readonly CancellationTokenSource _cts = new();
+
+    public sealed record TrendPoint(string Label, int Value);
+    public sealed record SlicePoint(string Label, int Count, string Color);
+    private sealed record Kpi(string Label, string Value, string Delta, string DeltaTone, string Note, string Icon, string Tone);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync(false);
+        _ = AutoRefreshAsync();
+    }
+
+    private async Task AutoRefreshAsync()
+    {
+        _timer = new PeriodicTimer(TimeSpan.FromMinutes(1));
+        try
+        {
+            while (await _timer.WaitForNextTickAsync(_cts.Token))
+                await InvokeAsync(() => LoadAsync(false));
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private async Task LoadAsync(bool showSpinner)
+    {
+        if (showSpinner)
+        {
+            _loading = true;
+            StateHasChanged();
+        }
+
+        var fresh = await DashboardService.GetAsync(_days, _cts.Token);
+        _failed = fresh is null;
+        if (fresh is not null)
+        {
+            _data = fresh;
+            _version++;
+        }
+
+        _loading = false;
+        StateHasChanged();
+    }
+
+    private async Task SetDaysAsync(int days)
+    {
+        if (_days == days) return;
+        _days = days;
+        await LoadAsync(false);
+    }
+
+    // ---------------- کارت‌ها
+
+    private IEnumerable<Kpi> Kpis(AdminDashboardDto d)
+    {
+        var k = d.Kpis;
+        var change = k.MessagesPrev24h == 0 ? (int?)null : (int)Math.Round((k.Messages24h - k.MessagesPrev24h) * 100.0 / k.MessagesPrev24h);
+        yield return new Kpi("پیام‌ها در ۲۴ ساعت گذشته", Num(k.Messages24h),
+            change is null ? "—" : (change >= 0 ? "▲ " : "▼ ") + Math.Abs(change.Value).ToString().ToPersianNumber() + "٪",
+            change is null or 0 ? "is-flat" : change > 0 ? "is-up" : "is-down",
+            "نسبت به ۲۴ ساعت قبل", Icons.Material.Outlined.Forum, "is-blue");
+        yield return new Kpi("کاربران", Num(k.Users), Plus(k.NewUsersWeek), k.NewUsersWeek > 0 ? "is-up" : "is-flat",
+            "کاربر تازه در این هفته", Icons.Material.Outlined.People, "is-orange");
+        yield return new Kpi("گروه‌ها", Num(k.Groups), Plus(k.NewGroupsWeek), k.NewGroupsWeek > 0 ? "is-up" : "is-flat",
+            "گروه تازه در این هفته", Icons.Material.Outlined.Groups, "is-green");
+        yield return new Kpi("کانال‌ها", Num(k.Channels), Plus(k.NewChannelsWeek), k.NewChannelsWeek > 0 ? "is-up" : "is-flat",
+            "کانال تازه در این هفته", Icons.Material.Outlined.Campaign, "is-yellow");
+    }
+
+    // ---------------- نمودارها
+
+    // رنگ‌ها از پالت دسته‌ای آزموده‌شده (برای کوررنگی هم جدا می‌شوند)؛ تم تیره پله‌ی خودش را دارد.
+    private string[] SeriesColors => Dark ? new[] { "#3987E5", "#D95926", "#199E70", "#C98500" } : new[] { "#2A78D6", "#EB6834", "#1BAF7A", "#EDA100" };
+    private string OtherColor => Dark ? "#6B7486" : "#9AA4B5";
+
+    private List<TrendPoint> TrendPoints(AdminDashboardDto d, int kind)
+        => d.Trend.Select((p, i) => new TrendPoint(DayLabel(p.Day, d.Trend.Count), kind switch { 0 => p.Private, 1 => p.Group, _ => p.Channel })).ToList();
+
+    private ApexCharts.ApexChartOptions<TrendPoint> TrendOptions => new()
+    {
+        Chart = new ApexCharts.Chart
+        {
+            Toolbar = new ApexCharts.Toolbar { Show = false },
+            Zoom = new ApexCharts.Zoom { Enabled = false },
+            FontFamily = "iransans-medium, sans-serif",
+            Background = "transparent",
+        },
+        Theme = new ApexCharts.Theme { Mode = Dark ? ApexCharts.Mode.Dark : ApexCharts.Mode.Light },
+        Colors = SeriesColors.Take(3).ToList(),
+        Stroke = new ApexCharts.Stroke { Curve = ApexCharts.Curve.Smooth, Width = 2 },
+        DataLabels = new ApexCharts.DataLabels { Enabled = false },
+        Legend = new ApexCharts.Legend { Position = ApexCharts.LegendPosition.Top, HorizontalAlign = ApexCharts.Align.Right },
+        Grid = new ApexCharts.Grid { BorderColor = Dark ? "#233044" : "#E9EDF3" },
+        Markers = new ApexCharts.Markers { Size = 0 },
+    };
+
+    private List<SlicePoint> Slices(AdminDashboardDto d)
+    {
+        if (_split == "active")
+            return new List<SlicePoint>
+            {
+                new("فعال در ۷ روز اخیر", d.Activity7Days.Active, SeriesColors[0]),
+                new("غیرفعال", d.Activity7Days.Inactive, OtherColor),
+            };
+
+        var list = new List<SlicePoint>();
+        var slot = 0;
+        foreach (var c in d.UsersByCity)
+        {
+            var other = c.Label is "سایر شهرها" or "نامشخص";
+            list.Add(new SlicePoint(c.Label, c.Count, other ? OtherColor : SeriesColors[Math.Min(slot++, SeriesColors.Length - 1)]));
+        }
+        return list;
+    }
+
+    private ApexCharts.ApexChartOptions<SlicePoint> DonutOptions(List<SlicePoint> slices) => new()
+    {
+        Chart = new ApexCharts.Chart
+        {
+            Toolbar = new ApexCharts.Toolbar { Show = false },
+            FontFamily = "iransans-medium, sans-serif",
+            Background = "transparent",
+        },
+        Theme = new ApexCharts.Theme { Mode = Dark ? ApexCharts.Mode.Dark : ApexCharts.Mode.Light },
+        Colors = slices.Select(s => s.Color).ToList(),
+        Legend = new ApexCharts.Legend { Show = false },
+        DataLabels = new ApexCharts.DataLabels { Enabled = false },
+        Stroke = new ApexCharts.Stroke { Width = 2, Colors = new List<string> { Dark ? "#0F172A" : "#FFFFFF" } },
+    };
+
+    // ---------------- قالب‌بندی
+
+    private static string Num(int n) => n.ToString("N0").Replace(",", "٬").ToPersianNumber();
+
+    private static string Plus(int n) => n > 0 ? "+" + Num(n) : "۰";
+
+    private static string Pct(int part, int total)
+        => total <= 0 ? "۰٪" : Math.Round(part * 100.0 / total).ToString().ToPersianNumber() + "٪";
+
+    private static string BarWidth(int value, int max)
+        => Math.Max(value > 0 ? 2 : 0, value * 100.0 / max).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + "%";
+
+    private static readonly System.Globalization.PersianCalendar Pc = new();
+
+    private static readonly string[] MonthNames =
+        { "فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور", "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند" };
+
+    private static readonly string[] WeekDays = { "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنج‌شنبه", "جمعه", "شنبه" };
+
+    private static string DayLabel(DateTime day, int count)
+        => count > 7
+            ? Pc.GetDayOfMonth(day).ToString().ToPersianNumber() + " " + MonthNames[Pc.GetMonth(day) - 1]
+            : WeekDays[(int)day.DayOfWeek] + " " + Pc.GetDayOfMonth(day).ToString().ToPersianNumber();
+
+    private static string TodayFa
+    {
+        get
+        {
+            var now = DateTime.Now;
+            return WeekDays[(int)now.DayOfWeek] + " " + Pc.GetDayOfMonth(now).ToString().ToPersianNumber() + " "
+                + MonthNames[Pc.GetMonth(now) - 1] + " " + Pc.GetYear(now).ToString().ToPersianNumber();
+        }
+    }
+
+    private static string Clock(DateTime at) => at.ToString("HH:mm").ToPersianNumber();
+
+    private static string When(DateTime at)
+    {
+        var now = DateTime.Now;
+        if (at.Date == now.Date) return Clock(at);
+        if (at.Date == now.Date.AddDays(-1)) return "دیروز";
+        return Pc.GetDayOfMonth(at).ToString().ToPersianNumber() + " " + MonthNames[Pc.GetMonth(at) - 1];
+    }
+
+    private static string Initials(string name)
+    {
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length switch
+        {
+            0 => "؟",
+            1 => parts[0][..1],
+            _ => parts[0][..1] + "‌" + parts[1][..1],
+        };
+    }
+
+    private static string ActivityTone(string kind) => kind switch
+    {
+        "user" => "is-orange",
+        "group" => "is-green",
+        "channel" => "is-yellow",
+        _ => "is-blue",
+    };
+
+    private static string ActivityIcon(string kind) => kind switch
+    {
+        "user" => Icons.Material.Outlined.PersonAdd,
+        "group" => Icons.Material.Outlined.Groups,
+        "channel" => Icons.Material.Outlined.Campaign,
+        _ => Icons.Material.Outlined.SmartToy,
+    };
+
+    public void Dispose()
+    {
+        _cts.Cancel();
+        _timer?.Dispose();
+        _cts.Dispose();
+    }
+}

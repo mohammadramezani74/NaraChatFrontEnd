@@ -1,7 +1,9 @@
-﻿@page "/admin"
+﻿@page "/admin/bots"
+@layout AdminLayout
 @inject IBotService BotService
 @inject IBotAdminService Admin
 @inject ISnackbar Snackbar
+@inject IJSRuntime JS
 
 @* پنل ربات‌ها. فقط برای حساب‌های Admin:UserIds سرور؛ برای بقیه «صفحه پیدا نشد».
    سرور هم همه‌ی این مسیرها را برای غیرادمین 404 می‌دهد. *@
@@ -19,16 +21,6 @@ else
     <div class="ba-mobile-note">پنل مدیریت ربات‌ها فقط روی دسکتاپ کار می‌کند.</div>
 
     <div class="ba-page" dir="rtl">
-        <header class="ba-header">
-            <div class="ba-header-title">
-                <h1>مدیریت ربات‌ها</h1>
-                <span class="ba-lock">
-                    <MudIcon Icon="@Icons.Material.Filled.Lock" Style="font-size:14px;" />
-                    فقط حساب شما به این صفحه دسترسی دارد
-                </span>
-            </div>
-            <a class="ba-back" href="/chat">بازگشت به چت</a>
-        </header>
 
         <div class="ba-body">
             @* ------------------------------------------------ فهرست ربات‌ها *@
@@ -88,7 +80,7 @@ else
                         @foreach (var (index, title) in Tabs)
                         {
                             var i = index;
-                            <button type="button" role="tab" class="ba-tab @(_tab == i ? "is-active" : string.Empty)" @onclick="() => _tab = i">
+                            <button type="button" role="tab" class="ba-tab @(_tab == i ? "is-active" : string.Empty)" @onclick="() => OpenTabAsync(i)">
                                 @title
                                 @if (i == 1 && _menuDirty)
                                 {
@@ -330,7 +322,7 @@ else
                             <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="_busy" OnClick="SaveSettingsAsync">ذخیره</MudButton>
                         </div>
                     }
-                    else
+                    else if (_tab == 3)
                     {
                         @* ---------------- جریان‌ها و اتصال‌ها *@
                         <section class="ba-card">
@@ -392,6 +384,146 @@ else
                             </div>
                         </section>
                     }
+                    else
+                    {
+                        @* ---------------- ارسال از بیرون *@
+                        if (_api is null)
+                        {
+                            <div class="ba-center"><MudProgressCircular Indeterminate="true" Size="Size.Small" /></div>
+                        }
+                        else
+                        {
+                            <section class="ba-card">
+                                <div class="ba-card-head">
+                                    <div>
+                                        <h2>ارسال پیام از سیستم‌های دیگر</h2>
+                                        <span class="ba-muted">سامانه‌هایی مثل منابع انسانی با کلید API این ربات و شماره‌ی موبایل به کاربر پیام می‌دهند. پیام در گفتگوی همین ربات می‌نشیند و اعلان دارد.</span>
+                                    </div>
+                                    <span class="ba-muted">امروز: @AdminFormat.Num(_api.SentToday) ارسال، @AdminFormat.Num(_api.FailedToday) ناموفق</span>
+                                </div>
+                                <label class="ba-switch">
+                                    <input type="checkbox" checked="@_api.IsOfficial" disabled="@_busy" @onchange="@(e => SetOfficialAsync(e.Value is bool v && v))" />
+                                    <span class="ba-switch-track"><span class="ba-switch-knob"></span></span>
+                                    <span>
+                                        <b>ربات رسمی سازمان</b>
+                                        <span class="ba-muted">@(_api.IsOfficial ? "به همه‌ی کاربران مجاز پیام می‌دهد، حتی اگر «شروع» را نزده باشند." : "فقط به کسانی پیام می‌دهد که ربات را «شروع» کرده‌اند (مثل تلگرام).")</span>
+                                    </span>
+                                </label>
+                                @if (!_bot.IsEnabled)
+                                {
+                                    <span class="ba-warn">ربات خاموش است؛ تا روشنش نکنید، درخواست‌های ارسال رد می‌شوند (bot_disabled).</span>
+                                }
+                            </section>
+
+                            <section class="ba-card">
+                                <div class="ba-card-head">
+                                    <div>
+                                        <h2>کلیدهای API</h2>
+                                        <span class="ba-muted">برای هر سیستم یک کلید جدا بسازید تا اگر یکی لو رفت، فقط همان باطل شود. کلید فقط یک بار، همین‌جا، نمایش داده می‌شود.</span>
+                                    </div>
+                                </div>
+
+                                @if (_newKey is not null)
+                                {
+                                    <div class="ba-key-reveal">
+                                        <b>کلید «@_newKeyName» ساخته شد. همین حالا کپی کنید؛ دیگر نمایش داده نمی‌شود.</b>
+                                        <div class="ba-key-row">
+                                            <code dir="ltr">@_newKey</code>
+                                            <button type="button" class="ba-mini" @onclick="() => CopyAsync(_newKey)">کپی</button>
+                                            <button type="button" class="ba-mini" @onclick="() => _newKey = null">بستن</button>
+                                        </div>
+                                    </div>
+                                }
+
+                                <div class="ba-key-create">
+                                    <input @bind="_keyName" @bind:event="oninput" placeholder="برای کدام سیستم؟ مثلاً سامانه‌ی منابع انسانی" />
+                                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" Disabled="_busy" OnClick="CreateKeyAsync">ساختن کلید</MudButton>
+                                </div>
+
+                                @if (_api.Keys.Count == 0)
+                                {
+                                    <span class="ba-muted">هنوز کلیدی ساخته نشده است.</span>
+                                }
+                                else
+                                {
+                                    <table class="ba-table">
+                                        <thead>
+                                            <tr><th>سیستم</th><th>کلید</th><th>ساخت</th><th>آخرین استفاده</th><th>وضعیت</th><th></th></tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var key in _api.Keys)
+                                            {
+                                                var k = key;
+                                                var active = k.RevokedAt is null;
+                                                <tr class="@(active ? string.Empty : "is-off")">
+                                                    <td>@k.Name</td>
+                                                    <td><code dir="ltr">@(k.Prefix + "…")</code></td>
+                                                    <td>@AdminFormat.Date(k.CreatedAt)</td>
+                                                    <td>@(k.LastUsedAt is null ? "هنوز نه" : AdminFormat.Ago(k.LastUsedAt))</td>
+                                                    <td><span class="ba-pill @(active ? "is-on" : "is-bad")">@(active ? "فعال" : "باطل‌شده")</span></td>
+                                                    <td>
+                                                        @if (active)
+                                                        {
+                                                            <button type="button" class="ba-mini is-danger" disabled="@_busy" @onclick="() => RevokeKeyAsync(k)">
+                                                                @(_confirmRevoke == k.Id ? "مطمئنید؟ باطل شود" : "باطل کردن")
+                                                            </button>
+                                                        }
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                }
+                            </section>
+
+                            <section class="ba-card">
+                                <div class="ba-card-head">
+                                    <div>
+                                        <h2>نمونه‌ی درخواست</h2>
+                                        <span class="ba-muted">این را به تیم سیستم دیگر بدهید. شماره به هر شکلی (۰۹… یا ‎+98…) پذیرفته می‌شود؛ externalId جلوی ارسال تکراری را می‌گیرد.</span>
+                                    </div>
+                                    <button type="button" class="ba-mini" @onclick="() => CopyAsync(Sample)">کپی</button>
+                                </div>
+                                <pre class="ba-code" dir="ltr">@Sample</pre>
+                            </section>
+
+                            <section class="ba-card">
+                                <div class="ba-card-head">
+                                    <h2>ارسال‌های اخیر</h2>
+                                    <button type="button" class="ba-mini" disabled="@_busy" @onclick="LoadApiAsync">تازه کردن</button>
+                                </div>
+                                @if (_api.Recent.Count == 0)
+                                {
+                                    <span class="ba-muted">هنوز پیامی از بیرون فرستاده نشده است.</span>
+                                }
+                                else
+                                {
+                                    <table class="ba-table">
+                                        <thead>
+                                            <tr><th>زمان</th><th>سیستم</th><th>گیرنده</th><th>متن</th><th>شناسه</th><th>نتیجه</th></tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var row in _api.Recent)
+                                            {
+                                                <tr>
+                                                    <td>@AdminFormat.DateTimeText(row.At)</td>
+                                                    <td>@row.KeyName</td>
+                                                    <td><span dir="ltr">@row.Phone</span></td>
+                                                    <td class="ba-clip">@row.Preview</td>
+                                                    <td class="ba-clip"><code dir="ltr">@row.Reference</code></td>
+                                                    <td>
+                                                        <span class="ba-pill @(row.Status == "sent" ? "is-on" : row.Status == "failed" ? "is-bad" : string.Empty)" title="@row.Error">
+                                                            @(row.Status == "sent" ? "رسید" : row.Status == "failed" ? row.ErrorText : "در حال ارسال")
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                }
+                            </section>
+                        }
+                    }
                 }
             </main>
         </div>
@@ -405,6 +537,7 @@ else
         (1, "منو"),
         (2, "دستورها"),
         (3, "جریان‌ها و اتصال‌ها"),
+        (4, "ارسال از بیرون"),
     };
 
     private static readonly (BotAccessMode Mode, string Title)[] AccessModes =
@@ -477,6 +610,12 @@ else
 
         _bot = bot;
         ResetMenu();
+
+        _api = null;
+        _newKey = null;
+        _confirmRevoke = null;
+        if (_tab == 4)
+            await LoadApiAsync();
     }
 
     private async Task CreateBotAsync()
@@ -725,6 +864,139 @@ else
         finally
         {
             _busy = false;
+        }
+    }
+
+    // ------------------------------------------------------------ ارسال از بیرون
+
+    private BotApiOverview? _api;
+    private string _keyName = string.Empty;
+    private string? _newKey;
+    private string? _newKeyName;
+    private Guid? _confirmRevoke;
+
+    private static readonly string[] SampleLines =
+    {
+        "POST {api}api/v1/botapi/send",
+        "X-Bot-Key: <کلید API>",
+        "Content-Type: application/json",
+        "",
+        "{",
+        "  \"phone\": \"09121234567\",",
+        "  \"text\": \"فیش حقوقی مهر آماده است.\",",
+        "  \"buttons\": [[{ \"text\": \"مشاهده در سامانه\", \"url\": \"https://hr.example.ir/payslip\" }]],",
+        "  \"externalId\": \"payslip-1405-07-1234\"",
+        "}",
+        "",
+        "فایل (اختیاری، حداکثر ۱۰ مگابایت):  \"file\": { \"name\": \"fish.pdf\", \"base64\": \"...\" }",
+        "",
+        "پاسخ موفق:  { \"ok\": true, \"messageId\": \"...\" }",
+        "پاسخ خطا:   { \"ok\": false, \"error\": \"user_not_found\", \"message\": \"...\" }",
+        "آزمایش کلید:  GET {api}api/v1/botapi/me  (با همان سربرگ)",
+    };
+
+    private static string Sample => string.Join("\n", SampleLines).Replace("{api}", SiteSettings.ApiUrl);
+
+    private async Task OpenTabAsync(int index)
+    {
+        _tab = index;
+        if (index == 4 && _api is null)
+            await LoadApiAsync();
+    }
+
+    private async Task LoadApiAsync()
+    {
+        if (_bot is null) return;
+        var id = _bot.Id;
+        var api = await Admin.ApiAsync(id);
+        if (_bot?.Id != id) return;
+        if (api is null)
+            Snackbar.Add("اطلاعات ارسال از بیرون خوانده نشد.", Severity.Warning);
+        _api = api ?? new BotApiOverview();
+    }
+
+    private async Task SetOfficialAsync(bool on)
+    {
+        if (_bot is null) return;
+        _busy = true;
+        try
+        {
+            var (ok, message) = await Admin.SetOfficialAsync(_bot.Id, on);
+            Snackbar.Add(ok ? (on ? "ربات رسمی شد." : "ربات از حالت رسمی بیرون آمد.") : message, ok ? Severity.Success : Severity.Warning);
+            await LoadApiAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task CreateKeyAsync()
+    {
+        if (_bot is null) return;
+        var name = _keyName.Trim();
+        if (name.Length < 2)
+        {
+            Snackbar.Add("بنویسید کلید برای کدام سیستم است.", Severity.Warning);
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            var (ok, created, message) = await Admin.CreateKeyAsync(_bot.Id, name);
+            if (!ok || created is null)
+            {
+                Snackbar.Add(message, Severity.Warning);
+                return;
+            }
+
+            _newKey = created.Key;
+            _newKeyName = name;
+            _keyName = string.Empty;
+            await LoadApiAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task RevokeKeyAsync(BotApiKeyItem key)
+    {
+        if (_bot is null) return;
+        if (_confirmRevoke != key.Id)
+        {
+            _confirmRevoke = key.Id;
+            return;
+        }
+
+        _confirmRevoke = null;
+        _busy = true;
+        try
+        {
+            var (ok, message) = await Admin.RevokeKeyAsync(_bot.Id, key.Id);
+            Snackbar.Add(ok ? "کلید باطل شد؛ سیستمی که با آن کار می‌کرد دیگر نمی‌تواند پیام بفرستد." : message,
+                ok ? Severity.Success : Severity.Warning);
+            await LoadApiAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task CopyAsync(string? text)
+    {
+        if (string.IsNullOrEmpty(text)) return;
+        try
+        {
+            await JS.InvokeVoidAsync("copyToClipboard", text);
+            Snackbar.Add("کپی شد.", Severity.Success);
+        }
+        catch (Exception)
+        {
+            Snackbar.Add("کپی نشد؛ دستی انتخاب و کپی کنید.", Severity.Warning);
         }
     }
 

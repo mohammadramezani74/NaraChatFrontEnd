@@ -1,0 +1,698 @@
+﻿@page "/admin/users"
+@layout AdminLayout
+@inject IAdminUsersService UsersService
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+@implements IDisposable
+
+@* کاربران و نقش‌ها. فقط مشخصات و آمار؛ متن پیام‌ها اینجا دیده نمی‌شود.
+   هر کار ادمین (غیرفعال کردن، خروج از دستگاه‌ها، نمایش شماره، تغییر نقش) در رویدادها ثبت می‌شود. *@
+
+<PageTitle>کاربران · پنل مدیریت ناراگرام</PageTitle>
+
+<div class="ak-page" dir="rtl">
+    <div class="ak-head">
+        <div class="ak-stack">
+            <h1>کاربران</h1>
+            @if (_page is not null)
+            {
+                <span class="ak-sub">@AdminFormat.Num(_page.AllCount) کاربر · @AdminFormat.Num(_page.ActiveCount) نفر در ۷ روز اخیر فعال</span>
+            }
+        </div>
+        <div class="ak-seg" role="tablist" aria-label="بخش">
+            <button type="button" role="tab" aria-selected="@(_tab == "users")" class="@(_tab == "users" ? "is-on" : null)" @onclick="@(() => _tab = "users")">کاربران</button>
+            <button type="button" role="tab" aria-selected="@(_tab == "roles")" class="@(_tab == "roles" ? "is-on" : null)" @onclick="ShowRolesAsync">نقش‌ها</button>
+        </div>
+    </div>
+
+    @if (_tab == "users")
+    {
+        <div class="ak-card ak-toolbar">
+            <label class="ak-search">
+                <MudIcon Icon="@Icons.Material.Filled.Search" Style="font-size:18px;" />
+                <input aria-label="جستجو" placeholder="نام یا شماره‌ی موبایل…" value="@_search" @oninput="OnSearchInput" />
+            </label>
+            <div class="ak-seg" role="group" aria-label="وضعیت">
+                @foreach (var (key, label, count) in StatusTabs)
+                {
+                    <button type="button" class="@(_status == key ? "is-on" : null)" @onclick="@(() => SetStatusAsync(key))">
+                        @label @(count is int c ? "(" + AdminFormat.Num(c) + ")" : "")
+                    </button>
+                }
+            </div>
+            <label class="ak-field">
+                شهر
+                <select class="ak-select" aria-label="شهر" value="@_city" @onchange="OnCityChanged">
+                    <option value="">همه</option>
+                    @foreach (var c in _page?.Cities ?? new List<string>())
+                    {
+                        <option value="@c">@c</option>
+                    }
+                </select>
+            </label>
+            <label class="ak-field">
+                نقش
+                <select class="ak-select" aria-label="نقش" value="@(_roleId?.ToString() ?? "")" @onchange="OnRoleChanged">
+                    <option value="">همه</option>
+                    @foreach (var r in _roles)
+                    {
+                        <option value="@r.Id">@r.Name</option>
+                    }
+                </select>
+            </label>
+            <button type="button" class="ak-btn" disabled="@_exporting" @onclick="ExportAsync">
+                <MudIcon Icon="@Icons.Material.Filled.Download" Style="font-size:17px;" /> خروجی Excel
+            </button>
+        </div>
+
+        <div class="ak-table-wrap">
+            @if (_page is null)
+            {
+                <div class="ak-empty">
+                    @if (_loading) { <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Small" /> }
+                    else { <span>لیست کاربران از سرور نیامد.</span> }
+                </div>
+            }
+            else if (_page.Items.Count == 0)
+            {
+                <div class="ak-empty">کاربری با این فیلترها پیدا نشد.</div>
+            }
+            else
+            {
+                <table class="ak-table">
+                    <thead>
+                        <tr>
+                            <th>کاربر</th>
+                            <th>موبایل</th>
+                            <th>شهر</th>
+                            <th>نقش‌ها</th>
+                            <th>آخرین بازدید</th>
+                            <th class="ak-num">پیام در ۷ روز</th>
+                            <th>وضعیت</th>
+                            <th class="ak-end">عملیات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var u in _page.Items)
+                        {
+                            <tr class="@(u.IsDisabled ? "is-dim" : null)">
+                                <td>
+                                    <button type="button" class="ak-rowbtn" @onclick="@(() => OpenAsync(u.Id))">
+                                        <span class="ak-avatar @AdminFormat.Tone(u.Id) @(u.Online ? "is-online" : null)">@AdminFormat.Initials(u.Name)</span>
+                                        <b>@u.Name</b>
+                                    </button>
+                                </td>
+                                <td dir="ltr" style="text-align:right">@AdminFormat.Phone(u.PhoneMasked)</td>
+                                <td>@(u.City ?? "—")</td>
+                                <td>
+                                    <span class="ak-chips">
+                                        @foreach (var r in u.Roles)
+                                        {
+                                            <span class="ak-pill is-info">@r.Name</span>
+                                        }
+                                        @if (u.IsAdmin)
+                                        {
+                                            <span class="ak-pill is-warn">ادمین پنل</span>
+                                        }
+                                    </span>
+                                </td>
+                                <td>@AdminFormat.Ago(u.LastSeen, u.Online)</td>
+                                <td class="ak-num">@AdminFormat.Num(u.Messages7d)</td>
+                                <td><span class="ak-pill @StateTone(u.IsDisabled, u.Online, u.LastSeen)">@StateLabel(u.IsDisabled, u.Online, u.LastSeen)</span></td>
+                                <td class="ak-end">
+                                    <span class="ak-actions">
+                                        <button type="button" class="ak-icon" title="جزئیات، نام و نقش‌ها" aria-label="@($"جزئیات {u.Name}")" @onclick="@(() => OpenAsync(u.Id, edit: true))">
+                                            <MudIcon Icon="@Icons.Material.Outlined.Edit" Style="font-size:18px;" />
+                                        </button>
+                                        @if (!u.IsAdmin)
+                                        {
+                                            if (u.IsDisabled)
+                                            {
+                                                <button type="button" class="ak-icon is-success" title="فعال کردن دوباره" aria-label="@($"فعال کردن {u.Name}")" @onclick="@(() => Ask("enable", u.Id, u.Name))">
+                                                    <MudIcon Icon="@Icons.Material.Outlined.LockOpen" Style="font-size:18px;" />
+                                                </button>
+                                            }
+                                            else
+                                            {
+                                                <button type="button" class="ak-icon" title="خروج از همه‌ی دستگاه‌ها" aria-label="@($"خروج {u.Name} از همه‌ی دستگاه‌ها")" @onclick="@(() => Ask("sessions", u.Id, u.Name))">
+                                                    <MudIcon Icon="@Icons.Material.Outlined.Logout" Style="font-size:18px;" />
+                                                </button>
+                                                <button type="button" class="ak-icon is-danger" title="غیرفعال کردن حساب" aria-label="@($"غیرفعال کردن {u.Name}")" @onclick="@(() => Ask("disable", u.Id, u.Name))">
+                                                    <MudIcon Icon="@Icons.Material.Outlined.Block" Style="font-size:18px;" />
+                                                </button>
+                                            }
+                                        }
+                                    </span>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+                <div class="ak-pager">
+                    <span>@AdminFormat.Num(_page.Total) کاربر · صفحه‌ی @AdminFormat.Num(_page.Page) از @AdminFormat.Num(PageCount)</span>
+                    <span class="ak-toolbar">
+                        <button type="button" class="ak-btn" aria-label="صفحه‌ی قبل" disabled="@(_page.Page <= 1)" @onclick="@(() => GoAsync(_page.Page - 1))">‹ قبلی</button>
+                        <button type="button" class="ak-btn" aria-label="صفحه‌ی بعد" disabled="@(_page.Page >= PageCount)" @onclick="@(() => GoAsync(_page.Page + 1))">بعدی ›</button>
+                    </span>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        @* ------------------------------------------------ نقش‌ها *@
+        <div class="ak-card">
+            <div class="ak-toolbar" style="justify-content: space-between">
+                <b>نقش‌ها</b>
+                <span class="ak-toolbar">
+                    <input class="ak-input" aria-label="نام نقش تازه" placeholder="نام نقش تازه" @bind="_newRole" @bind:event="oninput" />
+                    <button type="button" class="ak-btn is-primary" disabled="@(string.IsNullOrWhiteSpace(_newRole) || _busy)" @onclick="CreateRoleAsync">+ نقش تازه</button>
+                </span>
+            </div>
+            @if (_roles.Count == 0)
+            {
+                <div class="ak-empty">هنوز نقشی ساخته نشده است.</div>
+            }
+            @foreach (var r in _roles)
+            {
+                <div class="ak-list-row">
+                    @if (_renamingId == r.Id)
+                    {
+                        <input class="ak-input" aria-label="نام تازه" @bind="_renameText" @bind:event="oninput" style="flex:1" />
+                        <span class="ak-toolbar">
+                            <button type="button" class="ak-btn is-primary" disabled="@_busy" @onclick="@(() => RenameRoleAsync(r.Id))">ذخیره</button>
+                            <button type="button" class="ak-btn" @onclick="@(() => _renamingId = null)">انصراف</button>
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="ak-stack">
+                            <b>@r.Name</b>
+                            <span class="ak-muted">@AdminFormat.Num(r.Members) نفر</span>
+                        </span>
+                        <span class="ak-toolbar">
+                            <button type="button" class="ak-btn is-link" @onclick="@(() => FilterByRoleAsync(r.Id))">دیدن اعضا</button>
+                            <button type="button" class="ak-btn is-link" @onclick="@(() => { _renamingId = r.Id; _renameText = r.Name; })">تغییر نام</button>
+                            <button type="button" class="ak-btn is-link" disabled="@(r.Members > 0 || _busy)" title="@(r.Members > 0 ? "نقشِ عضودار حذف نمی‌شود" : "حذف")" @onclick="@(() => DeleteRoleAsync(r.Id))">حذف</button>
+                        </span>
+                    }
+                </div>
+            }
+            <span class="ak-note">نقش‌ها برای دسترسی ربات‌ها («فقط برای نقش‌های…») و فیلتر کاربران به کار می‌آیند. تغییر نقش یک کاربر در ربات‌ها همان لحظه اثر دارد.</span>
+        </div>
+    }
+</div>
+
+@* ------------------------------------------------ کشوی جزئیات *@
+@if (_openId is not null)
+{
+    <div class="ak-overlay" @onclick="Close">
+        <section class="ak-drawer" aria-label="جزئیات کاربر" @onclick:stopPropagation="true">
+            @if (_detail is null)
+            {
+                <div class="ak-empty"><MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Small" /></div>
+            }
+            else
+            {
+                var d = _detail;
+                <div class="ak-drawer-head">
+                    <span class="ak-avatar is-big @AdminFormat.Tone(d.Id) @(d.Online ? "is-online" : null)">@AdminFormat.Initials(d.Name)</span>
+                    <span class="ak-stack" style="flex:1;min-width:0">
+                        <b style="font-size:17px">@d.Name</b>
+                        <span class="ak-muted">@(d.City ?? "شهر نامشخص")</span>
+                    </span>
+                    <MudIconButton Icon="@Icons.Material.Filled.Close" aria-label="بستن" OnClick="Close" />
+                </div>
+
+                <div class="ak-drawer-body">
+                    @if (_editingName)
+                    {
+                        <div class="ak-edit">
+                            <b style="font-size:14px">ویرایش نام</b>
+                            <label>نام<input class="ak-input" @bind="_nameFirst" @bind:event="oninput" /></label>
+                            <label>نام خانوادگی<input class="ak-input" @bind="_nameLast" @bind:event="oninput" /></label>
+                            <span class="ak-toolbar">
+                                <button type="button" class="ak-btn is-primary" disabled="@(_busy || string.IsNullOrWhiteSpace(_nameFirst))" @onclick="SaveNameAsync">ذخیره</button>
+                                <button type="button" class="ak-btn" @onclick="@(() => _editingName = false)">انصراف</button>
+                            </span>
+                        </div>
+                    }
+                    else
+                    {
+                        <button type="button" class="ak-btn is-link" style="align-self:flex-start" @onclick="StartEditName">
+                            <MudIcon Icon="@Icons.Material.Outlined.Edit" Style="font-size:16px;" /> ویرایش نام
+                        </button>
+                    }
+
+                    <span class="ak-chips">
+                        <span class="ak-pill @StateTone(d.IsDisabled, d.Online, d.LastSeen)">@StateLabel(d.IsDisabled, d.Online, d.LastSeen)</span>
+                        @if (d.IsAdmin) { <span class="ak-pill is-warn">ادمین پنل</span> }
+                        @if (d.IsDisabled && d.DisabledAt is not null) { <span class="ak-muted">از @AdminFormat.Date(d.DisabledAt)</span> }
+                    </span>
+
+                    <div class="ak-grid2">
+                        <span>
+                            <span class="ak-muted">موبایل</span>
+                            <span class="ak-toolbar" style="gap:4px">
+                                <b dir="ltr">@AdminFormat.Phone(_phone ?? d.PhoneMasked)</b>
+                                @if (_phone is null)
+                                {
+                                    <button type="button" class="ak-btn is-link" disabled="@_busy" @onclick="RevealAsync">نمایش</button>
+                                }
+                            </span>
+                        </span>
+                        <span><span class="ak-muted">آخرین بازدید</span><b>@AdminFormat.Ago(d.LastSeen, d.Online)</b></span>
+                        <span><span class="ak-muted">عضو از</span><b>@(d.CreatedAt is null ? "قبل از ثبت این اطلاعات" : AdminFormat.Date(d.CreatedAt))</b></span>
+                        <span><span class="ak-muted">پیام‌ها</span><b>@AdminFormat.Num(d.Messages7d) در ۷ روز · @AdminFormat.Num(d.MessagesTotal) در کل</b></span>
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(d.Post))
+                    {
+                        <span class="ak-section"><span class="ak-muted">بیو</span><span>@d.Post</span></span>
+                    }
+                    @if (_phone is not null)
+                    {
+                        <span class="ak-note">نمایش شماره در رویدادهای پنل ثبت شد.</span>
+                    }
+
+                    <div class="ak-section">
+                        <b>نقش‌ها</b>
+                        <span class="ak-chips">
+                            @foreach (var r in d.Roles)
+                            {
+                                <span class="ak-chip">@r.Name <button type="button" aria-label="@($"برداشتن نقش {r.Name}")" disabled="@_busy" @onclick="@(() => RemoveRoleAsync(r.Id))">×</button></span>
+                            }
+                            @if (d.Roles.Count == 0) { <span class="ak-muted">بدون نقش</span> }
+                            @{ var addable = _roles.Where(x => d.Roles.All(y => y.Id != x.Id)).ToList(); }
+                            @if (addable.Count > 0)
+                            {
+                                <select class="ak-select" aria-label="افزودن نقش" value="" disabled="@_busy" @onchange="AddRoleAsync">
+                                    <option value="">+ نقش</option>
+                                    @foreach (var r in addable)
+                                    {
+                                        <option value="@r.Id">@r.Name</option>
+                                    }
+                                </select>
+                            }
+                        </span>
+                    </div>
+
+                    <div class="ak-section">
+                        <b>عضویت‌ها</b>
+                        @if (d.Memberships.Count == 0) { <span class="ak-muted">عضو هیچ گروه، کانال یا رباتی نیست.</span> }
+                        @foreach (var m in d.Memberships)
+                        {
+                            <span class="ak-list-row">
+                                <span>@m.Name @if (m.IsArchived) { <span class="ak-pill">بایگانی</span> }</span>
+                                <span class="ak-muted">@KindLabel(m.Kind)@(m.IsAdmin ? " · ادمین" : "")</span>
+                            </span>
+                        }
+                    </div>
+
+                    <div class="ak-section">
+                        <b>رویدادهای این حساب</b>
+                        @if (d.Log.Count == 0) { <span class="ak-muted">هنوز کاری روی این حساب انجام نشده است.</span> }
+                        @foreach (var l in d.Log)
+                        {
+                            <span class="ak-list-row">
+                                <span class="ak-stack">
+                                    <span>@l.Text · @l.ActorName</span>
+                                    @if (!string.IsNullOrWhiteSpace(l.Details)) { <span class="ak-muted">@l.Details</span> }
+                                </span>
+                                <span class="ak-muted" style="white-space:nowrap">@AdminFormat.Ago(l.At)</span>
+                            </span>
+                        }
+                    </div>
+
+                    <span class="ak-note"><b>پیام‌ها:</b> از پنل متن گفتگوها دیده نمی‌شود؛ فقط تعداد.</span>
+                </div>
+
+                <div class="ak-drawer-foot">
+                    @if (d.IsAdmin)
+                    {
+                        <span class="ak-muted">حساب ادمین‌ها از پنل غیرفعال یا خارج نمی‌شود.</span>
+                    }
+                    else
+                    {
+                        if (d.IsDisabled)
+                        {
+                            <button type="button" class="ak-btn is-success is-big" disabled="@_busy" @onclick="@(() => Ask("enable", d.Id, d.Name))">فعال کردن دوباره</button>
+                        }
+                        else
+                        {
+                            <button type="button" class="ak-btn is-danger is-big" disabled="@_busy" @onclick="@(() => Ask("disable", d.Id, d.Name))">غیرفعال کردن حساب</button>
+                            <button type="button" class="ak-btn is-big" disabled="@_busy" @onclick="@(() => Ask("sessions", d.Id, d.Name))">خروج از همه‌ی دستگاه‌ها</button>
+                        }
+                    }
+                </div>
+            }
+        </section>
+    </div>
+}
+
+@* ------------------------------------------------ تأیید *@
+@if (_confirm is not null && _targetId is not null)
+{
+    <div class="ak-dialog-wrap">
+        <div class="ak-dialog" role="dialog" aria-modal="true" aria-label="تأیید">
+            <b>@ConfirmTitle</b>
+            <p>@ConfirmText</p>
+            <label class="ak-stack" style="gap:6px;font-size:13px;font-weight:600">
+                دلیل (در رویدادها ثبت می‌شود)
+                <textarea class="ak-input" rows="2" placeholder="مثلاً: پایان همکاری" @bind="_reason" @bind:event="oninput"></textarea>
+            </label>
+            <div class="ak-toolbar">
+                <button type="button" class="ak-btn is-big @(_confirm == "enable" ? "is-success" : _confirm == "disable" ? "is-danger" : "is-primary")" disabled="@_busy" @onclick="ConfirmAsync">@ConfirmButton</button>
+                <button type="button" class="ak-btn is-big" @onclick="@(() => { _confirm = null; _targetId = null; })">انصراف</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private const int PageSize = 25;
+
+    private string _tab = "users";
+    private AdminUsersPage? _page;
+    private List<AdminRoleInfo> _roles = new();
+    private bool _loading = true;
+    private bool _busy;
+    private bool _exporting;
+    private string _search = string.Empty;
+    private string _status = "all";
+    private string _city = string.Empty;
+    private Guid? _roleId;
+    private int _pageNo = 1;
+
+    private Guid? _openId;
+    private AdminUserDetail? _detail;
+    private string? _phone;
+    private string? _confirm;
+    private Guid? _targetId;
+    private string _targetName = string.Empty;
+    private string? _reason;
+    private bool _editingName;
+    private string _nameFirst = string.Empty;
+    private string _nameLast = string.Empty;
+
+    private string _newRole = string.Empty;
+    private Guid? _renamingId;
+    private string _renameText = string.Empty;
+
+    private CancellationTokenSource? _searchDelay;
+    private readonly CancellationTokenSource _cts = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _roles = await UsersService.RolesAsync(_cts.Token) ?? new List<AdminRoleInfo>();
+        await LoadAsync();
+    }
+
+    private int PageCount => _page is null ? 1 : Math.Max(1, (int)Math.Ceiling(_page.Total / (double)_page.PageSize));
+
+    private IEnumerable<(string Key, string Label, int? Count)> StatusTabs => new (string, string, int?)[]
+    {
+        ("all", "همه", _page?.AllCount),
+        ("active", "فعال", _page?.ActiveCount),
+        ("quiet", "کم‌فعال", _page?.QuietCount),
+        ("disabled", "غیرفعال", _page?.DisabledCount),
+    };
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _page = await UsersService.ListAsync(_pageNo, PageSize, _search, _status, _city, _roleId, _cts.Token);
+        _loading = false;
+    }
+
+    private async Task OnSearchInput(ChangeEventArgs e)
+    {
+        _search = e.Value?.ToString() ?? string.Empty;
+        _searchDelay?.Cancel();
+        var delay = _searchDelay = new CancellationTokenSource();
+        try
+        {
+            await Task.Delay(400, delay.Token);
+        }
+        catch (TaskCanceledException)
+        {
+            return;
+        }
+        _pageNo = 1;
+        await LoadAsync();
+    }
+
+    private async Task SetStatusAsync(string status)
+    {
+        _status = status;
+        _pageNo = 1;
+        await LoadAsync();
+    }
+
+    private async Task OnCityChanged(ChangeEventArgs e)
+    {
+        _city = e.Value?.ToString() ?? string.Empty;
+        _pageNo = 1;
+        await LoadAsync();
+    }
+
+    private async Task OnRoleChanged(ChangeEventArgs e)
+    {
+        _roleId = Guid.TryParse(e.Value?.ToString(), out var g) ? g : null;
+        _pageNo = 1;
+        await LoadAsync();
+    }
+
+    private async Task GoAsync(int page)
+    {
+        _pageNo = Math.Clamp(page, 1, PageCount);
+        await LoadAsync();
+    }
+
+    private async Task ExportAsync()
+    {
+        _exporting = true;
+        var file = await UsersService.ExportAsync(_search, _cts.Token);
+        _exporting = false;
+        if (file is not { } f)
+        {
+            Snackbar.Add("خروجی گرفته نشد.", Severity.Error);
+            return;
+        }
+        await JS.InvokeVoidAsync("triggerDownload", Convert.ToBase64String(f.Bytes), f.FileName, f.ContentType);
+    }
+
+    // ---------------- جزئیات
+
+    private async Task OpenAsync(Guid id, bool edit = false)
+    {
+        _openId = id;
+        _detail = null;
+        _phone = null;
+        _confirm = null;
+        _editingName = false;
+        StateHasChanged();
+        _detail = await UsersService.GetAsync(id, _cts.Token);
+        if (_detail is null)
+        {
+            Snackbar.Add("جزئیات کاربر از سرور نیامد.", Severity.Error);
+            _openId = null;
+            return;
+        }
+        if (edit) StartEditName();
+    }
+
+    private void StartEditName()
+    {
+        if (_detail is null) return;
+        _nameFirst = _detail.NameFirst;
+        _nameLast = _detail.NameLast;
+        _editingName = true;
+    }
+
+    private async Task SaveNameAsync()
+    {
+        if (_detail is null) return;
+        _busy = true;
+        var (ok, message) = await UsersService.RenameAsync(_detail.Id, _nameFirst, _nameLast, _cts.Token);
+        _busy = false;
+        if (!ok)
+        {
+            Snackbar.Add(message, Severity.Error);
+            return;
+        }
+        Snackbar.Add("نام ذخیره شد.", Severity.Success);
+        _editingName = false;
+        await RefreshAfterChangeAsync();
+    }
+
+    private void Close()
+    {
+        _openId = null;
+        _detail = null;
+        _phone = null;
+        _editingName = false;
+    }
+
+    private async Task RefreshAfterChangeAsync()
+    {
+        if (_openId is Guid id)
+            _detail = await UsersService.GetAsync(id, _cts.Token) ?? _detail;
+        await LoadAsync();
+    }
+
+    private async Task RevealAsync()
+    {
+        if (_detail is null) return;
+        _busy = true;
+        var (ok, phone, message) = await UsersService.RevealPhoneAsync(_detail.Id, _cts.Token);
+        _busy = false;
+        if (ok) _phone = phone;
+        else Snackbar.Add(message, Severity.Error);
+    }
+
+    private async Task SaveRolesAsync(List<Guid> roleIds)
+    {
+        if (_detail is null) return;
+        _busy = true;
+        var (ok, message) = await UsersService.SetRolesAsync(_detail.Id, roleIds, _cts.Token);
+        _busy = false;
+        if (!ok)
+        {
+            Snackbar.Add(message, Severity.Error);
+            return;
+        }
+        _roles = await UsersService.RolesAsync(_cts.Token) ?? _roles;
+        await RefreshAfterChangeAsync();
+    }
+
+    private Task RemoveRoleAsync(Guid roleId)
+        => _detail is null ? Task.CompletedTask : SaveRolesAsync(_detail.Roles.Where(r => r.Id != roleId).Select(r => r.Id).ToList());
+
+    private Task AddRoleAsync(ChangeEventArgs e)
+        => _detail is null || !Guid.TryParse(e.Value?.ToString(), out var roleId)
+            ? Task.CompletedTask
+            : SaveRolesAsync(_detail.Roles.Select(r => r.Id).Append(roleId).Distinct().ToList());
+
+    private void Ask(string action, Guid id, string name)
+    {
+        _confirm = action;
+        _targetId = id;
+        _targetName = name;
+        _reason = null;
+    }
+
+    private string ConfirmTitle => _confirm switch
+    {
+        "disable" => $"غیرفعال کردن حساب {_targetName}؟",
+        "enable" => $"فعال کردن دوباره‌ی حساب {_targetName}؟",
+        _ => $"خروج {_targetName} از همه‌ی دستگاه‌ها؟",
+    };
+
+    private string ConfirmText => _confirm switch
+    {
+        "disable" => "همین الان از همه‌ی دستگاه‌ها بیرون می‌افتد، دیگر نمی‌تواند وارد شود و از لیست مخاطبین بقیه پنهان می‌شود. پیام‌ها و گروه‌هایش پاک نمی‌شوند و با فعال کردن دوباره همه سر جایشان است.",
+        "enable" => "دوباره می‌تواند با کد ملی وارد شود و در لیست مخاطبین دیده می‌شود.",
+        _ => "همه‌ی نشست‌هایش همین الان بسته می‌شود و باید دوباره وارد شود. حسابش فعال می‌ماند؛ برای وقتی که گوشی کسی گم شده.",
+    };
+
+    private string ConfirmButton => _confirm switch
+    {
+        "disable" => "غیرفعال کن",
+        "enable" => "فعال کن",
+        _ => "خارج کن",
+    };
+
+    private async Task ConfirmAsync()
+    {
+        if (_targetId is not Guid targetId || _confirm is null) return;
+        _busy = true;
+        var (ok, message) = await UsersService.SetAccessAsync(targetId, _confirm, _reason, _cts.Token);
+        _busy = false;
+        if (!ok)
+        {
+            Snackbar.Add(message, Severity.Error);
+            return;
+        }
+        Snackbar.Add(_confirm switch
+        {
+            "disable" => "حساب غیرفعال شد و کاربر از برنامه بیرون افتاد.",
+            "enable" => "حساب دوباره فعال شد.",
+            _ => "از همه‌ی دستگاه‌ها خارج شد.",
+        }, Severity.Success);
+        _confirm = null;
+        _targetId = null;
+        await RefreshAfterChangeAsync();
+    }
+
+    // ---------------- نقش‌ها
+
+    private async Task ShowRolesAsync()
+    {
+        _tab = "roles";
+        _roles = await UsersService.RolesAsync(_cts.Token) ?? _roles;
+    }
+
+    private async Task FilterByRoleAsync(Guid roleId)
+    {
+        _tab = "users";
+        _roleId = roleId;
+        _pageNo = 1;
+        await LoadAsync();
+    }
+
+    private async Task CreateRoleAsync()
+    {
+        _busy = true;
+        var (ok, message) = await UsersService.CreateRoleAsync(_newRole, _cts.Token);
+        _busy = false;
+        if (!ok) { Snackbar.Add(message, Severity.Error); return; }
+        _newRole = string.Empty;
+        _roles = await UsersService.RolesAsync(_cts.Token) ?? _roles;
+    }
+
+    private async Task RenameRoleAsync(Guid id)
+    {
+        _busy = true;
+        var (ok, message) = await UsersService.RenameRoleAsync(id, _renameText, _cts.Token);
+        _busy = false;
+        if (!ok) { Snackbar.Add(message, Severity.Error); return; }
+        _renamingId = null;
+        _roles = await UsersService.RolesAsync(_cts.Token) ?? _roles;
+    }
+
+    private async Task DeleteRoleAsync(Guid id)
+    {
+        _busy = true;
+        var (ok, message) = await UsersService.DeleteRoleAsync(id, _cts.Token);
+        _busy = false;
+        if (!ok) { Snackbar.Add(message, Severity.Error); return; }
+        if (_roleId == id) _roleId = null;
+        _roles = await UsersService.RolesAsync(_cts.Token) ?? _roles;
+    }
+
+    // ---------------- نمایش
+
+    private static bool Quiet(bool online, DateTime? lastSeen)
+        => !online && (lastSeen is null || lastSeen < DateTime.Now.AddDays(-7));
+
+    private static string StateLabel(bool disabled, bool online, DateTime? lastSeen)
+        => disabled ? "غیرفعال" : Quiet(online, lastSeen) ? "کم‌فعال" : "فعال";
+
+    private static string StateTone(bool disabled, bool online, DateTime? lastSeen)
+        => disabled ? "is-bad" : Quiet(online, lastSeen) ? "is-warn" : "is-ok";
+
+    private static string KindLabel(string kind) => kind switch
+    {
+        "group" => "گروه",
+        "channel" => "کانال",
+        "bot" => "ربات · شروع‌کرده",
+        _ => kind,
+    };
+
+    public void Dispose()
+    {
+        _searchDelay?.Cancel();
+        _cts.Cancel();
+        _cts.Dispose();
+    }
+}

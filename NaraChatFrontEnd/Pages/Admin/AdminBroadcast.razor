@@ -1,0 +1,605 @@
+﻿@page "/admin/broadcast"
+@layout AdminLayout
+@inject IAdminBroadcastService BroadcastService
+@inject IAdminUsersService UsersService
+@inject ISnackbar Snackbar
+@implements IDisposable
+
+@* پیام همگانی: از طرف ربات «اطلاع‌رسانی ناراگرام» به گفتگوی هر نفر می‌رود، با اعلان.
+   یک‌طرفه است؛ گیرنده‌ها لحظه‌ی ارسال حساب می‌شوند (غیرفعال‌ها و ربات‌ها بیرون). *@
+
+<PageTitle>پیام همگانی · پنل مدیریت ناراگرام</PageTitle>
+
+<div class="ak-page" dir="rtl">
+    <div class="ak-head">
+        <div class="ak-stack">
+            <h1>پیام همگانی</h1>
+            <span class="ak-sub">از طرف ربات «@BotName» به گفتگوی هر نفر می‌رسد، با اعلان روی گوشی.</span>
+        </div>
+    </div>
+
+    <div class="bc-layout">
+        @* ================================================ نوشتن *@
+        <section class="ak-card bc-compose" aria-label="نوشتن پیام">
+            <div class="bc-step">
+                <span class="bc-step-no">۱</span>
+                <div class="bc-step-body">
+                    <b>پیام</b>
+                    <div class="bc-kinds" role="radiogroup" aria-label="نوع پیام">
+                        @foreach (var (key, label, hint) in Kinds)
+                        {
+                            <button type="button" role="radio" aria-checked="@(_kind == key)"
+                                    class="bc-kind is-@key @(_kind == key ? "is-on" : null)" @onclick="@(() => _kind = key)">
+                                <span class="bc-kind-dot"></span>
+                                <span class="ak-stack">
+                                    <b>@label</b>
+                                    <small>@hint</small>
+                                </span>
+                            </button>
+                        }
+                    </div>
+                    <label class="bc-field">
+                        عنوان <small>(فقط برای تاریخچه؛ گیرنده نمی‌بیند)</small>
+                        <input class="ak-input" maxlength="120" placeholder="مثلاً: تعطیلی پنج‌شنبه" @bind="_title" @bind:event="oninput" />
+                    </label>
+                    <label class="bc-field">
+                        متن پیام
+                        <textarea class="ak-input bc-text" rows="6" maxlength="4000" placeholder="همکاران گرامی، ..." @bind="_text" @bind:event="oninput"></textarea>
+                        <small class="bc-count @(_text.Length > 3600 ? "is-warn" : null)">@AdminFormat.Num(_text.Length) از ۴٬۰۰۰</small>
+                    </label>
+                    <label class="bc-switch">
+                        <input type="checkbox" checked="@_withButton" @onchange="@(e => _withButton = e.Value is true)" />
+                        <span class="bc-switch-track" aria-hidden="true"><span class="bc-switch-knob"></span></span>
+                        <span>دکمه‌ی لینک زیر پیام</span>
+                    </label>
+                    @if (_withButton)
+                    {
+                        <div class="bc-two">
+                            <label class="bc-field">متن دکمه<input class="ak-input" maxlength="40" placeholder="مثلاً: دیدن بخشنامه" @bind="_buttonText" @bind:event="oninput" /></label>
+                            <label class="bc-field">لینک<input class="ak-input" dir="ltr" placeholder="https://" @bind="_buttonUrl" @bind:event="oninput" /></label>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="bc-step">
+                <span class="bc-step-no">۲</span>
+                <div class="bc-step-body">
+                    <b>گیرنده‌ها</b>
+                    <div class="ak-seg" role="radiogroup" aria-label="گیرنده‌ها">
+                        @foreach (var (key, label) in Modes)
+                        {
+                            <button type="button" role="radio" aria-checked="@(_mode == key)" class="@(_mode == key ? "is-on" : null)" @onclick="@(() => SetModeAsync(key))">@label</button>
+                        }
+                    </div>
+
+                    @if (_mode == "roles")
+                    {
+                        <div class="bc-picks">
+                            @if (_roles.Count == 0) { <span class="ak-muted">هنوز نقشی ساخته نشده؛ از «کاربران › نقش‌ها» بسازید.</span> }
+                            @foreach (var r in _roles)
+                            {
+                                var on = _roleIds.Contains(r.Id);
+                                <button type="button" class="bc-pick @(on ? "is-on" : null)" aria-pressed="@on" @onclick="@(() => ToggleRoleAsync(r.Id))">
+                                    @if (on) { <MudIcon Icon="@Icons.Material.Filled.Check" Style="font-size:15px;" /> }
+                                    @r.Name <small>@AdminFormat.Num(r.Members)</small>
+                                </button>
+                            }
+                        </div>
+                    }
+                    else if (_mode == "cities")
+                    {
+                        <div class="bc-picks">
+                            @foreach (var c in _cities)
+                            {
+                                var on = _citySet.Contains(c);
+                                <button type="button" class="bc-pick @(on ? "is-on" : null)" aria-pressed="@on" @onclick="@(() => ToggleCityAsync(c))">
+                                    @if (on) { <MudIcon Icon="@Icons.Material.Filled.Check" Style="font-size:15px;" /> }
+                                    @c
+                                </button>
+                            }
+                        </div>
+                    }
+                    else if (_mode == "users")
+                    {
+                        <label class="ak-search">
+                            <MudIcon Icon="@Icons.Material.Filled.PersonSearch" Style="font-size:18px;" />
+                            <input aria-label="جستجوی کاربر" placeholder="نام یا شماره‌ی موبایل…" value="@_peopleSearch" @oninput="OnPeopleSearch" />
+                        </label>
+                        @if (_peopleResults.Count > 0)
+                        {
+                            <div class="bc-results">
+                                @foreach (var u in _peopleResults)
+                                {
+                                    <button type="button" class="bc-result" @onclick="@(() => AddPersonAsync(u))">
+                                        <span class="ak-avatar @AdminFormat.Tone(u.Id)">@AdminFormat.Initials(u.Name)</span>
+                                        <span>@u.Name</span>
+                                        <small class="ak-muted">@(u.City ?? "")</small>
+                                    </button>
+                                }
+                            </div>
+                        }
+                        <div class="ak-chips">
+                            @foreach (var p in _people)
+                            {
+                                <span class="ak-chip">@p.Name <button type="button" aria-label="@($"برداشتن {p.Name}")" @onclick="@(() => RemovePersonAsync(p.Id))">×</button></span>
+                            }
+                        </div>
+                    }
+
+                    <div class="bc-reach">
+                        <span class="bc-reach-num">@(_preview is null ? "…" : AdminFormat.Num(_preview.Count))</span>
+                        <span class="ak-stack">
+                            <b>نفر این پیام را می‌گیرند</b>
+                            <small class="ak-muted">@(_preview is null || _preview.Sample.Count == 0 ? "کاربرهای غیرفعال و ربات‌ها حساب نمی‌شوند." : string.Join("، ", _preview.Sample) + (_preview.Count > _preview.Sample.Count ? " و …" : ""))</small>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bc-step">
+                <span class="bc-step-no">۳</span>
+                <div class="bc-step-body">
+                    <b>زمان ارسال</b>
+                    <div class="ak-seg" role="radiogroup" aria-label="زمان ارسال">
+                        <button type="button" role="radio" aria-checked="@(!_scheduled)" class="@(!_scheduled ? "is-on" : null)" @onclick="@(() => _scheduled = false)">همین الان</button>
+                        <button type="button" role="radio" aria-checked="@_scheduled" class="@(_scheduled ? "is-on" : null)" @onclick="@(() => _scheduled = true)">زمان‌بندی</button>
+                    </div>
+                    @if (_scheduled)
+                    {
+                        <div class="bc-days" role="radiogroup" aria-label="روز">
+                            @foreach (var day in Days)
+                            {
+                                var d = day;
+                                <button type="button" role="radio" aria-checked="@(_day == d.Date)" class="bc-day @(_day == d.Date ? "is-on" : null)" @onclick="@(() => _day = d.Date)">
+                                    <small>@DayName(d)</small>
+                                    <b>@PersianDay(d)</b>
+                                </button>
+                            }
+                        </div>
+                        <div class="bc-time">
+                            <label class="ak-field">
+                                ساعت
+                                <select class="ak-select" value="@_hour" @onchange="@(e => _hour = int.TryParse(e.Value?.ToString(), out var hh) ? hh : _hour)">
+                                    @for (var h = 0; h < 24; h++)
+                                    {
+                                        <option value="@h">@h.ToString("00").ToPersianNumber()</option>
+                                    }
+                                </select>
+                            </label>
+                            <label class="ak-field">
+                                دقیقه
+                                <select class="ak-select" value="@_minute" @onchange="@(e => _minute = int.TryParse(e.Value?.ToString(), out var mm) ? mm : _minute)">
+                                    @foreach (var m in new[] { 0, 15, 30, 45 })
+                                    {
+                                        <option value="@m">@m.ToString("00").ToPersianNumber()</option>
+                                    }
+                                </select>
+                            </label>
+                            <span class="bc-when @(ScheduleError is null ? null : "is-bad")">@(ScheduleError ?? WhenText(ScheduledAt))</span>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="bc-actions">
+                <button type="button" class="ak-btn is-primary is-big bc-send" disabled="@(!CanSend)" @onclick="@(() => _confirming = true)">
+                    <MudIcon Icon="@(_scheduled ? Icons.Material.Filled.Schedule : Icons.Material.Filled.Send)" Style="font-size:18px;" />
+                    @SendLabel
+                </button>
+                @if (!string.IsNullOrEmpty(Problem))
+                {
+                    <span class="ak-muted">@Problem</span>
+                }
+            </div>
+        </section>
+
+        @* ================================================ پیش‌نمایش *@
+        <aside class="bc-preview" aria-label="پیش‌نمایش پیام">
+            <span class="bc-preview-label">پیش‌نمایش در ناراگرام</span>
+            <div class="bc-phone">
+                <div class="bc-phone-head">
+                    <span class="bc-bot-avatar"><MudIcon Icon="@Icons.Material.Outlined.Campaign" Style="font-size:20px;" /></span>
+                    <span class="ak-stack">
+                        <b>@BotName</b>
+                        <small>ربات · اطلاع‌رسانی</small>
+                    </span>
+                </div>
+                <div class="bc-phone-body">
+                    <div class="bc-bubble">
+                        <span class="bc-tag is-@_kind">
+                            @if (_kind == "urgent") { <MudIcon Icon="@Icons.Material.Filled.PriorityHigh" Style="font-size:14px;" /> }
+                            @KindTag
+                        </span>
+                        <div class="bc-bubble-text">@((MarkupString)(string.IsNullOrWhiteSpace(_text) ? "<span class='bc-placeholder'>متن پیام اینجا دیده می‌شود…</span>" : _text.ToSafeHtml()))</div>
+                        <small class="bc-bubble-time">@(_scheduled && ScheduleError is null ? AdminFormat.Clock(ScheduledAt) : AdminFormat.Clock(DateTime.Now))</small>
+                    </div>
+                    @if (_withButton && !string.IsNullOrWhiteSpace(_buttonText))
+                    {
+                        <span class="bc-link-btn">@_buttonText <MudIcon Icon="@Icons.Material.Filled.OpenInNew" Style="font-size:14px;" /></span>
+                    }
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    @* ================================================ تاریخچه *@
+    <section class="ak-card" aria-label="تاریخچه‌ی ارسال‌ها">
+        <div class="ak-toolbar" style="justify-content:space-between">
+            <b style="font-size:16px">ارسال‌ها</b>
+            @if (_history is not null)
+            {
+                <span class="ak-muted">@AdminFormat.Num(_history.Total) پیام</span>
+            }
+        </div>
+        @if (_history is null)
+        {
+            <div class="ak-empty"><MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Small" /></div>
+        }
+        else if (_history.Items.Count == 0)
+        {
+            <div class="ak-empty">هنوز پیامی فرستاده نشده. اولین اطلاعیه را بالا بنویسید.</div>
+        }
+        else
+        {
+            <div class="bc-history">
+                @foreach (var h in _history.Items)
+                {
+                    <article class="bc-item">
+                        <span class="bc-item-icon is-@h.Kind"><MudIcon Icon="@KindIcon(h.Kind)" Style="font-size:19px;" /></span>
+                        <div class="bc-item-main">
+                            <div class="bc-item-top">
+                                <b class="ak-ellipsis">@h.Title</b>
+                                <span class="ak-pill @StatusTone(h.Status)">@StatusLabel(h.Status)</span>
+                            </div>
+                            <span class="ak-muted ak-ellipsis">@FirstLine(h.Text)</span>
+                            <span class="bc-item-meta">
+                                <span><MudIcon Icon="@Icons.Material.Outlined.Groups" Style="font-size:15px;" /> @h.AudienceLabel</span>
+                                <span><MudIcon Icon="@Icons.Material.Outlined.Schedule" Style="font-size:15px;" /> @WhenText(h.ScheduledAt)</span>
+                                <span><MudIcon Icon="@Icons.Material.Outlined.Person" Style="font-size:15px;" /> @h.CreatedByName</span>
+                            </span>
+                            @if (h.Status is "sending" or "sent")
+                            {
+                                <div class="bc-meters">
+                                    <span class="bc-meter">
+                                        <span class="bc-meter-text"><span>رسید</span><b>@AdminFormat.Num(h.Delivered) از @AdminFormat.Num(h.Total)</b></span>
+                                        <span class="bc-meter-track"><span style="width:@Pct(h.Delivered, h.Total)"></span></span>
+                                    </span>
+                                    <span class="bc-meter is-seen">
+                                        <span class="bc-meter-text"><span>دیده شد</span><b>@AdminFormat.Num(h.Seen) · @PctFa(h.Seen, h.Delivered)</b></span>
+                                        <span class="bc-meter-track"><span style="width:@Pct(h.Seen, h.Delivered)"></span></span>
+                                    </span>
+                                </div>
+                            }
+                            @if (h.Status == "failed" && !string.IsNullOrWhiteSpace(h.Error))
+                            {
+                                <span class="ak-pill is-bad" style="white-space:normal">@h.Error</span>
+                            }
+                        </div>
+                        @if (h.Status == "scheduled")
+                        {
+                            <button type="button" class="ak-btn" disabled="@_busy" @onclick="@(() => CancelAsync(h))">لغو</button>
+                        }
+                    </article>
+                }
+            </div>
+            @if (_history.Total > _history.Items.Count)
+            {
+                <button type="button" class="ak-btn" style="align-self:center" @onclick="MoreAsync">نمایش بیشتر</button>
+            }
+        }
+    </section>
+</div>
+
+@if (_confirming)
+{
+    <div class="ak-dialog-wrap">
+        <div class="ak-dialog" role="dialog" aria-modal="true" aria-label="تأیید ارسال">
+            <b>@(_scheduled ? "زمان‌بندی پیام همگانی؟" : "ارسال پیام همگانی؟")</b>
+            <p>@ConfirmText</p>
+            <div class="ak-toolbar">
+                <button type="button" class="ak-btn is-primary is-big" disabled="@_busy" @onclick="SendAsync">@(_scheduled ? "زمان‌بندی کن" : "بفرست")</button>
+                <button type="button" class="ak-btn is-big" @onclick="@(() => _confirming = false)">انصراف</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private string _kind = "info";
+    private string _title = string.Empty;
+    private string _text = string.Empty;
+    private bool _withButton;
+    private string _buttonText = string.Empty;
+    private string _buttonUrl = string.Empty;
+
+    private string _mode = "all";
+    private List<AdminRoleInfo> _roles = new();
+    private readonly HashSet<Guid> _roleIds = new();
+    private List<string> _cities = new();
+    private readonly HashSet<string> _citySet = new();
+    private readonly List<AdminUserRow> _people = new();
+    private List<AdminUserRow> _peopleResults = new();
+    private string _peopleSearch = string.Empty;
+    private BroadcastAudiencePreview? _preview;
+
+    private bool _scheduled;
+    private DateTime _day = DateTime.Today;
+    private int _hour = Math.Min(23, DateTime.Now.Hour + 1);
+    private int _minute;
+
+    private BroadcastsPage? _history;
+    private int _historySize = 10;
+    private bool _busy;
+    private bool _confirming;
+
+    private CancellationTokenSource? _searchDelay;
+    private readonly CancellationTokenSource _cts = new();
+    private PeriodicTimer? _timer;
+
+    private static readonly (string Key, string Label, string Hint)[] Kinds =
+    {
+        ("info", "اطلاعیه", "خبر و بخشنامه"),
+        ("urgent", "فوری", "با برچسب قرمز"),
+        ("reminder", "یادآوری", "جلسه، مهلت، رویداد"),
+    };
+
+    private static readonly (string Key, string Label)[] Modes =
+    {
+        ("all", "همه"), ("roles", "نقش‌ها"), ("cities", "شهرها"), ("users", "افراد"),
+    };
+
+    private string BotName => string.IsNullOrWhiteSpace(_history?.BotName) ? "اطلاع‌رسانی ناراگرام" : _history!.BotName;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _roles = await UsersService.RolesAsync(_cts.Token) ?? new List<AdminRoleInfo>();
+        var firstPage = await UsersService.ListAsync(1, 10, null, null, null, null, _cts.Token);
+        _cities = firstPage?.Cities ?? new List<string>();
+        await Task.WhenAll(RefreshPreviewAsync(), LoadHistoryAsync());
+        _ = AutoRefreshAsync();
+    }
+
+    // ---------------- گیرنده‌ها
+
+    private BroadcastAudience Audience => new()
+    {
+        Mode = _mode,
+        RoleIds = _mode == "roles" ? _roleIds.ToList() : null,
+        Cities = _mode == "cities" ? _citySet.ToList() : null,
+        UserIds = _mode == "users" ? _people.Select(p => p.Id).ToList() : null,
+    };
+
+    private async Task RefreshPreviewAsync()
+    {
+        _preview = null;
+        _preview = await BroadcastService.PreviewAsync(Audience, _cts.Token);
+        StateHasChanged();
+    }
+
+    private Task SetModeAsync(string mode)
+    {
+        _mode = mode;
+        return RefreshPreviewAsync();
+    }
+
+    private Task ToggleRoleAsync(Guid id)
+    {
+        if (!_roleIds.Add(id)) _roleIds.Remove(id);
+        return RefreshPreviewAsync();
+    }
+
+    private Task ToggleCityAsync(string city)
+    {
+        if (!_citySet.Add(city)) _citySet.Remove(city);
+        return RefreshPreviewAsync();
+    }
+
+    private async Task OnPeopleSearch(ChangeEventArgs e)
+    {
+        _peopleSearch = e.Value?.ToString() ?? string.Empty;
+        _searchDelay?.Cancel();
+        var delay = _searchDelay = new CancellationTokenSource();
+        try
+        {
+            await Task.Delay(300, delay.Token);
+        }
+        catch (TaskCanceledException)
+        {
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(_peopleSearch))
+        {
+            _peopleResults = new();
+            return;
+        }
+        var page = await UsersService.ListAsync(1, 8, _peopleSearch, "all", null, null, _cts.Token);
+        _peopleResults = page?.Items.Where(u => !u.IsDisabled && _people.All(p => p.Id != u.Id)).ToList() ?? new();
+    }
+
+    private Task AddPersonAsync(AdminUserRow user)
+    {
+        if (_people.All(p => p.Id != user.Id)) _people.Add(user);
+        _peopleResults.RemoveAll(u => u.Id == user.Id);
+        _peopleSearch = string.Empty;
+        _peopleResults = new();
+        return RefreshPreviewAsync();
+    }
+
+    private Task RemovePersonAsync(Guid id)
+    {
+        _people.RemoveAll(p => p.Id == id);
+        return RefreshPreviewAsync();
+    }
+
+    // ---------------- زمان
+
+    private static readonly System.Globalization.PersianCalendar Pc = new();
+    private static readonly string[] WeekDays = { "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنج‌شنبه", "جمعه", "شنبه" };
+    private static readonly string[] Months = { "فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور", "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند" };
+
+    private static IEnumerable<DateTime> Days => Enumerable.Range(0, 14).Select(i => DateTime.Today.AddDays(i));
+
+    private static string DayName(DateTime d)
+        => d.Date == DateTime.Today ? "امروز" : d.Date == DateTime.Today.AddDays(1) ? "فردا" : WeekDays[(int)d.DayOfWeek];
+
+    private static string PersianDay(DateTime d)
+        => Pc.GetDayOfMonth(d).ToString().ToPersianNumber() + " " + Months[Pc.GetMonth(d) - 1];
+
+    private DateTime ScheduledAt => _day.Date.AddHours(_hour).AddMinutes(_minute);
+
+    private string? ScheduleError => _scheduled && ScheduledAt <= DateTime.Now.AddMinutes(1) ? "این زمان گذشته است؛ زمان دیگری انتخاب کنید." : null;
+
+    private static string WhenText(DateTime at)
+    {
+        var day = at.Date == DateTime.Today ? "امروز" : at.Date == DateTime.Today.AddDays(1) ? "فردا" : at.Date == DateTime.Today.AddDays(-1) ? "دیروز"
+            : WeekDays[(int)at.DayOfWeek] + " " + PersianDay(at);
+        return day + " ساعت " + AdminFormat.Clock(at);
+    }
+
+    // ---------------- ارسال
+
+    private string? Problem
+    {
+        get
+        {
+            if (_text.Trim().Length < 2) return "متن پیام را بنویسید.";
+            if (_withButton && (string.IsNullOrWhiteSpace(_buttonText) || !IsUrl(_buttonUrl))) return "برای دکمه، متن و لینکی که با https:// شروع شود لازم است.";
+            if (_preview is null) return null;
+            if (_preview.Count == 0) return "با این انتخاب، پیام به کسی نمی‌رسد.";
+            return ScheduleError;
+        }
+    }
+
+    private bool CanSend => !_busy && _preview is { Count: > 0 } && Problem is null;
+
+    private string SendLabel => _scheduled
+        ? $"زمان‌بندی برای {AdminFormat.Num(_preview?.Count ?? 0)} نفر"
+        : $"ارسال به {AdminFormat.Num(_preview?.Count ?? 0)} نفر";
+
+    private static bool IsUrl(string? url)
+        => Uri.TryCreate(url?.Trim(), UriKind.Absolute, out var u) && (u.Scheme == Uri.UriSchemeHttps || u.Scheme == Uri.UriSchemeHttp);
+
+    private async Task SendAsync()
+    {
+        _busy = true;
+        var (ok, _, message) = await BroadcastService.CreateAsync(new CreateBroadcastRequest
+        {
+            Title = _title,
+            Text = _text,
+            Kind = _kind,
+            ButtonText = _withButton ? _buttonText : null,
+            ButtonUrl = _withButton ? _buttonUrl?.Trim() : null,
+            Audience = Audience,
+            ScheduledAt = _scheduled ? ScheduledAt : null,
+        }, _cts.Token);
+        _busy = false;
+        _confirming = false;
+
+        if (!ok)
+        {
+            Snackbar.Add(message, Severity.Error);
+            return;
+        }
+
+        Snackbar.Add(_scheduled ? "پیام زمان‌بندی شد." : "ارسال شروع شد؛ پیشرفتش را پایین همین صفحه ببینید.", Severity.Success);
+        _title = string.Empty;
+        _text = string.Empty;
+        _withButton = false;
+        _buttonText = string.Empty;
+        _buttonUrl = string.Empty;
+        _scheduled = false;
+        await LoadHistoryAsync();
+    }
+
+    // ---------------- تاریخچه
+
+    private async Task LoadHistoryAsync()
+    {
+        var page = await BroadcastService.ListAsync(1, _historySize, _cts.Token);
+        if (page is not null) _history = page;
+        StateHasChanged();
+    }
+
+    private async Task MoreAsync()
+    {
+        _historySize += 10;
+        await LoadHistoryAsync();
+    }
+
+    private async Task AutoRefreshAsync()
+    {
+        // در حین ارسال یا وقتی پیامی در صف است، هر ۵ ثانیه پیشرفت تازه می‌شود.
+        _timer = new PeriodicTimer(TimeSpan.FromSeconds(5));
+        try
+        {
+            while (await _timer.WaitForNextTickAsync(_cts.Token))
+            {
+                if (_history?.Items.Any(h => h.Status is "sending" or "scheduled") == true)
+                    await InvokeAsync(LoadHistoryAsync);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private async Task CancelAsync(BroadcastRow row)
+    {
+        _busy = true;
+        var (ok, message) = await BroadcastService.CancelAsync(row.Id, _cts.Token);
+        _busy = false;
+        if (!ok) { Snackbar.Add(message, Severity.Error); return; }
+        Snackbar.Add("لغو شد.", Severity.Success);
+        await LoadHistoryAsync();
+    }
+
+    // ---------------- نمایش
+
+    private string ConfirmText
+        => $"این پیام {(_scheduled ? WhenText(ScheduledAt) : "همین الان")} برای {AdminFormat.Num(_preview?.Count ?? 0)} نفر ({_preview?.Label}) فرستاده می‌شود و برای همه اعلان می‌آید. "
+           + (_scheduled ? "تا قبل از زمانش می‌شود لغوش کرد؛ بعد از ارسال پس گرفته نمی‌شود." : "پیام فرستاده‌شده پس گرفته نمی‌شود.");
+
+    private string KindTag => _kind switch { "urgent" => "اطلاعیه‌ی فوری", "reminder" => "یادآوری", _ => "اطلاعیه‌ی سازمان" };
+
+    private static string KindIcon(string kind) => kind switch
+    {
+        "urgent" => Icons.Material.Outlined.NotificationImportant,
+        "reminder" => Icons.Material.Outlined.Alarm,
+        _ => Icons.Material.Outlined.Campaign,
+    };
+
+    private static string StatusLabel(string s) => s switch
+    {
+        "scheduled" => "زمان‌بندی‌شده",
+        "sending" => "در حال ارسال",
+        "sent" => "ارسال شد",
+        "cancelled" => "لغو شد",
+        _ => "ناموفق",
+    };
+
+    private static string StatusTone(string s) => s switch
+    {
+        "scheduled" => "is-info",
+        "sending" => "is-warn",
+        "sent" => "is-ok",
+        "cancelled" => "",
+        _ => "is-bad",
+    };
+
+    private static string FirstLine(string text) => (text ?? string.Empty).Split('\n')[0];
+
+    private static string Pct(int part, int total)
+        => (total <= 0 ? 0 : Math.Min(100, part * 100.0 / total)).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + "%";
+
+    private static string PctFa(int part, int total)
+        => (total <= 0 ? 0 : (int)Math.Round(part * 100.0 / total)).ToString().ToPersianNumber() + "٪";
+
+    public void Dispose()
+    {
+        _searchDelay?.Cancel();
+        _cts.Cancel();
+        _timer?.Dispose();
+        _cts.Dispose();
+    }
+}

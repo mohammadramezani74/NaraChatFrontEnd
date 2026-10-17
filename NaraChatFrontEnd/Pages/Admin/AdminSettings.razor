@@ -1,0 +1,432 @@
+﻿@page "/admin/settings"
+@layout AdminLayout
+@inject IAdminSettingsService SettingsService
+@inject IAdminUsersService UsersService
+@inject IAppInfoService AppInfo
+@inject ISnackbar Snackbar
+@implements IDisposable
+
+@* تنظیمات: اعلان بالای برنامه، اجازه‌ی ساخت گروه/کانال، و فهرست (فقط‌خواندنی) ادمین‌ها.
+   هر ذخیره در «رویدادهای پنل» ثبت می‌شود. *@
+
+<PageTitle>تنظیمات · پنل مدیریت ناراگرام</PageTitle>
+
+<div class="ak-page" dir="rtl">
+    <div class="ak-head">
+        <div class="ak-stack">
+            <h1>تنظیمات</h1>
+            <span class="ak-sub">چیزهایی که برای همه‌ی سازمان یک‌جا عوض می‌شود. هر تغییر در «گزارش‌ها › رویدادهای پنل» ثبت می‌شود.</span>
+        </div>
+    </div>
+
+    @if (_loading)
+    {
+        <div class="st-grid">
+            <div class="ak-card st-skeleton" style="height:420px"></div>
+            <div class="ak-card st-skeleton" style="height:260px"></div>
+        </div>
+    }
+    else if (_settings is null)
+    {
+        <div class="ak-card ak-empty">
+            <MudIcon Icon="@Icons.Material.Filled.CloudOff" />
+            <b>تنظیمات بارگذاری نشد</b>
+            <button type="button" class="ak-btn" @onclick="LoadAsync">دوباره</button>
+        </div>
+    }
+    else
+    {
+        <div class="st-grid">
+            <div class="st-main">
+                @* ================================================ اعلان *@
+                <section class="ak-card st-card" aria-labelledby="st-ann-title">
+                    <header class="st-card-head">
+                        <span class="st-card-icon is-blue"><MudIcon Icon="@Icons.Material.Filled.Campaign" /></span>
+                        <div class="ak-stack">
+                            <h2 id="st-ann-title">اعلان بالای برنامه</h2>
+                            <span class="ak-sub">نوار کوچکی بالای صفحه‌ی همه؛ هر کس می‌تواند ببندد. برای خبرهای کوتاه مثل قطعی سرور یا تعطیلی.</span>
+                        </div>
+                        <label class="st-switch" title="روشن/خاموش">
+                            <input type="checkbox" checked="@_ann.Enabled" @onchange="@(e => _ann.Enabled = e.Value is true)" />
+                            <span class="st-switch-track" aria-hidden="true"><span class="st-switch-knob"></span></span>
+                            <span class="st-switch-label">@(_ann.Enabled ? "روشن" : "خاموش")</span>
+                        </label>
+                    </header>
+
+                    <div class="st-body @(_ann.Enabled ? null : "is-off")">
+                        <div class="st-row">
+                            <span class="st-label">رنگ</span>
+                            <div class="st-tones" role="radiogroup" aria-label="رنگ اعلان">
+                                @foreach (var (key, label, icon) in Tones)
+                                {
+                                    <button type="button" role="radio" aria-checked="@(_ann.Tone == key)"
+                                            class="st-tone is-@key @(_ann.Tone == key ? "is-on" : null)" @onclick="@(() => _ann.Tone = key)">
+                                        <MudIcon Icon="@icon" Style="font-size:18px" />
+                                        @label
+                                    </button>
+                                }
+                            </div>
+                        </div>
+
+                        <label class="st-field">
+                            <span class="st-label">متن</span>
+                            <textarea class="ak-input st-text" rows="3" maxlength="300" placeholder="مثلاً: سرور پنج‌شنبه ساعت ۲۲ تا ۲۳ برای به‌روزرسانی در دسترس نیست." @bind="_ann.Text" @bind:event="oninput"></textarea>
+                            <small class="st-count @(TextLength > 260 ? "is-warn" : null)">@TextCounter</small>
+                        </label>
+
+                        <label class="st-switch is-small">
+                            <input type="checkbox" checked="@_withLink" @onchange="@(e => _withLink = e.Value is true)" />
+                            <span class="st-switch-track" aria-hidden="true"><span class="st-switch-knob"></span></span>
+                            <span>دکمه‌ی لینک کنار اعلان</span>
+                        </label>
+                        @if (_withLink)
+                        {
+                            <div class="st-two">
+                                <label class="st-field"><span class="st-label">متن دکمه</span><input class="ak-input" maxlength="30" placeholder="مثلاً: جزئیات" @bind="_linkText" @bind:event="oninput" /></label>
+                                <label class="st-field"><span class="st-label">لینک</span><input class="ak-input" dir="ltr" placeholder="https://" @bind="_linkUrl" @bind:event="oninput" /></label>
+                            </div>
+                        }
+
+                        <div class="st-row">
+                            <span class="st-label">تا کی</span>
+                            <div class="ak-seg" role="radiogroup" aria-label="مدت نمایش">
+                                @foreach (var (key, label) in Durations)
+                                {
+                                    <button type="button" role="radio" aria-checked="@(_duration == key)" class="@(_duration == key ? "is-on" : null)" @onclick="@(() => _duration = key)">@label</button>
+                                }
+                                @if (_keptUntil is not null)
+                                {
+                                    <button type="button" role="radio" aria-checked="@(_duration == "keep")" class="@(_duration == "keep" ? "is-on" : null)" @onclick="@(() => _duration = "keep")">@KeptUntilLabel</button>
+                                }
+                            </div>
+                        </div>
+
+                        <div class="st-preview">
+                            <span class="st-preview-label">پیش‌نمایش</span>
+                            <div class="st-mock">
+                                <div class="st-mock-bar">
+                                    <span class="st-mock-dot"></span><span class="st-mock-line"></span>
+                                </div>
+                                <div class="st-mock-body">
+                                    @if (string.IsNullOrWhiteSpace(_ann.Text))
+                                    {
+                                        <span class="ak-muted">متن اعلان را بنویسید تا اینجا ببینید.</span>
+                                    }
+                                    else
+                                    {
+                                        <AnnouncementBanner Value="PreviewValue" Preview="true" />
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <footer class="st-foot">
+                        <span class="ak-muted">@AnnUpdatedText</span>
+                        <button type="button" class="ak-btn is-primary" disabled="@(_savingAnn || !AnnDirty)" @onclick="SaveAnnouncementAsync">
+                            @(_savingAnn ? "در حال ذخیره…" : "ذخیره‌ی اعلان")
+                        </button>
+                    </footer>
+                </section>
+
+                @* ================================================ ساخت گروه و کانال *@
+                <section class="ak-card st-card" aria-labelledby="st-create-title">
+                    <header class="st-card-head">
+                        <span class="st-card-icon is-green"><MudIcon Icon="@Icons.Material.Filled.GroupAdd" /></span>
+                        <div class="ak-stack">
+                            <h2 id="st-create-title">چه کسی گروه و کانال بسازد</h2>
+                            <span class="ak-sub">ادمین‌های پنل همیشه می‌توانند. دکمه‌ی ساخت برای بقیه پنهان می‌شود.</span>
+                        </div>
+                    </header>
+
+                    @foreach (var kind in new[] { "group", "channel" })
+                    {
+                        var isGroup = kind == "group";
+                        var mode = isGroup ? _creation.Groups : _creation.Channels;
+                        var picked = isGroup ? _creation.GroupRoleIds : _creation.ChannelRoleIds;
+                        <div class="st-perm">
+                            <div class="st-perm-head">
+                                <span class="st-perm-icon @(isGroup ? "is-orange" : "is-blue")">
+                                    <MudIcon Icon="@(isGroup ? Icons.Material.Filled.Groups : Icons.Material.Filled.RssFeed)" Style="font-size:20px" />
+                                </span>
+                                <b>@(isGroup ? "ساخت گروه" : "ساخت کانال")</b>
+                                <div class="ak-seg" role="radiogroup" aria-label="@(isGroup ? "ساخت گروه" : "ساخت کانال")">
+                                    <button type="button" role="radio" aria-checked="@(mode == "all")" class="@(mode == "all" ? "is-on" : null)" @onclick="@(() => SetMode(kind, "all"))">همه</button>
+                                    <button type="button" role="radio" aria-checked="@(mode == "roles")" class="@(mode == "roles" ? "is-on" : null)" @onclick="@(() => SetMode(kind, "roles"))">فقط نقش‌های انتخابی</button>
+                                </div>
+                            </div>
+                            @if (mode == "roles")
+                            {
+                                <div class="st-picks">
+                                    @if (_roles.Count == 0)
+                                    {
+                                        <span class="ak-muted">هنوز نقشی ساخته نشده؛ از «کاربران › نقش‌ها» بسازید.</span>
+                                    }
+                                    @foreach (var r in _roles)
+                                    {
+                                        var on = picked.Contains(r.Id);
+                                        <button type="button" class="st-pick @(on ? "is-on" : null)" aria-pressed="@on" @onclick="@(() => ToggleRole(kind, r.Id))">
+                                            @if (on) { <MudIcon Icon="@Icons.Material.Filled.Check" Style="font-size:16px" /> }
+                                            @r.Name <small>@AdminFormat.Num(r.Members)</small>
+                                        </button>
+                                    }
+                                </div>
+                                <p class="st-reach">@ReachText(picked)</p>
+                            }
+                            else
+                            {
+                                <p class="st-reach">@(isGroup ? "هر کاربر فعال می‌تواند گروه بسازد." : "هر کاربری که دسترسی ساخت کانال دارد می‌تواند کانال بسازد.")</p>
+                            }
+                        </div>
+                    }
+
+                    <p class="ak-note st-note">ساخت کانال جدا از این تنظیم، هنوز به دسترسی‌های قبلیِ «ساخت کانال» در نقش‌ها نیاز دارد؛ این تنظیم فقط محدودتر می‌کند.</p>
+
+                    <footer class="st-foot">
+                        <span class="ak-muted">@CreationSummary</span>
+                        <button type="button" class="ak-btn is-primary" disabled="@(_savingCreation || !CreationDirty)" @onclick="SaveCreationAsync">
+                            @(_savingCreation ? "در حال ذخیره…" : "ذخیره")
+                        </button>
+                    </footer>
+                </section>
+            </div>
+
+            @* ================================================ ادمین‌ها *@
+            <aside class="st-side">
+                <section class="ak-card st-card" aria-labelledby="st-admins-title">
+                    <header class="st-card-head">
+                        <span class="st-card-icon is-yellow"><MudIcon Icon="@Icons.Material.Filled.AdminPanelSettings" /></span>
+                        <div class="ak-stack">
+                            <h2 id="st-admins-title">ادمین‌های پنل</h2>
+                            <span class="ak-sub">@AdminsCountText</span>
+                        </div>
+                    </header>
+                    <div class="st-admins">
+                        @foreach (var name in _settings.AdminNames)
+                        {
+                            <div class="st-admin">
+                                <span class="ak-avatar @AvatarTone(name)">@AdminFormat.Initials(name)</span>
+                                <b>@name</b>
+                                <span class="ak-pill is-info">ادمین</span>
+                            </div>
+                        }
+                        @if (_settings.AdminNames.Count == 0)
+                        {
+                            <span class="ak-muted">کسی پیدا نشد.</span>
+                        }
+                    </div>
+                    <p class="ak-note st-lock">
+                        <MudIcon Icon="@Icons.Material.Filled.Lock" Style="font-size:16px" />
+                        <span>فهرست ادمین‌ها برای امنیت فقط از تنظیمات سرور (<code dir="ltr">Admin:UserIds</code>) عوض می‌شود، نه از اینجا.</span>
+                    </p>
+                </section>
+
+                <section class="ak-card st-card st-tip">
+                    <MudIcon Icon="@Icons.Material.Filled.Lightbulb" />
+                    <p>اعلان برای خبر کوتاه است و روی گوشی اعلان نمی‌فرستد. برای پیامی که حتماً دیده شود از <a href="/admin/broadcast">پیام همگانی</a> استفاده کنید.</p>
+                </section>
+            </aside>
+        </div>
+    }
+</div>
+
+@code {
+    private static readonly (string Key, string Label, string Icon)[] Tones =
+    {
+        ("info", "اطلاع", Icons.Material.Filled.Campaign),
+        ("warn", "هشدار", Icons.Material.Filled.WarningAmber),
+        ("success", "خبر خوب", Icons.Material.Filled.CheckCircle),
+    };
+
+    private static readonly (string Key, string Label)[] Durations =
+    {
+        ("none", "تا خاموشش کنم"),
+        ("1", "۲۴ ساعت"),
+        ("3", "۳ روز"),
+        ("7", "یک هفته"),
+    };
+
+    private static readonly string[] AvatarTones = { "is-blue", "is-orange", "is-green", "is-yellow" };
+
+    private readonly CancellationTokenSource _cts = new();
+    private bool _loading = true;
+    private AdminSettingsDto? _settings;
+    private List<AdminRoleInfo> _roles = new();
+
+    // فرم اعلان
+    private AnnouncementSetting _ann = new();
+    private bool _withLink;
+    private string _linkText = string.Empty;
+    private string _linkUrl = string.Empty;
+    private string _duration = "none";
+    private DateTime? _keptUntil;
+    private string _savedAnnKey = string.Empty;
+    private bool _savingAnn;
+
+    // فرم ساخت
+    private CreationSetting _creation = new();
+    private string _savedCreationKey = string.Empty;
+    private bool _savingCreation;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        var settingsTask = SettingsService.GetAsync(_cts.Token);
+        var rolesTask = UsersService.RolesAsync(_cts.Token);
+        await Task.WhenAll(settingsTask, rolesTask);
+        _settings = settingsTask.Result;
+        _roles = rolesTask.Result ?? new List<AdminRoleInfo>();
+        if (_settings is not null)
+        {
+            ResetAnnouncement(_settings.Announcement);
+            _creation = _settings.Creation.Clone();
+            _savedCreationKey = CreationKey;
+        }
+        _loading = false;
+    }
+
+    private void ResetAnnouncement(AnnouncementSetting a)
+    {
+        _ann = a.Clone();
+        _withLink = !string.IsNullOrWhiteSpace(a.LinkUrl);
+        _linkText = a.LinkText ?? string.Empty;
+        _linkUrl = a.LinkUrl ?? string.Empty;
+        _keptUntil = a.Until is DateTime u && u > DateTime.Now ? u : null;
+        _duration = _keptUntil is null ? "none" : "keep";
+        _savedAnnKey = AnnKey;
+    }
+
+    // ---------------- اعلان
+
+    private int TextLength => _ann.Text?.Length ?? 0;
+    private string TextCounter => AdminFormat.Num(TextLength) + " از ۳۰۰";
+
+    private DateTime? Until => _duration switch
+    {
+        "1" => DateTime.Now.AddDays(1),
+        "3" => DateTime.Now.AddDays(3),
+        "7" => DateTime.Now.AddDays(7),
+        "keep" => _keptUntil,
+        _ => null,
+    };
+
+    private string KeptUntilLabel => "تا " + AdminFormat.DateTimeText(_keptUntil);
+
+    private AnnouncementSetting Built => new()
+    {
+        Enabled = _ann.Enabled,
+        Text = (_ann.Text ?? string.Empty).Trim(),
+        Tone = _ann.Tone,
+        LinkText = _withLink && !string.IsNullOrWhiteSpace(_linkText) ? _linkText.Trim() : null,
+        LinkUrl = _withLink && !string.IsNullOrWhiteSpace(_linkUrl) ? _linkUrl.Trim() : null,
+        Until = Until,
+    };
+
+    private AnnouncementSetting PreviewValue
+    {
+        get
+        {
+            var b = Built;
+            b.UpdatedAt = DateTime.Now;
+            return b;
+        }
+    }
+
+    private string AnnKey => string.Join("|", _ann.Enabled, (_ann.Text ?? string.Empty).Trim(), _ann.Tone, _withLink, _linkText.Trim(), _linkUrl.Trim(), _duration);
+    private bool AnnDirty => AnnKey != _savedAnnKey;
+
+    private string AnnUpdatedText
+    {
+        get
+        {
+            if (_settings?.AnnouncementUpdatedAt is not DateTime at)
+                return "هنوز اعلانی ثبت نشده.";
+            var by = string.IsNullOrWhiteSpace(_settings.AnnouncementUpdatedBy) ? string.Empty : " · " + _settings.AnnouncementUpdatedBy;
+            return "آخرین تغییر " + AdminFormat.Ago(at) + by;
+        }
+    }
+
+    private async Task SaveAnnouncementAsync()
+    {
+        var value = Built;
+        if (value.Enabled && value.Text.Length < 2)
+        {
+            Snackbar.Add("متن اعلان را بنویسید.", Severity.Warning);
+            return;
+        }
+        if (_withLink && (value.LinkText is null || value.LinkUrl is null || !value.LinkUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))
+        {
+            Snackbar.Add("برای دکمه، متن و لینکی که با https:// شروع شود لازم است.", Severity.Warning);
+            return;
+        }
+
+        _savingAnn = true;
+        var (ok, message) = await SettingsService.SaveAnnouncementAsync(value, _cts.Token);
+        _savingAnn = false;
+        if (!ok)
+        {
+            Snackbar.Add(message, Severity.Error);
+            return;
+        }
+        Snackbar.Add(value.Enabled ? "اعلان برای همه روشن شد." : "اعلان خاموش شد.", Severity.Success);
+        await AppInfo.GetAsync(force: true, _cts.Token);
+        await LoadAsync();
+    }
+
+    // ---------------- ساخت گروه و کانال
+
+    private void SetMode(string kind, string mode)
+    {
+        if (kind == "group") _creation.Groups = mode;
+        else _creation.Channels = mode;
+    }
+
+    private void ToggleRole(string kind, Guid roleId)
+    {
+        var list = kind == "group" ? _creation.GroupRoleIds : _creation.ChannelRoleIds;
+        if (!list.Remove(roleId))
+            list.Add(roleId);
+    }
+
+    private string ReachText(List<Guid> picked)
+    {
+        if (picked.Count == 0)
+            return "هیچ نقشی انتخاب نشده؛ فقط ادمین‌های پنل می‌توانند بسازند.";
+        var members = _roles.Where(r => picked.Contains(r.Id)).Sum(r => r.Members);
+        return "حدود " + AdminFormat.Num(members) + " نفر (عضو نقش‌های انتخابی) به‌علاوه‌ی ادمین‌ها.";
+    }
+
+    private string CreationKey => string.Join("|", _creation.Groups, string.Join(",", _creation.GroupRoleIds.OrderBy(x => x)),
+        _creation.Channels, string.Join(",", _creation.ChannelRoleIds.OrderBy(x => x)));
+    private bool CreationDirty => CreationKey != _savedCreationKey;
+
+    private string CreationSummary => CreationDirty ? "تغییرات ذخیره نشده" : "ذخیره شده";
+
+    private async Task SaveCreationAsync()
+    {
+        _savingCreation = true;
+        var (ok, message) = await SettingsService.SaveCreationAsync(_creation, _cts.Token);
+        _savingCreation = false;
+        if (!ok)
+        {
+            Snackbar.Add(message, Severity.Error);
+            return;
+        }
+        _savedCreationKey = CreationKey;
+        Snackbar.Add("اجازه‌ی ساخت ذخیره شد.", Severity.Success);
+    }
+
+    // ---------------- ادمین‌ها
+
+    private string AdminsCountText => AdminFormat.Num(_settings?.AdminNames.Count ?? 0) + " نفر به همه‌ی پنل دسترسی دارند.";
+
+    private static string AvatarTone(string name) => AvatarTones[(name.Length + (name.Length > 0 ? name[0] : 0)) % AvatarTones.Length];
+
+    public void Dispose()
+    {
+        _cts.Cancel();
+        _cts.Dispose();
+    }
+}

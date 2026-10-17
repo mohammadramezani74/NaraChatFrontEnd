@@ -1,0 +1,122 @@
+﻿/* گزارش‌ها. کیت مشترک ak-* از AdminLayout می‌آید. */
+
+.rp-tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 14px;
+}
+
+.rp-tile {
+    gap: 6px;
+}
+
+    .rp-tile b {
+        font-size: 26px;
+        font-weight: 800;
+    }
+
+    .rp-tile small {
+        font-size: 12px;
+    }
+
+.rp-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: stretch;
+}
+
+.rp-wide {
+    flex: 999 1 520px;
+}
+
+.rp-narrow {
+    flex: 1 1 280px;
+}
+
+.rp-card-head {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+    .rp-card-head b {
+        font-size: 15px;
+    }
+
+.rp-chart {
+    width: 100%;
+    min-height: 290px;
+}
+
+/* ساعت‌های شبانه‌روز: ۲۴ ستون */
+.rp-hours {
+    height: 190px;
+    display: flex;
+    align-items: stretch;
+    gap: 4px;
+    direction: ltr;
+}
+
+.rp-hour {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+}
+
+    .rp-hour small {
+        font-size: 10px;
+        height: 14px;
+        color: var(--mud-palette-text-secondary);
+    }
+
+.rp-hour-bar {
+    width: 100%;
+    max-width: 22px;
+    border-radius: 5px 5px 2px 2px;
+    background: var(--mud-palette-primary);
+    opacity: .55;
+    transition: opacity .15s ease;
+}
+
+.rp-hour:hover .rp-hour-bar,
+.rp-hour.is-peak .rp-hour-bar {
+    opacity: 1;
+}
+
+/* میله‌های افقی (روز هفته، شهر) */
+.rp-bar-row {
+    display: grid;
+    grid-template-columns: 76px minmax(0, 1fr) 56px;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    min-height: 30px;
+}
+
+.rp-bar-label {
+    color: var(--mud-palette-text-secondary);
+}
+
+.rp-bar-track {
+    height: 10px;
+    border-radius: 999px;
+    background: var(--mud-palette-background);
+    display: flex;
+    overflow: hidden;
+}
+
+    .rp-bar-track span {
+        height: 100%;
+        border-radius: 999px;
+        background: var(--mud-palette-primary);
+    }
+
+.rp-bar-value {
+    text-align: left;
+    font-weight: 600;
+}

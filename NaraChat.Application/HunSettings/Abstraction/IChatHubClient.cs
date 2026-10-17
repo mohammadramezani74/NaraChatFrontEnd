@@ -44,6 +44,8 @@ namespace NaraChat.Application.HunSettings.Abstraction
 
         /// <summary>کیبورد ربات برای این کاربر عوض شد.</summary>
         Task BotStateChanged(NaraChat.Contract.Models.Bots.BotStateDto state);
+        /// <summary>حساب غیرفعال شد یا از همه‌ی دستگاه‌ها خارج شد.</summary>
+        Task ForceLogout(string message);
 
     }
 }

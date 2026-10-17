@@ -25,6 +25,7 @@
 @inject IChannelService channelservice
 @inject ISnackbar snackbar
 @inject NaraChat.Application.Services.Bots.IBotService BotService
+@inject NaraChat.Application.Services.Admin.IAppInfoService AppInfo
 @implements IDisposable
 
 
@@ -97,8 +98,14 @@
                 <MudMenu Disabled="@(CurrentUser==null)" Icon="@Icons.Material.Filled.MoreVert" 
                 AriaLabel="Open user menu"> 
                     @* <MudIconButton @onclick="RouteToDownload"  title="اپ اندروید ناراگرام"  Icon="@Icons.Material.Filled.Android" Color=" Color.Tertiary" />  *@
-                     <MudIconButton @onclick="CreateChannel"  title="ایجاد کانال"  Icon="@Icons.Material.Filled.AddComment" Color=" Color.Info" />  
-                    <MudIconButton @onclick="CreateGroup"  title="ایجاد گروه"  Icon="@Icons.Material.Filled.Group" Color=" Color.Secondary" /> 
+                    @if (_appInfo.CanCreateChannel)
+                    {
+                        <MudIconButton @onclick="CreateChannel"  title="ایجاد کانال"  Icon="@Icons.Material.Filled.AddComment" Color=" Color.Info" />
+                    }
+                    @if (_appInfo.CanCreateGroup)
+                    {
+                        <MudIconButton @onclick="CreateGroup"  title="ایجاد گروه"  Icon="@Icons.Material.Filled.Group" Color=" Color.Secondary" />
+                    }
 
 
 
@@ -110,6 +117,7 @@
 
 
             <MudMainContent>
+                <AnnouncementBanner Value="_appInfo.Announcement" />
                 @Body
             </MudMainContent>
 
@@ -205,12 +213,10 @@ private async Task ShowAbout()
 
             myAvatar = cachedAvatar;
         }
+        // the stored value is the theme to show; it used to be flipped on every start (DarkModel toggles)
         string? darkMode = await localStorage.GetItemAsync(nameof(IsDarkMode));
-        if (darkMode != null)
-        {
-            IsDarkMode = darkMode == "True" ? true : false;
-            DarkModel();
-        }
+        IsDarkMode = darkMode == "True";
+        ApplyTheme();
 
     }
 
@@ -373,7 +379,7 @@ ThemeChanging.backGroundChatStyle =
                    snackbar.Clear();
                 snackbar.Configuration.PositionClass = Defaults.Classes.Position.BottomRight;
 
-                snackbar.Add("ساخت گروه با خطا مواجه شد", Severity.Error);
+                snackbar.Add(string.IsNullOrWhiteSpace(response.Message) ? "ساخت گروه با خطا مواجه شد" : response.Message, Severity.Error);
             }
         }
     }
@@ -477,11 +483,35 @@ PaletteLight = new PaletteLight
         public void Dispose()
         {
             stateprovider.AuthenticationStateChanged -= OnAuthStateChanged;
+            _appInfoTimer?.Dispose();
         }
+
+        // اعلان بالای برنامه و اجازه‌ی ساخت گروه/کانال (از تنظیمات پنل ادمین).
+        private NaraChat.Contract.Models.Admin.AppInfoDto _appInfo = new();
+        private System.Threading.Timer? _appInfoTimer;
 
         private async Task RefreshBotAdminAsync(AuthenticationState state)
         {
-            _isBotAdmin = state.User.Identity?.IsAuthenticated == true && await BotService.IsAdminAsync();
+            var signedIn = state.User.Identity?.IsAuthenticated == true;
+            _isBotAdmin = signedIn && await BotService.IsAdminAsync();
+            _appInfo = signedIn ? await AppInfo.GetAsync(force: true) : new();
+
+            // اعلان تازه بدون رفرش صفحه هم دیده شود (هر ۳ دقیقه).
+            _appInfoTimer ??= new System.Threading.Timer(async _ =>
+            {
+                try
+                {
+                    var st = await stateprovider.GetAuthenticationStateAsync();
+                    if (st.User.Identity?.IsAuthenticated != true)
+                        return;
+                    _appInfo = await AppInfo.GetAsync(force: true);
+                    await InvokeAsync(StateHasChanged);
+                }
+                catch (Exception)
+                {
+                    // اعلان مهم نیست که برنامه را بهم بزند.
+                }
+            }, null, TimeSpan.FromMinutes(3), TimeSpan.FromMinutes(3));
         }
 
         private async void OnAuthStateChanged(Task<AuthenticationState> task)
