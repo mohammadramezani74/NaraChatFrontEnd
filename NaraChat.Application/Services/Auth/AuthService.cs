@@ -121,25 +121,87 @@ namespace NaraChat.Application.Services.Auth
             }
         }
 
+        // فقط یک تازه‌سازی در هر لحظه. وقتی توکن منقضی می‌شود چند درخواست هم‌زمان 401 می‌گیرند؛
+        // قبلاً هر کدام جدا refresh می‌کرد، اولی موفق می‌شد و refresh token را عوض می‌کرد، بقیه با
+        // توکن قدیمی رد می‌شدند و ClearTokenAsync توکن تازه‌ی اولی را هم پاک می‌کرد → خروج.
+        private static readonly SemaphoreSlim RefreshGate = new(1, 1);
+
         public async Task<string?> RefreshTokenAsync(string refreshToken)
         {
-            var respose = await httpClient.PostAsJsonAsync("/api/v1/account/RefreshToken", new { RefreshToken = refreshToken });
-            if (respose.IsSuccessStatusCode)
+            await RefreshGate.WaitAsync();
+            try
             {
-                var result = await respose.Content.ReadFromJsonAsync<BaseResponseDto<TokenDto>>();
-                if (result != null)
-                {
-                    await _tokenService.SetTokenAsync(result.result.token, result.result.refreshtoken);
-                    ((CustomAuthenticationStateProvider)_stateprovider).UpdateAuthenticationState();
-                    return result.result.token;
-                }
-            }
-            else
-            {
-                await _tokenService.ClearTokenAsync();
+                // درخواست دیگری همین الان تازه‌اش کرده؟ همان توکن تازه را بده.
+                var current = await _tokenService.GetReffreshTokenAsync();
+                if (string.IsNullOrEmpty(current))
+                    return null;
+                if (current != refreshToken)
+                    return await _tokenService.GetAccessTokenAsync();
 
+                HttpResponseMessage response;
+                try
+                {
+                    response = await httpClient.PostAsJsonAsync("/api/v1/account/RefreshToken", new { RefreshToken = refreshToken });
+                }
+                catch (Exception)
+                {
+                    // قطعی شبکه یا سرور در حال ری‌استارت: توکن‌ها می‌مانند، دفعه‌ی بعد دوباره امتحان می‌شود.
+                    return null;
+                }
+
+                if (response.IsSuccessStatusCode)
+                {
+                    BaseResponseDto<TokenDto>? result = null;
+                    try { result = await response.Content.ReadFromJsonAsync<BaseResponseDto<TokenDto>>(); } catch (Exception) { }
+                    if (result?.isSucceded == true && !string.IsNullOrEmpty(result.result?.token))
+                    {
+                        await _tokenService.SetTokenAsync(result.result.token, result.result.refreshtoken);
+                        ((CustomAuthenticationStateProvider)_stateprovider).UpdateAuthenticationState();
+                        return result.result.token;
+                    }
+                }
+
+                // فقط وقتی سرور صریحاً گفت refresh token معتبر نیست، کاربر بیرون می‌رود؛ نه با خطای 5xx.
+                if (response.IsSuccessStatusCode
+                    || response.StatusCode == System.Net.HttpStatusCode.Unauthorized
+                    || response.StatusCode == System.Net.HttpStatusCode.BadRequest)
+                {
+                    await _tokenService.ClearTokenAsync();
+                    ((CustomAuthenticationStateProvider)_stateprovider).UpdateAuthenticationState();
+                }
+                return null;
             }
-            return null;
+            finally
+            {
+                RefreshGate.Release();
+            }
+        }
+
+        /// <summary>
+        /// توکن دسترسیِ معتبر برای اتصال‌هایی که خودشان 401 را مدیریت نمی‌کنند (هاب SignalR):
+        /// اگر کمتر از یک دقیقه به انقضا مانده، اول تازه می‌شود.
+        /// </summary>
+        public async Task<string?> GetFreshAccessTokenAsync()
+        {
+            var token = await _tokenService.GetAccessTokenAsync();
+            if (string.IsNullOrEmpty(token))
+                return token;
+
+            try
+            {
+                var jwt = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler().ReadJwtToken(token);
+                if (jwt.ValidTo > DateTime.UtcNow.AddMinutes(1))
+                    return token;
+            }
+            catch (Exception)
+            {
+                return token;
+            }
+
+            var refreshToken = await _tokenService.GetReffreshTokenAsync();
+            if (string.IsNullOrEmpty(refreshToken))
+                return token;
+            return await RefreshTokenAsync(refreshToken) ?? await _tokenService.GetAccessTokenAsync();
         }
 
         public async Task<bool> RegisterAsync(RegisterUserDto command, CancellationToken cancellationToken = default)

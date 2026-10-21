@@ -39,7 +39,10 @@ namespace NaraChat.Application.Services
                         return await base.SendAsync(request, cancellationToken);
                     }
                 }
-                nm.NavigateTo("/", true);
+                // فقط وقتی واقعاً از حساب بیرون رفته (توکن‌ها پاک شده) به صفحه‌ی ورود برو؛
+                // اگر تازه‌سازی به‌خاطر قطعی شبکه نشد، کاربر نباید بیرون بیفتد.
+                if (string.IsNullOrEmpty(await _tokenService.GetAccessTokenAsync()))
+                    nm.NavigateTo("/", true);
             }
             return response;
         }

@@ -519,11 +519,11 @@
     }
     private async Task<HubConnection> ConfigureHubConnection()
     {
-        var token = await ((CustomAuthenticationStateProvider)stateprovider).GetTokenAsync();
-
         var hubConnection = new HubConnectionBuilder()
        .WithUrl(nm.ToAbsoluteUri(SiteSettings.HubConnectuinUrl), Options => {
-           Options.AccessTokenProvider = () => Task.FromResult(token);
+           // هر اتصال و اتصال دوباره توکن تازه می‌خواند؛ قبلاً توکنِ لحظه‌ی ساخت ثابت می‌ماند و
+           // بعد از انقضایش اتصال دوباره‌ی هاب با 401 رد می‌شد.
+           Options.AccessTokenProvider = () => ForceAuth.GetFreshAccessTokenAsync();
        })
        .WithAutomaticReconnect()
        .Build();

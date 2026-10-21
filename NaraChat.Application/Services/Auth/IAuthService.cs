@@ -16,5 +16,6 @@ namespace NaraChat.Application.Services.Auth
         Task<bool> LoginWithGoogleAsync(string tokenId, CancellationToken cancellationToken = default);
         Task<bool> LogoutAsync( CancellationToken cancellationToken = default);
         Task<string?> RefreshTokenAsync(string refreshToken);
+        Task<string?> GetFreshAccessTokenAsync();
     }
 }
