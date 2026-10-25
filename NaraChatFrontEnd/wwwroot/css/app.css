@@ -234,3 +234,13 @@ html.nara-dark .btn-primary:hover, html.nara-dark .btn-primary:active {
 html.nara-dark .btn:focus, html.nara-dark .btn:active:focus {
     box-shadow: 0 0 0 0.25rem rgba(179, 157, 255, .45);
 }
+
+/* تم تیره: کلاس‌های روشن بوت‌استرپ (bg-light پشت کارت‌ها و خط‌های border-top/bottom)
+   گوشه‌های گرد کارت‌ها و خط‌های بالا و پایین چت را سفید نشان می‌دادند. */
+html.nara-dark .bg-light {
+    background-color: var(--mud-palette-background) !important;
+}
+html.nara-dark .border, html.nara-dark .border-top, html.nara-dark .border-bottom,
+html.nara-dark .border-start, html.nara-dark .border-end {
+    border-color: var(--mud-palette-lines-default) !important;
+}
