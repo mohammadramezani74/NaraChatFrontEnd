@@ -716,7 +716,7 @@ else
         {
             if (message.SendAt.Date <= DateTime.Today.Date)
             {
-                <div style="display: flex; align-items: center; gap: 10px; margin: 10px 0;">
+                <div class="nara-date-divider" style="display: flex; align-items: center; gap: 10px; margin: 10px 0;">
                     <div style="flex-grow: 1; height: 1px; background-color: gray;"></div>
                     <MudChipSet T="string" SelectionMode="SelectionMode.MultiSelection">
                         <MudChip Text="pink" Variant="Variant.Text" Color="ThemeCascading.SeenColor">@message.SendAt.ToFarsi().ConvertPersianDate()</MudChip>

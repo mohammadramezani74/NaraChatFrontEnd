@@ -217,6 +217,7 @@ private async Task ShowAbout()
         string? darkMode = await localStorage.GetItemAsync(nameof(IsDarkMode));
         IsDarkMode = darkMode == "True";
         ApplyTheme();
+        await SyncThemeClassAsync();
 
     }
 
@@ -231,7 +232,14 @@ private async Task ShowAbout()
     IsDarkMode = !IsDarkMode;
     localStorage.SetItemAsync(nameof(IsDarkMode), IsDarkMode.ToString());
     ApplyTheme();
+    _ = SyncThemeClassAsync();
     StateHasChanged();
+}
+
+// کلاس nara-dark روی <html>: پس‌زمینه‌ی کهکشانی، گوشه‌ی گرد حباب‌ها و تاریخ‌ها در app.css
+async Task SyncThemeClassAsync()
+{
+    try { await js.InvokeVoidAsync("naraSetDarkTheme", IsDarkMode); } catch { /* هنوز site.js بالا نیامده */ }
 }
  
 void ApplyTheme()
@@ -240,45 +248,49 @@ void ApplyTheme()
     {
         ThemeChanging = new ThemeChanging("", " color:#1D6FD0;", " box-shadow: 0 16px 45px #cbd5e1;");
  
+// تم روشن «برفی»: عکس پس‌زمینه را app.css می‌گذارد (html:not(.nara-dark) #mainchat)،
+// افقی برای دسکتاپ و عمودی برای موبایل. نسخه‌ی قبلی (الگوی light.svg) در تاریخچه‌ی گیت هست.
 ThemeChanging.backGroundChatStyle =
-    "height: 100%; overflow-y: auto; background-color: #EEF4FA; " +
-    "background-image: url(lib/assets/Images/light.svg); " +
-    "background-repeat: repeat; background-size: 96px 96px;";
+    "height: 100%; overflow-y: auto; background-color: #EEF1F5;";
  
-        // اپاسیتی بالا نگه داشته شده چون حباب روی تصویر می‌نشیند
-        ThemeChanging.myColorChat    = "rgba(219, 234, 254, 0.94)";   // Blue 100
-        ThemeChanging.OtherColorChat = "rgba(255, 255, 255, 0.94)";
+        // زمینه تقریباً سفید است، پس حباب‌ها کم‌شفاف‌اند و سایه‌ی خیلی کم دارند (app.css)
+        ThemeChanging.myColorChat    = "rgba(219, 234, 254, 0.90)";    // Blue 100
+        ThemeChanging.OtherColorChat = "rgba(255, 255, 255, 0.90)";
         ThemeChanging.MyTextColor    = "#0F172A";
         ThemeChanging.OtherTextColor = "#0F172A";
  
-        ThemeChanging.SeenColor  = Color.Primary;
-        ThemeChanging.ClockColor = "#475569";                          // Slate 600
+        ThemeChanging.SeenColor    = Color.Primary;
+        ThemeChanging.ClockColor   = "#64748B";                        // Slate 500
+        ThemeChanging.MyClockColor = "#64748B";
  
-        ThemeChanging.MyColorReply    = "#BFDBFE";                     // Blue 200
-        ThemeChanging.OtherColorReply = "#EFF6FF";                     // Blue 50
+        ThemeChanging.MyColorReply    = "rgba(29, 111, 208, 0.10)";
+        ThemeChanging.OtherColorReply = "rgba(29, 111, 208, 0.08)";
         ThemeChanging.ReplyAccent     = "#1D6FD0";
     }
     else
     {
-        ThemeChanging = new ThemeChanging("", " color:#64B5F6;", " box-shadow: 0 16px 45px #0b1220");
+        ThemeChanging = new ThemeChanging("", " color:#B39DFF;", " box-shadow: 0 16px 45px #0b1220");
  
         // ThemeChanging.backGroundChatStyle =
         //     "height: 100%; overflow-y: auto; background-image:url(lib/assets/Images/pxfuel.jpg); background-size: cover; background-repeat:no-repeat; background-position: center; background-attachment: scroll;";
+ // تم تیره‌ی «کهکشانی»: عکس پس‌زمینه را app.css می‌گذارد (html.nara-dark #mainchat)،
+ // افقی برای دسکتاپ و عمودی برای موبایل. نسخه‌ی قبلی (الگوی chat-bg-dark.svg و حباب آبی)
+ // در تاریخچه‌ی گیت هست.
  ThemeChanging.backGroundChatStyle =
-    "height: 100%; overflow-y: auto; background-color: #0B1220; " +
-    "background-image: url(lib/assets/Images/chat-bg-dark.svg); " +
-    "background-repeat: repeat; background-size: 96px 96px;";
-        ThemeChanging.myColorChat    = "rgba(30, 58, 95, 0.94)";       // ته‌مایه آبی
-        ThemeChanging.OtherColorChat = "rgba(30, 41, 59, 0.94)";       // Slate 800
-        ThemeChanging.MyTextColor    = "#E5E7EB";
-        ThemeChanging.OtherTextColor = "#E5E7EB";
+    "height: 100%; overflow-y: auto; background-color: #0B0D1A;";
+        // حباب‌های شیشه‌ای: نیمه‌شفاف، پشتشان در app.css تار می‌شود (backdrop-filter)
+        ThemeChanging.myColorChat    = "rgba(150, 120, 220, 0.30)";    // بنفش شیشه‌ای
+        ThemeChanging.OtherColorChat = "rgba(16, 16, 26, 0.55)";       // تیره‌ی شیشه‌ای
+        ThemeChanging.MyTextColor    = "#F6F1FF";
+        ThemeChanging.OtherTextColor = "#ECE8F2";
  
-        ThemeChanging.SeenColor  = Color.Primary;
-        ThemeChanging.ClockColor = "#94A3B8";                          // Slate 400
+        ThemeChanging.SeenColor    = Color.Primary;
+        ThemeChanging.ClockColor   = "#B0AABB";                        // روی حباب تیره
+        ThemeChanging.MyClockColor = "#D5C8F2";                        // روی حباب بنفش
  
-        ThemeChanging.MyColorReply    = "#172554";                     // Blue 950
-        ThemeChanging.OtherColorReply = "#0F172A";
-        ThemeChanging.ReplyAccent     = "#64B5F6";
+        ThemeChanging.MyColorReply    = "rgba(255, 255, 255, 0.10)";
+        ThemeChanging.OtherColorReply = "rgba(255, 255, 255, 0.08)";
+        ThemeChanging.ReplyAccent     = "#B388FF";
     }
 }
  
@@ -449,10 +461,11 @@ PaletteLight = new PaletteLight
                 // --- Dark (آبی/مشکی حرفه‌ای) ---
                     PaletteDark = new PaletteDark
                     {
-                        Primary = "#64B5F6",           // Light Blue برای کنتراست عالی روی تیره
-                        Secondary     = "#22D3EE",         // Cornflower برای اکستنت
+                        Primary = "#B39DFF",           // بنفش روشن، هم‌رنگ حباب‌های کهکشانی
+                        PrimaryContrastText = "#1A1530",
+                        Secondary     = "#C4A8FF",         // بنفش ملایم برای اکستنت
                         Tertiary = "#8B5CF6",          // Purple accent
-                        Info = "#64B5F6",
+                        Info = "#B39DFF",
                         Success = "#34D399",           // سبز ملایم و خوانا
                         Warning = "#FBBF24",
                         Error = "#EF5350",
@@ -475,7 +488,7 @@ PaletteLight = new PaletteLight
                         TableLines = "#233044",
                         Divider = "#233044",
 
-                     ActionDefault = "#64B5F6",
+                     ActionDefault = "#B39DFF",
                         ActionDisabled = "#64748B",
                         ActionDisabledBackground = "#1E293B"
                     }

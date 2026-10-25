@@ -320,7 +320,7 @@
     public string? OtherName { get; set; }
     public string? GetAvatar() => CurrentUser.Id == message.UserId ? myAvatar : OtherAvatar;
     public string replyColor() { return message.IsMine ? $"background-color: {ThemeCascading.MyColorReply}" : $"background-color: {ThemeCascading.OtherColorReply}"; }
-    public string ClockColor() => $"color: {ThemeCascading.ClockColor};";
+    public string ClockColor() => $"color: {(message.IsMine ? ThemeCascading.MyClockColor ?? ThemeCascading.ClockColor : ThemeCascading.ClockColor)};";
     public string Style() => message.IsMine
       ? $"min-width: 305px; background-color: {ThemeCascading.myColorChat}; color: {ThemeCascading.MyTextColor};"
       : $"min-width: 305px; background-color: {ThemeCascading.OtherColorChat}; color: {ThemeCascading.OtherTextColor};";

@@ -154,4 +154,83 @@ code {
     text-align: start;
 }
 
+/* ==========================================================================
+   تم تیره‌ی «کهکشانی» (کلاس nara-dark روی <html>، از MainLayout)
+   عکس افقی برای صفحه‌ی پهن، عمودی برای موبایل. رنگ حباب‌ها در MainLayout.ApplyTheme.
+   ========================================================================== */
+html.nara-dark #mainchat {
+    background-color: #0B0D1A;
+    background-image: url(../lib/assets/Images/chat-bg-galaxy-wide.webp);
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+@media (orientation: portrait), (max-width: 760px) {
+    html.nara-dark #mainchat {
+        background-image: url(../lib/assets/Images/chat-bg-galaxy-tall.webp);
+    }
+}
+/* حباب‌های شیشه‌ای در هر دو تم: پس‌زمینه از پشت حباب کمی تار پیداست */
+#mainchat .mud-chat-bubble {
+    border-radius: 22px !important;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, .6);
+}
+html.nara-dark #mainchat .mud-chat-bubble {
+    border-color: rgba(255, 255, 255, .12);
+}
+html:not(.nara-dark) #mainchat .mud-chat-bubble {
+    border-color: rgba(15, 23, 42, .08);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, .06);
+}
 
+/* تم روشن «برفی» */
+html:not(.nara-dark) #mainchat {
+    background-color: #EEF1F5;
+    background-image: url(../lib/assets/Images/chat-bg-snow-wide.webp);
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+@media (orientation: portrait), (max-width: 760px) {
+    html:not(.nara-dark) #mainchat {
+        background-image: url(../lib/assets/Images/chat-bg-snow-tall.webp);
+    }
+}
+html:not(.nara-dark) .nara-date-divider .mud-chip {
+    background: rgba(255, 255, 255, .75) !important;
+    color: #475569 !important;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+html:not(.nara-dark) .nara-date-divider > div:first-child,
+html:not(.nara-dark) .nara-date-divider > div:last-child {
+    background-color: rgba(255, 255, 255, .45) !important;
+}
+/* تاریخ وسط گفتگو روی قسمت روشن سحابی هم خوانا بماند */
+html.nara-dark .nara-date-divider .mud-chip {
+    background: rgba(11, 13, 26, .62) !important;
+    color: #E8E3EC !important;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+html.nara-dark .nara-date-divider > div:first-child,
+html.nara-dark .nara-date-divider > div:last-child {
+    background-color: rgba(232, 227, 236, .18) !important;
+}
+
+/* تم تیره: دکمه‌ی «بارگذاری نسخه جدید» و بقیه‌ی btn-primary ها بنفش، هم‌رنگ پالت */
+html.nara-dark .btn-primary {
+    color: #1A1530;
+    background-color: #B39DFF;
+    border-color: #A48BF5;
+}
+html.nara-dark .btn-primary:hover, html.nara-dark .btn-primary:active {
+    color: #1A1530;
+    background-color: #C4B2FF;
+    border-color: #B39DFF;
+}
+html.nara-dark .btn:focus, html.nara-dark .btn:active:focus {
+    box-shadow: 0 0 0 0.25rem rgba(179, 157, 255, .45);
+}

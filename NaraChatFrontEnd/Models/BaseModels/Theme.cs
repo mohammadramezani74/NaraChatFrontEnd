@@ -21,6 +21,10 @@
             public MudBlazor.Color SeenColor { get; set; } = MudBlazor.Color.Primary;
             public string ClockColor { get; set; } = "#475569";
 
+            // ساعت روی حباب خود کاربر؛ وقتی رنگ دو حباب خیلی فرق دارد (تم تیره‌ی کهکشانی:
+            // بنفش روشن و تقریباً مشکی) یک رنگ برای هر دو خوانا نیست. null یعنی همان ClockColor.
+            public string? MyClockColor { get; set; }
+
             public string MyColorReply { get; set; } = "#BFDBFE";
             public string OtherColorReply { get; set; } = "#EFF6FF";
 

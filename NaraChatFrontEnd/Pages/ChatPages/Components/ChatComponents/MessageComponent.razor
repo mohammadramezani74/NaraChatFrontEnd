@@ -412,7 +412,7 @@ private Task GoToParent()
     }
     public string replyColor() => message.IsMine
     ? $"background-color: {ThemeCascading.MyColorReply}; border-right: 3px solid {ThemeCascading.ReplyAccent};"
-    : $"background-color: {ThemeCascading.OtherColorReply}; border-right: 3px solid {ThemeCascading.ReplyAccent};";    public string ClockColor () => $"color: {ThemeCascading.ClockColor};";
+    : $"background-color: {ThemeCascading.OtherColorReply}; border-right: 3px solid {ThemeCascading.ReplyAccent};";    public string ClockColor () => $"color: {(message.IsMine ? ThemeCascading.MyClockColor ?? ThemeCascading.ClockColor : ThemeCascading.ClockColor)};";
   public string Style() => message.IsMine
     ? $"min-width: 305px; background-color: {ThemeCascading.myColorChat}; color: {ThemeCascading.MyTextColor};"
     : $"min-width: 50px; background-color: {ThemeCascading.OtherColorChat}; color: {ThemeCascading.OtherTextColor};";  protected override async Task OnInitializedAsync()

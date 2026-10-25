@@ -148,7 +148,7 @@
     //     ? $"background-color: {ThemeCascading.MyColorReply}"
     //     : $"background-color: {ThemeCascading.OtherColorReply}";
 
-    public string ClockColor() => $"color: {ThemeCascading.ClockColor};";
+    public string ClockColor() => $"color: {(message.IsMine ? ThemeCascading.MyClockColor ?? ThemeCascading.ClockColor : ThemeCascading.ClockColor)};";
 
     public string replyColor() => message.IsMine
     ? $"background-color: {ThemeCascading.MyColorReply}; border-right: 3px solid {ThemeCascading.ReplyAccent};"

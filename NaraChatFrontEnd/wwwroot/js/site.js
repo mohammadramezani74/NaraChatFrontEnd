@@ -721,3 +721,10 @@ window.naraTaskAlarm = function (data) {
         // روی بعضی موبایل‌ها new Notification مجاز نیست؛ اعلان داخل برنامه کافی است.
     }
 };
+
+// ----------------------------------------------------------------------------
+// تم تیره: کلاس nara-dark روی <html>. پس‌زمینه‌ی کهکشانی و گوشه‌های گرد حباب‌ها
+// در app.css به این کلاس بسته‌اند (MainLayout.SyncThemeClassAsync صدا می‌زند).
+window.naraSetDarkTheme = function (dark) {
+    document.documentElement.classList.toggle('nara-dark', !!dark);
+};
