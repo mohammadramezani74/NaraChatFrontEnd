@@ -1,0 +1,131 @@
+﻿@using NaraChat.Contract.Utilities.FilesExtensions
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+@* نوار ضبط ویس. با نمایش شروع به ضبط می‌کند؛ «ارسال» فایل را تحویل والد
+   می‌دهد و «لغو» دور می‌ریزد. میکروفون در هر دو حالت آزاد می‌شود. *@
+
+<div class="nr" @ref="_el" style="--nm-accent:@MediaKit.Accent(ThemeCascading)">
+    <button type="button" class="nr-cancel" @onclick="Cancel" title="لغو و حذف" aria-label="لغو و حذف">
+        <svg class="nm-svg" viewBox="0 0 24 24"><path d="@NaraIcons.Delete" /></svg>
+    </button>
+    <span class="nr-dot"></span>
+    <span class="nr-time"></span>
+    <div class="nr-level" aria-hidden="true">
+        @for (var i = 0; i < 32; i++)
+        {
+            <i></i>
+        }
+    </div>
+    <span class="nr-hint">@(_starting ? "در حال آماده شدن میکروفون…" : "در حال ضبط")</span>
+    <button type="button" class="nr-send" @onclick="Send" disabled="@(_starting || _busy)"
+            title="ارسال ویس" aria-label="ارسال ویس">
+        <svg class="nm-svg nm-flip" viewBox="0 0 24 24"><path d="@NaraIcons.Send" /></svg>
+    </button>
+</div>
+
+@code {
+    [CascadingParameter(Name = "Theme")]
+    public ThemeChanging? ThemeCascading { get; set; }
+
+    /// <summary>فایل ضبط‌شده، آماده‌ی آپلود.</summary>
+    [Parameter] public EventCallback<IBrowserFile> OnRecorded { get; set; }
+
+    /// <summary>نوار باید بسته شود (ارسال، لغو یا خطا).</summary>
+    [Parameter] public EventCallback OnClosed { get; set; }
+
+    [Parameter] public EventCallback<string> OnError { get; set; }
+
+    private ElementReference _el;
+    private DotNetObjectReference<VoiceRecorderBar>? _self;
+    private bool _starting = true, _busy, _recording, _disposed;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        _self = DotNetObjectReference.Create(this);
+
+        RecorderResult? r = null;
+        try { r = await JS.InvokeAsync<RecorderResult>("naraRecorder.start", _el, _self); }
+        catch (JSException) { }
+
+        if (_disposed)
+        {
+            // تا اجازه‌ی میکروفون بیاید کاربر رفته بود
+            if (r is { Ok: true }) await StopQuietly();
+            return;
+        }
+
+        if (r is not { Ok: true })
+        {
+            await OnError.InvokeAsync(r?.Error switch
+            {
+                "denied" => "اجازه‌ی استفاده از میکروفون داده نشده. از تنظیمات مرورگر (آیکون قفل کنار آدرس) میکروفون را مجاز کنید.",
+                "nomic" => "میکروفونی پیدا نشد. اتصال میکروفون را بررسی کنید.",
+                "busy-mic" => "میکروفون در اختیار برنامه‌ی دیگری است.",
+                "unsupported" => "مرورگر شما ضبط صدا را پشتیبانی نمی‌کند. لطفاً از نسخه‌ی جدید کروم، فایرفاکس یا اج استفاده کنید.",
+                "busy" => "ضبط دیگری در جریان است.",
+                _ => "شروع ضبط ممکن نشد. دوباره تلاش کنید."
+            });
+            await OnClosed.InvokeAsync();
+            return;
+        }
+
+        _recording = true;
+        _starting = false;
+        StateHasChanged();
+    }
+
+    private async Task Send()
+    {
+        if (_busy || !_recording) return;
+        _busy = true;
+
+        RecorderResult? r = null;
+        try { r = await JS.InvokeAsync<RecorderResult>("naraRecorder.stop", true); }
+        catch (JSException) { }
+        _recording = false;
+
+        if (r?.Data is { Length: > 0 } data)
+        {
+            var bytes = Convert.FromBase64String(data);
+            var name = "voice-" + DateTime.Now.ToString("yyyyMMdd-HHmmss", System.Globalization.CultureInfo.InvariantCulture) + (r.Ext ?? ".weba");
+            await OnRecorded.InvokeAsync(new CustomBrowserFile(bytes, name, r.Mime ?? "audio/webm"));
+        }
+        else if (r?.Error == "short")
+        {
+            await OnError.InvokeAsync("ویس خیلی کوتاه بود؛ برای ضبط، کمی بیشتر صحبت کنید.");
+        }
+        else
+        {
+            await OnError.InvokeAsync("ذخیره‌ی ویس ممکن نشد. دوباره تلاش کنید.");
+        }
+
+        await OnClosed.InvokeAsync();
+    }
+
+    private async Task Cancel()
+    {
+        if (_busy) return;
+        _busy = true;
+        await StopQuietly();
+        await OnClosed.InvokeAsync();
+    }
+
+    /// <summary>به حداکثر زمان ضبط رسید؛ همان چیزی که ضبط شده فرستاده می‌شود.</summary>
+    [JSInvokable]
+    public Task OnRecorderLimit() => InvokeAsync(Send);
+
+    private async Task StopQuietly()
+    {
+        _recording = false;
+        try { await JS.InvokeAsync<RecorderResult?>("naraRecorder.stop", false); } catch { }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        if (_recording) await StopQuietly();
+        _self?.Dispose();
+    }
+}

@@ -54,9 +54,7 @@
 
                         @if (message.Type == MessageType.Location)
                         {
-                            <MudPaper Class="pa-2 mt-2" Style="border:1px solid #ccc; border-radius:12px; width:300px; margin:20px;">
-                                <div id="map-@message.Id" style="height:350px; border-radius:12px;"></div>
-                            </MudPaper>
+                            <LocationView Lat="message.Latitude" Lng="message.Longitude" />
                         }
                     </MudText>
 
@@ -161,8 +159,8 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender && message.Type == MessageType.Location)
-            await JS.InvokeVoidAsync("showMiniMap", $"map-{message.Id}", message.Latitude, message.Longitude);
+        // نقشه‌ی پیام موقعیت را خود LocationView می‌کشد.
+        await Task.CompletedTask;
     }
 
     public async Task copyMessage(ChatMessageDto message)

@@ -112,6 +112,10 @@
                     {
                         @UploadProgressBar
                     }
+                    @if (isRecording)
+                    {
+                        @VoiceRecorder
+                    }
 
                     <MudGrid Class="align-center w-100" Spacing="2">
 
@@ -152,19 +156,10 @@
                         </MudItem>
 
                         <MudMenu Disabled="@(SelectedChannel==null)" Icon="@Icons.Material.Filled.MoreVert" AriaLabel="Open user menu">
-                            @if (!isRecording)
-                            {
-                                <MudButton Disabled="@(SelectedChannel==null)" OnClick="RecordVoice">
-                                    <MudIcon Color="Color.Tertiary" Icon="@Icons.Material.Filled.Mic" Title="میکروفون"></MudIcon>
-                                </MudButton>
-                            }
-                            else
-                            {
-                                <MudButton OnClick="StopRecording">
-                                    <MudIcon Color="Color.Secondary" Icon="@Icons.Material.Filled.Stop" Title="توقف ضبط صدا"></MudIcon>
-                                </MudButton>
-                            }
-                            <MudButton @onclick="@uploadChannelDialog" Disabled="@(IsUploading==null)" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AttachFile" Size="Size.Small">
+                            <MudButton Disabled="@(SelectedChannel==null || isRecording)" OnClick="RecordVoice">
+                                <MudIcon Color="Color.Tertiary" Icon="@Icons.Material.Filled.Mic" Title="ضبط ویس"></MudIcon>
+                            </MudButton>
+                            <MudButton @onclick="@uploadChannelDialog" Disabled="@IsUploading" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AttachFile" Size="Size.Small">
                             </MudButton>
 
                         </MudMenu>
@@ -275,6 +270,10 @@ else if (SelectedGroup != null)
                     {
                         @UploadProgressBar
                     }
+                    @if (isRecording)
+                    {
+                        @VoiceRecorder
+                    }
 
                     <MudGrid Class="align-center w-100" Spacing="2">
 
@@ -315,19 +314,13 @@ else if (SelectedGroup != null)
                         </MudItem>
 
                         <MudMenu Disabled="@(SelectedGroup==null)" Icon="@Icons.Material.Filled.MoreVert" AriaLabel="Open user menu">
-                            @if (!isRecording)
-                            {
-                                <MudButton Disabled="@(SelectedChannel==null)" OnClick="RecordVoice">
-                                    <MudIcon Color="Color.Tertiary" Icon="@Icons.Material.Filled.Mic" Title="میکروفون"></MudIcon>
-                                </MudButton>
-                            }
-                            else
-                            {
-                                <MudButton OnClick="StopRecording">
-                                    <MudIcon Color="Color.Secondary" Icon="@Icons.Material.Filled.Stop" Title="توقف ضبط صدا"></MudIcon>
-                                </MudButton>
-                            }
-                            <MudButton @onclick="@uploadFileDialog" Disabled="@(IsUploading==null)" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AttachFile" Size="Size.Small">
+                            <MudButton Disabled="@(SelectedGroup==null || isRecording)" OnClick="RecordVoice">
+                                <MudIcon Color="Color.Tertiary" Icon="@Icons.Material.Filled.Mic" Title="ضبط ویس"></MudIcon>
+                            </MudButton>
+                            <MudButton @onclick="@uploadFileDialog" Disabled="@IsUploading" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AttachFile" Size="Size.Small">
+                            </MudButton>
+                            <MudButton Disabled="@(SelectedGroup==null)" OnClick="GetLocation">
+                                <MudIcon Color="Color.Error" Icon="@Icons.Material.Filled.MyLocation" Title="ارسال موقعیت"></MudIcon>
                             </MudButton>
 
                         </MudMenu>
@@ -473,6 +466,10 @@ else
             {
                 @UploadProgressBar
             }
+            @if (isRecording)
+            {
+                @VoiceRecorder
+            }
 
             <MudGrid Class="align-center w-100" Spacing="2">
 
@@ -514,22 +511,13 @@ else
                 </MudItem>
 
                 <MudMenu Disabled="@(OtherUser==null)" Icon="@Icons.Material.Filled.MoreVert" AriaLabel="Open user menu">
-                    @if (!isRecording)
-                    {
-                        <MudButton Disabled="@(OtherUser==null)" OnClick="RecordVoice">
-                            <MudIcon Color="Color.Tertiary" Icon="@Icons.Material.Filled.Mic" Title="میکروفون"></MudIcon>
-                        </MudButton>
-                    }
-                    else
-                    {
-                        <MudButton OnClick="StopRecording">
-                            <MudIcon Color="Color.Secondary" Icon="@Icons.Material.Filled.Stop" Title="توقف ضبط صدا"></MudIcon>
-                        </MudButton>
-                    }
+                    <MudButton Disabled="@(OtherUser==null || isRecording)" OnClick="RecordVoice">
+                        <MudIcon Color="Color.Tertiary" Icon="@Icons.Material.Filled.Mic" Title="ضبط ویس"></MudIcon>
+                    </MudButton>
                     <MudButton @onclick="@uploadDialog"  Disabled="@(IsUploading||OtherUser==null)" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AttachFile" Size="Size.Small">
                     </MudButton>
                     <MudButton Disabled="@(OtherUser==null)" OnClick="GetLocation">
-                        <MudIcon Color="Color.Error"  Icon="@Icons.Material.Filled.MyLocation" Title="لوکیشن"></MudIcon>
+                        <MudIcon Color="Color.Error" Icon="@Icons.Material.Filled.MyLocation" Title="ارسال موقعیت"></MudIcon>
                     </MudButton>
                 </MudMenu>
 
@@ -564,12 +552,29 @@ else
     // تغییر کرد، چون «٪» فارسی کاراکتر معتبر شناسه نیست و پارسر Razor
     // گاهی سر آن گیج می‌شود.
 
+    // نوار ضبط ویس؛ در هر سه حالت (خصوصی، گروه، کانال) یکی است و SendVoice
+    // خودش تشخیص می‌دهد فایل به کجا برود.
+    private RenderFragment VoiceRecorder =>
+        @<VoiceRecorderBar OnRecorded="SendVoice" OnClosed="CloseRecorder" OnError="ErrorMessage" />;
+
     private RenderFragment UploadProgressBar =>
     @<MudPaper Class="pa-3 ma-2" Elevation="1">
+        @{
+            // سه مرحله: هنوز بایتی نرفته، در حال ارسال، و «همه رسید، سرور دارد ذخیره می‌کند».
+            // مرحله‌ی آخر برای فایل بزرگ چند ثانیه طول می‌کشد و قبلاً شبیه گیر کردن بود.
+            var starting = UploadPercent <= 0 && string.IsNullOrEmpty(UploadSizeText);
+            var processing = UploadPercent >= 100;
+            var title = processing ? "فایل رسید؛ در حال ذخیره روی سرور…"
+                      : starting ? "در حال شروع ارسال…"
+                      : "در حال ارسال فایل…";
+        }
         <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
-            <MudText Typo="Typo.body2">در حال ارسال فایل…</MudText>
+            <MudText Typo="Typo.body2">@title</MudText>
             <MudStack Row AlignItems="AlignItems.Center" Spacing="1">
-                <MudText Typo="Typo.body2">@(UploadPercent)٪</MudText>
+                @if (!starting && !processing)
+                {
+                    <MudText Typo="Typo.body2">@(UploadPercent)٪</MudText>
+                }
                 <MudIconButton Icon="@Icons.Material.Filled.Close"
                                Size="Size.Small"
                                OnClick="cancelUpload" />
@@ -578,6 +583,7 @@ else
 
         <MudProgressLinear Color="Color.Primary"
                            Value="@UploadPercent"
+                           Indeterminate="@(starting || processing)"
                            Size="Size.Medium"
                            Class="mt-2" />
 

@@ -13,10 +13,33 @@
             <div class="bot-card">
                 @foreach (var row in _markup.Card)
                 {
-                    <div class="bot-card-row">
-                        <span class="bot-card-label">@row.Label</span>
-                        <span class="bot-card-value">@row.Value</span>
-                    </div>
+                    @switch (row.Kind)
+                    {
+                        case "hero":
+                            <div class="bot-card-row is-hero">
+                                <span class="bot-card-label">@row.Label</span>
+                                <span class="bot-card-value">@row.Value</span>
+                            </div>
+                            break;
+                        case "note":
+                            <div class="bot-card-row is-note">@row.Label</div>
+                            break;
+                        case "bar":
+                            <div class="bot-card-row is-bar">
+                                <div class="bot-card-line">
+                                    <span class="bot-card-label">@row.Label</span>
+                                    <span class="bot-card-value">@row.Value</span>
+                                </div>
+                                <div class="bot-card-bar"><i style="width:@BarWidth(row.Percent)"></i></div>
+                            </div>
+                            break;
+                        default:
+                            <div class="bot-card-row @(row.Kind is "section" ? "is-section" : row.Kind is "total" ? "is-total" : string.Empty)">
+                                <span class="bot-card-label">@row.Label</span>
+                                <span class="bot-card-value">@row.Value</span>
+                            </div>
+                            break;
+                    }
                 }
             </div>
         }
@@ -83,6 +106,19 @@
     .bot-card-row:last-child { border-bottom: 0; }
     .bot-card-label { color: var(--mud-palette-text-secondary); }
     .bot-card-value { font-weight: 600; text-align: left; }
+    .bot-card-row.is-hero { flex-direction: column; align-items: center; gap: 2px; padding: 14px 12px 10px; border-bottom: 0; }
+    .bot-card-row.is-hero .bot-card-label { font-size: 12px; }
+    .bot-card-row.is-hero .bot-card-value { font-size: 22px; font-weight: 800; color: var(--mud-palette-primary); text-align: center; }
+    .bot-card-row.is-note { display: block; font-size: 12px; line-height: 1.7; color: var(--mud-palette-text-secondary); }
+    .bot-card-row.is-hero + .bot-card-row.is-note { text-align: center; padding-top: 0; }
+    .bot-card-row.is-section { background: var(--mud-palette-background-gray); font-weight: 700; padding-top: 8px; padding-bottom: 8px; }
+    .bot-card-row.is-section .bot-card-label { color: var(--mud-palette-text-primary); }
+    .bot-card-row.is-total { font-weight: 700; }
+    .bot-card-row.is-total .bot-card-label { color: var(--mud-palette-text-primary); }
+    .bot-card-row.is-bar { flex-direction: column; gap: 5px; }
+    .bot-card-line { display: flex; justify-content: space-between; gap: 12px; }
+    .bot-card-bar { height: 4px; border-radius: 4px; background: var(--mud-palette-lines-default); overflow: hidden; }
+    .bot-card-bar i { display: block; height: 100%; border-radius: 4px; background: var(--mud-palette-primary); margin-inline-start: 0; }
     .bot-note { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--mud-palette-text-secondary); padding: 0 4px; }
     .bot-note.is-ok { color: var(--mud-palette-success); font-weight: 600; }
     .bot-note.is-warn { color: var(--mud-palette-error); font-weight: 700; }
@@ -98,6 +134,9 @@
 
 @code {
     [Parameter, EditorRequired] public ChatMessageDto Message { get; set; } = default!;
+
+    private static string BarWidth(double? percent)
+        => Math.Clamp(percent ?? 0, 0, 100).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + "%";
 
     // فقط http/https؛ لینک دیگر (javascript: و ...) دکمه‌ی عادی می‌ماند و کاری نمی‌کند.
     private static bool IsLink(BotButton b)

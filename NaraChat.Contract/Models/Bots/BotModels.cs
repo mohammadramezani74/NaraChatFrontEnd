@@ -48,6 +48,12 @@ namespace NaraChat.Contract.Models.Bots
     {
         public string Label { get; set; } = string.Empty;
         public string Value { get; set; } = string.Empty;
+
+        /// <summary>null معمولی، section، hero، bar، total یا note.</summary>
+        public string? Kind { get; set; }
+
+        /// <summary>برای bar: ۰ تا ۱۰۰.</summary>
+        public double? Percent { get; set; }
     }
 
     // ======================================================================

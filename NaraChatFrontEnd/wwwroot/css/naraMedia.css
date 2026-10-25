@@ -1,0 +1,456 @@
+﻿/* naraMedia.css — پخش ویس، پخش ویدیو، نوار ضبط و کارت موقعیت.
+   رنگ متن از حباب پیام به ارث می‌رسد (تم روشن و تیره هر دو)، و رنگ اصلی
+   از متغیر --nm-accent که کامپوننت از روی تم کاربر می‌گذارد. */
+
+.nv, .nvid-wrap, .nr, .nloc, .nlp {
+    --nm-accent: var(--mud-palette-primary, #1D6FD0);
+    --nm-soft: color-mix(in srgb, currentColor 10%, transparent);
+    direction: rtl;
+}
+
+.nm-svg { width: 22px; height: 22px; fill: currentColor; display: block; flex: none; }
+.nm-svg.sm { width: 18px; height: 18px; }
+.nm-svg.lg { width: 34px; height: 34px; }
+.nm-flip { transform: scaleX(-1); }
+
+/* ------------------------------------------------------------------ ویس */
+
+.nv {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 280px;
+    max-width: 100%;
+    padding: 4px 2px 2px;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.nv-btn {
+    position: relative;
+    flex: none;
+    width: 44px;
+    height: 44px;
+    border: 0;
+    border-radius: 50%;
+    background: var(--nm-accent);
+    color: #fff;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--nm-accent) 40%, transparent);
+    transition: transform .12s ease, filter .12s ease;
+}
+.nv-btn:hover { filter: brightness(1.08); }
+.nv-btn:active { transform: scale(.93); }
+.nv-btn:focus-visible { outline: 2px solid var(--nm-accent); outline-offset: 3px; }
+
+.nm-ring {
+    position: absolute;
+    inset: -4px;
+    width: calc(100% + 8px);
+    height: calc(100% + 8px);
+    transform: rotate(-90deg);
+    pointer-events: none;
+}
+.nm-ring circle { fill: none; stroke-width: 3; stroke-linecap: round; }
+.nm-ring .bg { stroke: color-mix(in srgb, var(--nm-accent) 25%, transparent); }
+.nm-ring .fg { stroke: var(--nm-accent); transition: stroke-dashoffset .2s linear; }
+.nm-ring.spin { animation: nm-spin 1s linear infinite; }
+.nm-ring.spin .fg { stroke-dashoffset: 100 !important; }
+@keyframes nm-spin { to { transform: rotate(270deg); } }
+
+.nv-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+
+.nv-wave {
+    position: relative;
+    height: 30px;
+    cursor: pointer;
+    touch-action: none;
+}
+.nv-bars {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 2px;
+    direction: rtl;
+    pointer-events: none;
+}
+.nv-bars i {
+    flex: 1 1 0;
+    max-width: 4px;
+    min-height: 3px;
+    height: var(--h, 30%);
+    border-radius: 3px;
+    background: currentColor;
+    opacity: .25;
+    transition: height .25s ease;
+}
+.nv-bars.played { clip-path: inset(0 0 0 calc(100% - var(--p, 0%))); }
+.nv-bars.played i { background: var(--nm-accent); opacity: 1; }
+.nv.is-idle .nv-bars i { opacity: .2; }
+
+.nv-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 22px;
+    font-size: 11.5px;
+    line-height: 1;
+}
+.nv-time { opacity: .8; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.nv-time:empty::before { content: attr(data-placeholder); }
+.nv-time.err { color: var(--mud-palette-error, #d32f2f); opacity: 1; }
+
+.nm-chip {
+    border: 0;
+    background: var(--nm-soft);
+    color: inherit;
+    border-radius: 10px;
+    padding: 3px 8px;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.nm-chip:hover { background: color-mix(in srgb, currentColor 16%, transparent); }
+
+.nm-icon {
+    border: 0;
+    background: transparent;
+    color: inherit;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    opacity: .7;
+    padding: 0;
+}
+.nm-icon:hover { opacity: 1; background: var(--nm-soft); }
+.nv-meta .nm-icon { margin-inline-start: auto; }
+
+/* ------------------------------------------------------------------ ویدیو */
+
+.nvid-wrap { width: 320px; max-width: 100%; }
+
+.nvid {
+    --ar: 16 / 9;
+    position: relative;
+    width: 100%;
+    aspect-ratio: var(--ar);
+    max-height: 420px;
+    min-height: 160px;
+    background: #0b0f17;
+    border-radius: 12px;
+    overflow: hidden;
+    color: #fff;
+    outline: none;
+    container-type: inline-size;
+    user-select: none;
+    -webkit-user-select: none;
+}
+.nvid:focus-visible { box-shadow: 0 0 0 2px var(--nm-accent); }
+.nvid video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #000;
+    display: block;
+}
+.nvid:fullscreen { width: 100vw; height: 100vh; max-height: none; aspect-ratio: auto; border-radius: 0; }
+.nvid:-webkit-full-screen { width: 100vw; height: 100vh; max-height: none; aspect-ratio: auto; border-radius: 0; }
+
+.nvid-poster {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    background:
+        radial-gradient(120% 90% at 80% 10%, color-mix(in srgb, var(--nm-accent) 45%, transparent), transparent 60%),
+        linear-gradient(160deg, #1b2333, #0b0f17);
+}
+.nvid-big {
+    position: relative;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: rgba(0, 0, 0, .45);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border: 1px solid rgba(255, 255, 255, .25);
+    transition: transform .15s ease, background .15s ease;
+}
+.nvid-poster:hover .nvid-big { transform: scale(1.06); background: rgba(0, 0, 0, .6); }
+.nvid-big .nm-ring .bg { stroke: rgba(255, 255, 255, .25); }
+.nvid-big .nm-ring .fg { stroke: #fff; }
+.nvid-info {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 9px;
+    border-radius: 20px;
+    font-size: 12px;
+    background: rgba(0, 0, 0, .45);
+}
+.nvid-status {
+    position: absolute;
+    top: calc(50% + 42px);
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 12px;
+    opacity: .9;
+    padding: 0 12px;
+}
+
+.nvid-center {
+    position: absolute;
+    inset: 0;
+    display: none;
+    place-items: center;
+    pointer-events: none;
+}
+.nvid-center span {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: rgba(0, 0, 0, .45);
+}
+.nvid.is-ready[data-playing="0"] .nvid-center { display: grid; }
+
+.nvid-bar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 18px 10px 6px;
+    background: linear-gradient(to top, rgba(0, 0, 0, .75), rgba(0, 0, 0, 0));
+    display: none;
+    flex-direction: column;
+    gap: 2px;
+    transition: opacity .25s ease;
+}
+.nvid.is-ready .nvid-bar { display: flex; }
+.nvid[data-idle="1"] .nvid-bar { opacity: 0; }
+.nvid[data-idle="1"] { cursor: none; }
+
+.nvid-seek {
+    --p: 0%;
+    position: relative;
+    height: 16px;
+    cursor: pointer;
+    touch-action: none;
+}
+.nvid-seek::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 7px;
+    height: 3px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, .3);
+}
+.nvid-fill {
+    position: absolute;
+    right: 0;
+    top: 7px;
+    height: 3px;
+    width: var(--p);
+    border-radius: 3px;
+    background: var(--nm-accent);
+}
+.nvid-thumb {
+    position: absolute;
+    top: 2.5px;
+    right: calc(var(--p) - 6px);
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--nm-accent) 45%, transparent);
+    transform: scale(.0);
+    transition: transform .12s ease;
+}
+.nvid-seek:hover .nvid-thumb, .nvid:focus-within .nvid-thumb { transform: scale(1); }
+
+.nvid-row { display: flex; align-items: center; gap: 2px; }
+.nvid-row .nm-icon { opacity: .9; width: 30px; height: 30px; }
+.nvid-row .nm-icon:hover { background: rgba(255, 255, 255, .15); }
+.nvid-time { font-size: 12px; font-variant-numeric: tabular-nums; padding: 0 6px; white-space: nowrap; }
+.nvid-sp { flex: 1; }
+.nvid-rate {
+    border: 0;
+    background: rgba(255, 255, 255, .15);
+    color: #fff;
+    border-radius: 9px;
+    padding: 3px 7px;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.nvid .when-playing, .nvid .when-muted, .nvid .when-full { display: none; }
+.nvid[data-playing="1"] .when-playing { display: block; }
+.nvid[data-playing="1"] .when-paused { display: none; }
+.nvid[data-muted="1"] .when-muted { display: block; }
+.nvid[data-muted="1"] .when-unmuted { display: none; }
+.nvid:fullscreen .when-full { display: block; }
+.nvid:fullscreen .when-window { display: none; }
+.nvid[data-pip="0"] .nvid-pip { display: none; }
+
+@container (max-width: 260px) {
+    .nvid-pip, .nvid-rate { display: none; }
+}
+
+/* ------------------------------------------------------------------ نوار ضبط */
+
+.nr {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 6px 8px;
+    border-radius: 28px;
+    background: var(--mud-palette-surface, #fff);
+    border: 1px solid var(--mud-palette-lines-default, rgba(0, 0, 0, .12));
+    color: var(--mud-palette-text-primary, #0f172a);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, .06);
+}
+.nr-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--mud-palette-error, #e53935);
+    animation: nr-pulse 1.2s ease-in-out infinite;
+    flex: none;
+}
+@keyframes nr-pulse { 50% { opacity: .25; transform: scale(.8); } }
+.nr-time { font-variant-numeric: tabular-nums; font-size: 14px; min-width: 40px; }
+.nr-level {
+    flex: 1;
+    min-width: 0;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 2px;
+    overflow: hidden;
+    direction: rtl;
+}
+.nr-level i {
+    flex: 1 1 0;
+    max-width: 4px;
+    min-height: 3px;
+    height: 8%;
+    border-radius: 3px;
+    background: var(--nm-accent);
+    opacity: .85;
+    transition: height .09s linear;
+}
+.nr-hint { font-size: 12px; opacity: .65; white-space: nowrap; }
+.nr-cancel, .nr-send {
+    flex: none;
+    border: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    transition: transform .12s ease, filter .12s ease;
+}
+.nr-cancel { background: transparent; color: var(--mud-palette-error, #e53935); }
+.nr-cancel:hover { background: color-mix(in srgb, var(--mud-palette-error, #e53935) 12%, transparent); }
+.nr-send { background: var(--nm-accent); color: #fff; }
+.nr-send:hover { filter: brightness(1.08); }
+.nr-send:active, .nr-cancel:active { transform: scale(.92); }
+.nr-send:disabled { opacity: .6; cursor: default; }
+@media (max-width: 420px) { .nr-hint { display: none; } }
+
+/* ------------------------------------------------------------------ موقعیت */
+
+.nloc {
+    width: 300px;
+    max-width: 100%;
+    margin-top: 6px;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid color-mix(in srgb, currentColor 14%, transparent);
+    background: var(--nm-soft);
+}
+.nloc-map-box { position: relative; height: 170px; }
+.nloc-map { position: absolute; inset: 0; background: #e8eef5; z-index: 0; }
+.nloc-hit { position: absolute; inset: 0; z-index: 500; }
+.nloc-foot {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 8px 6px 4px;
+}
+.nloc-title { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.nloc-title b { font-size: 13px; font-weight: 600; }
+.nloc-title span { font-size: 12.5px; opacity: .85; direction: ltr; text-align: right; font-variant-numeric: tabular-nums; }
+.nloc-foot .nm-icon { opacity: .8; }
+.nloc-foot .nm-icon.ok { color: var(--mud-palette-success, #2e7d32); opacity: 1; }
+
+.nlp { position: relative; height: min(60vh, 420px); border-radius: 12px; overflow: hidden; }
+.nlp-map { position: absolute; inset: 0; background: #e8eef5; }
+.nlp-me {
+    position: absolute;
+    z-index: 500;
+    left: 10px;
+    bottom: 10px;
+    width: 44px;
+    height: 44px;
+    border: 0;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: var(--mud-palette-surface, #fff);
+    color: var(--nm-accent);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, .25);
+    cursor: pointer;
+}
+.nlp-me.busy .nm-svg { animation: nr-pulse 1s ease-in-out infinite; }
+.nlp-status { font-size: 13px; margin-top: 10px; min-height: 20px; opacity: .85; }
+
+/* سنجاق نقشه (به‌جای تصویر پیش‌فرض Leaflet که از اینترنت می‌آمد) */
+.nara-pin { background: transparent; border: 0; }
+.nara-pin span {
+    position: absolute;
+    left: 0;
+    top: 2px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    background: #e53935;
+    border: 3px solid #fff;
+    box-shadow: -1px 2px 6px rgba(0, 0, 0, .35);
+}
+.nara-pin span::after {
+    content: "";
+    position: absolute;
+    left: 6px;
+    top: 6px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #fff;
+}

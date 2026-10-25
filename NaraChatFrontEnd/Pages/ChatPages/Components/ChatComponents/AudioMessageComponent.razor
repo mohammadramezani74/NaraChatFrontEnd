@@ -1,121 +1,217 @@
-﻿@using NaraChat.Application.Services.TokenProvider
-@using NaraChatFrontEnd.Pages.ChatPages.Components.DialogComponents
+﻿@using NaraChat.Application.Services.Auth
+@using NaraChatFrontEnd.Pages.ChatPages.Components.ChatComponents.Media
+@implements IAsyncDisposable
 @inject IJSRuntime JS
-@inject IMessageService service
-@inject ITokenService tokenservice
+@inject IAuthService Auth
 
-@if (message.FileContent != null)
+@* پخش‌کننده‌ی ویس و فایل صوتی. ساختار و وضعیت‌ها با Blazor است؛ پیشرفت پخش
+   و زمان را naraMedia.js مستقیم روی .nv-wave و .nv-time می‌نویسد. *@
+
+@if (message.FileContent is not null)
 {
-    <div style="display: flex; flex-direction: column; align-items: center; max-width: 200px; margin: auto; padding: 10px;  box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1); direction: rtl;">
+    <div class="nv @(_loaded ? "" : "is-idle")" @ref="_el" style="--nm-accent:@MediaKit.Accent(ThemeCascading)">
+        <button type="button" class="nv-btn" @onclick="OnMainClick" @onclick:stopPropagation="true"
+                title="@MainTitle" aria-label="@MainTitle">
+            @if (_loading)
+            {
+                <svg class="nm-ring @(_percent < 0 ? "spin" : "")" viewBox="0 0 52 52" aria-hidden="true">
+                    <circle class="bg" cx="26" cy="26" r="24" />
+                    <circle class="fg" cx="26" cy="26" r="24" stroke-dasharray="150.8"
+                            stroke-dashoffset="@RingOffset" />
+                </svg>
+                <svg class="nm-svg sm" viewBox="0 0 24 24"><path d="@NaraIcons.Close" /></svg>
+            }
+            else if (_failed)
+            {
+                <svg class="nm-svg" viewBox="0 0 24 24"><path d="@NaraIcons.Refresh" /></svg>
+            }
+            else if (_playing)
+            {
+                <svg class="nm-svg" viewBox="0 0 24 24"><path d="@NaraIcons.Pause" /></svg>
+            }
+            else
+            {
+                <svg class="nm-svg" viewBox="0 0 24 24"><path d="@NaraIcons.Play" /></svg>
+            }
+        </button>
 
-
-        <!-- ویدیو -->
-        <audio src="@($"data:audio/mp3;base64,{AudioData}")" controls>
-
-            مرورگر شما از ویدیو پشتیبانی نمی‌کند.
-        </audio>
-
-
+        <div class="nv-body">
+            <div class="nv-wave">
+                <div class="nv-bars">
+                    @foreach (var h in _peaks)
+                    {
+                        <i style="--h:@MediaKit.Percent(h)"></i>
+                    }
+                </div>
+                <div class="nv-bars played">
+                    @foreach (var h in _peaks)
+                    {
+                        <i style="--h:@MediaKit.Percent(h)"></i>
+                    }
+                </div>
+            </div>
+            <div class="nv-meta">
+                <span class="nv-time @(_failed ? "err" : "")" data-placeholder="@Placeholder"></span>
+                @if (_loaded)
+                {
+                    <button type="button" class="nm-chip" @onclick="CycleRate" @onclick:stopPropagation="true"
+                            title="سرعت پخش">@RateText</button>
+                }
+                <button type="button" class="nm-icon" @onclick="Download" @onclick:stopPropagation="true"
+                        title="دانلود" aria-label="دانلود">
+                    <svg class="nm-svg sm" viewBox="0 0 24 24"><path d="@NaraIcons.Download" /></svg>
+                </button>
+            </div>
+        </div>
     </div>
 }
 
-
-<style>
-
-    video {
-    position: relative; 
-    width: 300px;
-    height: 250px;
-    border-radius: 10px;
-    object-fit: cover;
-    }
-
-
-    .video-overlay {
-    position: absolute;
-    top: 40%;
-    left: 50%;
-    right: 10%;
-    transform: translate(-50%, -50%);
-    z-index: 10; 
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    opacity: 0.8; 
-    cursor: pointer; 
-    }
-
-
-    .play-button {
-    background-color: rgba(0, 0, 0, 0.5);
-    color: white;
-    font-size: 16px;
-    padding: 10px 20px;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    opacity: 1;
-    transition: opacity 0.3s ease;
-    }
-
-
-    .video-overlay.hidden {
-    display: none;
-    }
-</style>
-
 @code {
     [CascadingParameter(Name = "Theme")]
-    public ThemeChanging ThemeCascading { get; set; }
+    public ThemeChanging ThemeCascading { get; set; } = default!;
+
     [Parameter]
     public ChatMessageDto message { get; set; } = null!;
-    public bool Loading { get; set; } = false;
-    protected override async Task OnInitializedAsync()
-    {
-        var file = await service.GetImageById(message.FileContent.FileId);
 
-        AudioData = file.Data;
+    private const int Bars = 40;
+
+    // ویس‌های کوچک خودکار دریافت می‌شوند تا مدت و موج واقعی همان اول دیده
+    // شود (یک دقیقه ویس حدود ۲۵۰ کیلوبایت است). فایل‌های صوتی بزرگ‌تر فقط با
+    // زدن دکمه دریافت می‌شوند.
+    private const long AutoLoadBytes = 1_500_000;
+
+    private ElementReference _el;
+    private DotNetObjectReference<AudioMessageComponent>? _self;
+    private Guid _fileId;
+    private double[] _peaks = Array.Empty<double>();
+    private bool _initialized, _loading, _loaded, _playing, _failed, _disposed;
+    private int _percent;
+    private double _rate = 1;
+    private string? _durationText;
+
+    private long? Size => MediaKit.ParseSize(message.FileContent?.FileSize);
+
+    private string Placeholder => _failed
+        ? "دریافت نشد؛ دوباره بزنید"
+        : _durationText ?? (Size is long s ? MediaKit.FormatBytes(s) : "پیام صوتی");
+
+    private string MainTitle => _loading ? "لغو دریافت" : _failed ? "تلاش دوباره" : _playing ? "توقف" : "پخش";
+
+    private string RingOffset => (150.8 * (1 - Math.Clamp(_percent, 0, 100) / 100.0))
+        .ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
+
+    private string RateText => MediaKit.Fa(_rate.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)) + "×";
+
+    protected override void OnParametersSet()
+    {
+        var id = message.FileContent?.FileId ?? Guid.Empty;
+        if (id != _fileId)
+        {
+            _fileId = id;
+            _peaks = MediaKit.PseudoPeaks(id, Bars);
+        }
     }
-}
-@code {
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    private bool isAudioPlaying = false;
-    public string? AudioData { get; set; } = null;
-
-    public async Task loadAudio(Guid FileId)
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (_initialized || message.FileContent is null || _disposed) return;
+        _initialized = true;
 
-        Loading = true;
-        var file= await service.GetImageById(FileId);
+        _self = DotNetObjectReference.Create(this);
+        try
+        {
+            _rate = await JS.InvokeAsync<double>("naraVoice.init", _el, _self);
+        }
+        catch (JSException)
+        {
+            return;
+        }
 
-        AudioData = file.Data;
-        Loading = false;
+        if (Size is long size && size <= AutoLoadBytes)
+            await LoadAsync(autoplay: false);
+        else
+            StateHasChanged();
     }
-    private void OnAudioPlay()
+
+    private async Task LoadAsync(bool autoplay)
     {
-        isAudioPlaying = true;
+        if (_loading || _fileId == Guid.Empty) return;
+
+        _loading = true;
+        _failed = false;
+        _percent = 0;
+        StateHasChanged();
+
+        VoiceLoadResult? result = null;
+        try
+        {
+            var token = await Auth.GetFreshAccessTokenAsync();
+            var url = SiteSettings.ApiUrl + $"api/v1/chatfiles/{_fileId}/files";
+            result = await JS.InvokeAsync<VoiceLoadResult>("naraVoice.load", _el, url, token, Bars, autoplay);
+        }
+        catch (JSException) { }
+        catch (TaskCanceledException) { }
+
+        if (_disposed) return;
+        _loading = false;
+
+        if (result is null || result.Error is not null)
+        {
+            _failed = result?.Error != "aborted";
+        }
+        else
+        {
+            _loaded = true;
+            _durationText = result.DurationText;
+            if (result.Peaks is { Length: > 0 } peaks) _peaks = peaks;
+        }
         StateHasChanged();
     }
 
-
-    private void OnAudioEnded()
+    private async Task OnMainClick()
     {
-        isAudioPlaying = false;
-        StateHasChanged();
+        if (_loading)
+        {
+            await JS.InvokeVoidAsync("naraVoice.abort", _el);
+            return;
+        }
+        if (!_loaded)
+        {
+            await LoadAsync(autoplay: true);
+            return;
+        }
+        _playing = await JS.InvokeAsync<bool>("naraVoice.toggle", _el);
+    }
+
+    private async Task CycleRate()
+        => _rate = await JS.InvokeAsync<double>("naraVoice.cycleRate", _el);
+
+    private async Task Download()
+    {
+        if (!_loaded) await LoadAsync(autoplay: false);
+        if (_loaded)
+            await JS.InvokeVoidAsync("naraVoice.download", _el, "voice-" + message.SendAt.ToString("yyyyMMdd-HHmmss", System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    [JSInvokable]
+    public Task OnVoiceProgress(int percent)
+    {
+        _percent = percent;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public Task OnVoiceState(bool playing)
+    {
+        _playing = playing;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        if (_self is null) return;
+        try { await JS.InvokeVoidAsync("naraVoice.dispose", _el); } catch { /* صفحه بسته شده */ }
+        _self.Dispose();
     }
 }

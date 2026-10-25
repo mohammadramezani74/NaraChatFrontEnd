@@ -1,178 +1,177 @@
-﻿@using NaraChat.Application.Services.TokenProvider
-@using NaraChatFrontEnd.Pages.ChatPages.Components.DialogComponents
+﻿@using NaraChat.Application.Services.Auth
+@using NaraChatFrontEnd.Pages.ChatPages.Components.ChatComponents.Media
+@implements IAsyncDisposable
 @inject IJSRuntime JS
-@inject ITokenService tokenservice
-@implements IDisposable
-@if (message.FileContent != null)
+@inject IAuthService Auth
+
+@* پخش‌کننده‌ی ویدیو. تا کاربر پخش را نزند فایل دریافت نمی‌شود (ویدیو می‌تواند
+   صدها مگ باشد). بعد از دریافت، کنترل‌ها را naraMedia.js اداره می‌کند و وضعیت را
+   با data-playing و data-muted و data-idle روی .nvid می‌گذارد؛ Blazor به این
+   ویژگی‌ها دست نمی‌زند. *@
+
+@if (message.FileContent is not null)
 {
-    <div style="display: flex; flex-direction: column; align-items: center; max-width: 300px; margin: auto; padding: 10px; border: 1px solid #ddd; border-radius: 10px; box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1); direction: rtl;">
+    <div class="nvid-wrap" style="--nm-accent:@MediaKit.Accent(ThemeCascading)">
+        <div class="nvid @(_loaded ? "is-ready" : "")" @ref="_el" tabindex="0" @onclick:stopPropagation="true">
+            <video playsinline preload="metadata"></video>
 
+            @if (!_loaded)
+            {
+                <div class="nvid-poster" @onclick="OnPosterClick" title="@(_loading ? "لغو دریافت" : "پخش ویدیو")">
+                    <div class="nvid-big">
+                        @if (_loading)
+                        {
+                            <svg class="nm-ring @(_percent < 0 ? "spin" : "")" viewBox="0 0 52 52" aria-hidden="true">
+                                <circle class="bg" cx="26" cy="26" r="24" />
+                                <circle class="fg" cx="26" cy="26" r="24" stroke-dasharray="150.8"
+                                        stroke-dashoffset="@RingOffset" />
+                            </svg>
+                            <svg class="nm-svg" viewBox="0 0 24 24"><path d="@NaraIcons.Close" /></svg>
+                        }
+                        else if (_failed)
+                        {
+                            <svg class="nm-svg lg" viewBox="0 0 24 24"><path d="@NaraIcons.Refresh" /></svg>
+                        }
+                        else
+                        {
+                            <svg class="nm-svg lg" viewBox="0 0 24 24"><path d="@NaraIcons.Play" /></svg>
+                        }
+                    </div>
 
-        <!-- ویدیو -->
-        <video poster="lib/assets/Images/blured.jpg"  @onplay="OnVideoPlay" @onended="OnVideoEnded" id="video-@message.FileContent!.FileId" controls style="width: 100%; height: 200px; border-radius: 10px; object-fit: cover;">
+                    @if (_loading)
+                    {
+                        <div class="nvid-status">@(_progressText ?? "در حال آماده‌سازی…")</div>
+                    }
+                    else if (_failed)
+                    {
+                        <div class="nvid-status">دریافت ویدیو ناموفق بود؛ دوباره بزنید</div>
+                    }
 
-            مرورگر شما از ویدیو پشتیبانی نمی‌کند.
-        </video>
-        @if (!isVideoPlaying){
-            <div id="@message.FileContent!.FileId" class="video-overlay" @onclick="()=>loadVideo(message.FileContent!.FileId)">
-                <MudIcon Size="Size.Large" Icon="@Icons.Material.Filled.PlayCircle" Color="ThemeCascading.SeenColor"></MudIcon>
+                    <div class="nvid-info">
+                        <svg class="nm-svg sm" viewBox="0 0 24 24"><path d="@NaraIcons.Movie" /></svg>
+                        <span>@SizeText</span>
+                    </div>
+                </div>
+            }
+
+            <div class="nvid-center" aria-hidden="true">
+                <span><svg class="nm-svg lg" viewBox="0 0 24 24"><path d="@NaraIcons.Play" /></svg></span>
             </div>
-        }
-        @if (Loading)
-        {
-            <div class="video-overlay" style="flex-direction: column; gap: 8px;">
-                @if (_percent < 0)
-                {
-                    <MudProgressCircular Color="ThemeCascading.SeenColor" Indeterminate="true" />
-                }
-                else
-                {
-                    <MudProgressCircular Color="ThemeCascading.SeenColor"
-                                         Value="@_percent"
-                                         Size="Size.Large" />
-                    <MudText Typo="Typo.caption" Style="color: white;">@(_percent)٪</MudText>
-                }
 
-                <MudText Typo="Typo.caption" Style="color: white;">@_sizeText</MudText>
-
-                <MudIconButton Icon="@Icons.Material.Filled.Close"
-                               Size="Size.Small"
-                               Style="color: white;"
-                               OnClick="CancelVideoLoad" />
+            <div class="nvid-bar">
+                <div class="nvid-seek" role="slider" aria-label="جابه‌جایی در ویدیو">
+                    <div class="nvid-fill"></div>
+                    <div class="nvid-thumb"></div>
+                </div>
+                <div class="nvid-row">
+                    <button type="button" class="nm-icon" data-act="toggle" title="پخش / توقف">
+                        <svg class="nm-svg when-paused" viewBox="0 0 24 24"><path d="@NaraIcons.Play" /></svg>
+                        <svg class="nm-svg when-playing" viewBox="0 0 24 24"><path d="@NaraIcons.Pause" /></svg>
+                    </button>
+                    <span class="nvid-time"></span>
+                    <span class="nvid-sp"></span>
+                    <button type="button" class="nvid-rate" data-act="rate" title="سرعت پخش"></button>
+                    <button type="button" class="nm-icon" data-act="mute" title="صدا">
+                        <svg class="nm-svg sm when-unmuted" viewBox="0 0 24 24"><path d="@NaraIcons.VolumeUp" /></svg>
+                        <svg class="nm-svg sm when-muted" viewBox="0 0 24 24"><path d="@NaraIcons.VolumeOff" /></svg>
+                    </button>
+                    <button type="button" class="nm-icon nvid-pip" data-act="pip" title="پخش شناور">
+                        <svg class="nm-svg sm" viewBox="0 0 24 24"><path d="@NaraIcons.Pip" /></svg>
+                    </button>
+                    <button type="button" class="nm-icon" data-act="download" title="دانلود">
+                        <svg class="nm-svg sm" viewBox="0 0 24 24"><path d="@NaraIcons.Download" /></svg>
+                    </button>
+                    <button type="button" class="nm-icon" data-act="full" title="تمام‌صفحه">
+                        <svg class="nm-svg sm when-window" viewBox="0 0 24 24"><path d="@NaraIcons.Fullscreen" /></svg>
+                        <svg class="nm-svg sm when-full" viewBox="0 0 24 24"><path d="@NaraIcons.FullscreenExit" /></svg>
+                    </button>
+                </div>
             </div>
-        }
+        </div>
     </div>
 }
 
-
-<style>
-
-    /* برای ویدیو */
-    video {
-    position: relative; /* موقعیت‌دهی ویدیو */
-    width: 300px;
-    height: 250px;
-    border-radius: 10px;
-    object-fit: cover;
-    }
-
-    /* قرار دادن دکمه وسط ویدیو */
-    .video-overlay {
-    position: absolute;
-    top: 40%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 10; /* دکمه روی ویدیو نمایش داده شود */
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    opacity: 0.8; /* مقداری محو بودن دکمه */
-    cursor: pointer; /* نشانه کلیک */
-    }
-
-
-    /* طراحی دکمه */
-    .play-button {
-    background-color: rgba(0, 0, 0, 0.5);
-    color: white;
-    font-size: 16px;
-    padding: 10px 20px;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    opacity: 1;
-    transition: opacity 0.3s ease;
-    }
-
-    /* مخفی کردن دکمه وقتی ویدیو در حال پخش است */
-    .video-overlay.hidden {
-    display: none;
-    }
-</style>
-
 @code {
     [CascadingParameter(Name = "Theme")]
-    public ThemeChanging ThemeCascading { get; set; }
+    public ThemeChanging ThemeCascading { get; set; } = default!;
 
     [Parameter]
     public ChatMessageDto message { get; set; } = null!;
-    public bool Loading { get; set; } = false;
-}
 
-
-@code {
-    private bool isVideoPlaying = false;
-
-
+    private ElementReference _el;
+    private DotNetObjectReference<VideoMessageComponent>? _self;
+    private bool _initialized, _loading, _loaded, _failed, _disposed;
     private int _percent;
-    private string _sizeText = string.Empty;
-    private Guid? _loadingFileId;
-    private DotNetObjectReference<VideoMessageComponent>? _selfRef;
+    private string? _progressText;
 
-    public async Task loadVideo(Guid FileId)
+    private string SizeText => MediaKit.ParseSize(message.FileContent?.FileSize) is long s
+        ? "ویدیو · " + MediaKit.FormatBytes(s)
+        : "ویدیو";
+
+    private string RingOffset => (150.8 * (1 - Math.Clamp(_percent, 0, 100) / 100.0))
+        .ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        Loading = true;
+        if (_initialized || message.FileContent is null || _disposed) return;
+        _initialized = true;
+        _self = DotNetObjectReference.Create(this);
+        try { await JS.InvokeVoidAsync("naraVideo.init", _el, _self); }
+        catch (JSException) { }
+    }
+
+    private async Task OnPosterClick()
+    {
+        if (_loading)
+        {
+            await JS.InvokeVoidAsync("naraVideo.abort", _el);
+            return;
+        }
+
+        _loading = true;
+        _failed = false;
         _percent = 0;
-        _sizeText = string.Empty;
-        _loadingFileId = FileId;
+        _progressText = null;
         StateHasChanged();
 
-        _selfRef ??= DotNetObjectReference.Create(this);
+        VideoLoadResult? result = null;
+        try
+        {
+            var token = await Auth.GetFreshAccessTokenAsync();
+            var url = SiteSettings.ApiUrl + $"api/v1/chatfiles/{message.FileContent!.FileId}/files";
+            var name = "video-" + message.SendAt.ToString("yyyyMMdd-HHmmss", System.Globalization.CultureInfo.InvariantCulture);
+            result = await JS.InvokeAsync<VideoLoadResult>("naraVideo.load", _el, url, token, name, true);
+        }
+        catch (JSException) { }
+        catch (TaskCanceledException) { }
 
-        var token = await tokenservice.GetAccessTokenAsync();
-        var videoUrl = SiteSettings.ApiUrl + $"api/v1/chatfiles/{FileId}/files";
-
-        await JS.InvokeVoidAsync("playVideoFromApi", $"{FileId}", videoUrl, token, _selfRef);
-
-        Loading = false;
-        _loadingFileId = null;
+        if (_disposed) return;
+        _loading = false;
+        if (result is { Ok: true }) _loaded = true;
+        else _failed = result?.Error != "aborted";
         StateHasChanged();
+
+        if (_loaded)
+        {
+            try { await _el.FocusAsync(); } catch { }
+        }
     }
 
     [JSInvokable]
     public Task OnVideoProgress(int percent, long loaded, long total)
     {
-        // ۲- خطا، ۳- لغو شده
-        if (percent == -2 || percent == -3)
-        {
-            Loading = false;
-            _loadingFileId = null;
-            return InvokeAsync(StateHasChanged);
-        }
-
         _percent = percent;
-        _sizeText = percent < 0
-            ? $"{FormatBytes(loaded)} دریافت شد"
-            : $"{FormatBytes(loaded)} از {FormatBytes(total)}";
-
+        _progressText = percent < 0
+            ? MediaKit.FormatBytes(loaded) + " دریافت شد"
+            : MediaKit.FormatBytes(loaded) + " از " + MediaKit.FormatBytes(total);
         return InvokeAsync(StateHasChanged);
     }
 
-    private async Task CancelVideoLoad()
+    public async ValueTask DisposeAsync()
     {
-        if (_loadingFileId is not null)
-            await JS.InvokeVoidAsync("abortVideoLoad", _loadingFileId.ToString());
+        _disposed = true;
+        if (_self is null) return;
+        try { await JS.InvokeVoidAsync("naraVideo.dispose", _el); } catch { }
+        _self.Dispose();
     }
-
-    private static string FormatBytes(long bytes)
-    {
-        string[] units = { "بایت", "کیلوبایت", "مگابایت", "گیگابایت" };
-        double value = bytes;
-        var unit = 0;
-        while (value >= 1024 && unit < units.Length - 1) { value /= 1024; unit++; }
-        return $"{value:0.#} {units[unit]}";
-    }
-    private void OnVideoPlay()
-    {
-        isVideoPlaying = true;
-        StateHasChanged();
-    }
-
-    private void OnVideoEnded()
-    {
-        isVideoPlaying = false;
-        StateHasChanged();
-    }
-    public void Dispose() => _selfRef?.Dispose();
 }
-

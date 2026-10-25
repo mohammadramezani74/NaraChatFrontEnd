@@ -1,0 +1,73 @@
+﻿@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+@* کارت موقعیت داخل پیام: نقشه‌ی کوچک (کلیک = باز شدن در نقشه)، مختصات، و
+   دکمه‌های مسیریابی و کپی. *@
+
+@if (Lat is not null && Lng is not null)
+{
+    <div class="nloc" style="--nm-accent:@MediaKit.Accent(ThemeCascading)" @onclick:stopPropagation="true">
+        <div class="nloc-map-box">
+            <div class="nloc-map" id="@_mapId"></div>
+            <a class="nloc-hit" href="@OpenUrl" target="_blank" rel="noopener" title="باز کردن در نقشه" aria-label="باز کردن در نقشه"></a>
+        </div>
+        <div class="nloc-foot">
+            <div class="nloc-title">
+                <span>@MediaKit.Fa(MediaKit.Coord(Math.Round(Lat.Value, 5))), @MediaKit.Fa(MediaKit.Coord(Math.Round(Lng.Value, 5)))</span>
+            </div>
+            <a class="nm-icon" href="@OpenUrl" target="_blank" rel="noopener" title="باز کردن در نقشه" aria-label="باز کردن در نقشه">
+                <svg class="nm-svg sm" viewBox="0 0 24 24"><path d="@NaraIcons.Map" /></svg>
+            </a>
+            <a class="nm-icon" href="@DirectionsUrl" target="_blank" rel="noopener" title="مسیریابی" aria-label="مسیریابی">
+                <svg class="nm-svg sm" viewBox="0 0 24 24"><path d="@NaraIcons.Directions" /></svg>
+            </a>
+            <button type="button" class="nm-icon @(_copied ? "ok" : "")" @onclick="Copy" title="کپی مختصات" aria-label="کپی مختصات">
+                <svg class="nm-svg sm" viewBox="0 0 24 24"><path d="@(_copied ? NaraIcons.Check : NaraIcons.Copy)" /></svg>
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    [CascadingParameter(Name = "Theme")]
+    public ThemeChanging? ThemeCascading { get; set; }
+
+    [Parameter] public double? Lat { get; set; }
+    [Parameter] public double? Lng { get; set; }
+
+    private readonly string _mapId = "nloc-" + Guid.NewGuid().ToString("N");
+    private bool _drawn, _copied;
+    private double? _drawnLat, _drawnLng;
+
+    private string LatLng => $"{MediaKit.Coord(Lat ?? 0)},{MediaKit.Coord(Lng ?? 0)}";
+    private string OpenUrl => $"https://www.google.com/maps/search/?api=1&query={LatLng}";
+    private string DirectionsUrl => $"https://www.google.com/maps/dir/?api=1&destination={LatLng}";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (Lat is null || Lng is null) return;
+        if (_drawn && _drawnLat == Lat && _drawnLng == Lng) return;
+
+        _drawn = true;
+        _drawnLat = Lat;
+        _drawnLng = Lng;
+        try { await JS.InvokeVoidAsync("naraLocation.mini", _mapId, Lat.Value, Lng.Value); }
+        catch (JSException) { }
+    }
+
+    private async Task Copy()
+    {
+        try { _copied = await JS.InvokeAsync<bool>("naraLocation.copy", LatLng); }
+        catch (JSException) { _copied = false; }
+        if (!_copied) return;
+        StateHasChanged();
+        await Task.Delay(1500);
+        _copied = false;
+        StateHasChanged();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try { await JS.InvokeVoidAsync("naraLocation.destroy", _mapId); } catch { }
+    }
+}

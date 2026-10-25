@@ -251,12 +251,26 @@ window.naraUpload = (function () {
                 xhr.timeout = 0; // بدون محدودیت زمانی — برای فایل بزرگ حیاتی است
 
                 let lastPercent = -1;
-                xhr.upload.onprogress = function (e) {
-                    if (!e.lengthComputable) return;
-                    const percent = Math.floor((e.loaded / e.total) * 100);
-                    if (percent === lastPercent) return;
+                let lastAt = 0;
+                function report(percent, loaded, total) {
                     lastPercent = percent;
-                    dotNetRef.invokeMethodAsync('OnUploadProgress', percent, e.loaded, e.total);
+                    // خطای این فراخوانی قبلاً بی‌صدا گم می‌شد و نوار روی صفر می‌ماند
+                    Promise.resolve(dotNetRef.invokeMethodAsync('OnUploadProgress', percent, loaded, total))
+                        .catch(function (err) { console.warn('[nara] upload progress callback failed:', err); });
+                }
+                xhr.upload.onprogress = function (e) {
+                    const total = e.lengthComputable ? e.total : file.size;
+                    if (!total) return;
+                    const percent = Math.min(99, Math.floor((e.loaded / total) * 100));
+                    const now = Date.now();
+                    // هر درصد یک بار، و حداکثر هر ۱۵۰ میلی‌ثانیه (رندر Blazor عقب نیفتد)
+                    if (percent === lastPercent || (now - lastAt < 150 && percent < 99)) return;
+                    lastAt = now;
+                    report(percent, e.loaded, total);
+                };
+                // همه‌ی بایت‌ها رفت؛ از اینجا سرور دارد فایل را ذخیره می‌کند
+                xhr.upload.onload = function () {
+                    report(100, file.size, file.size);
                 };
 
                 xhr.onload = function () {

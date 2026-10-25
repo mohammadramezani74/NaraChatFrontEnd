@@ -13,6 +13,7 @@ using NaraChat.Contract.Models.ContactTasks;
 using NaraChat.Contract.Models.Users;
 using NaraChat.Contract.Utilities.FilesExtensions;
 using NaraChatFrontEnd.Models.BaseModels;
+using NaraChatFrontEnd.Pages.ChatPages.Components.ChatComponents.Media;
 using NaraChatFrontEnd.Pages.ChatPages.Components.ContactTasks;
 using NaraChatFrontEnd.Pages.ChatPages.Components.DialogComponents;
 using System.ComponentModel.DataAnnotations;
@@ -587,32 +588,58 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
 
     #region UI actions
 
+    /// <summary>
+    /// پنجره‌ی انتخاب موقعیت را باز می‌کند و نتیجه را در گفتگوی خصوصی یا گروه
+    /// می‌فرستد. کاربر قبل از ارسال نقطه را روی نقشه می‌بیند و می‌تواند جابه‌جا کند.
+    /// </summary>
     private async Task GetLocation()
     {
-        await js.InvokeVoidAsync("startLocationWatcher", objRef);
+        var dialog = await DialogService.ShowAsync<LocationPickerDialog>(null, new DialogOptions
+        {
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            CloseButton = true,
+        });
+        var result = await dialog.Result;
+        if (result is null || result.Canceled || result.Data is not LocationPick pick) return;
+
+        var location = new ChatMessageDto
+        {
+            Id = Guid.NewGuid(),
+            Content = "📍 موقعیت مکانی",
+            IsMine = true,
+            Type = MessageType.Location,
+            SendAt = DateTime.Now,
+            Latitude = (float)pick.Lat,
+            Longitude = (float)pick.Lng,
+        };
+
+        if (SelectedGroup != null) await SendGroupMessage(location);
+        else if (OtherUser != null) await SendMessage(location);
     }
 
-    private async Task RecordVoice()
+    // ضبط را خود VoiceRecorderBar انجام می‌دهد؛ اینجا فقط نوار نمایش داده می‌شود.
+    private void RecordVoice()
     {
-        bool hasMic = await js.InvokeAsync<bool>("checkAudioDevices");
-        if (!hasMic)
+        if (IsUploading)
         {
-            ErrorMessage("🚨  هیچ میکروفونی متصل نیست یا اجازه میکروفون را به مرورگر نداده اید!");
+            ErrorMessage("کمی صبر کنید تا آپلود فایل قبلی تمام شود.");
             return;
         }
-
         isRecording = true;
-        await js.InvokeVoidAsync("startRecording");
     }
 
-    private async Task StopRecording()
+    private void CloseRecorder()
     {
         isRecording = false;
-        var file = await js.InvokeAsync<string>("stopRecording");
-        byte[] audioData = Convert.FromBase64String(file);
-        IBrowserFile browserFile = new CustomBrowserFile(audioData, "recorded_audio.wav", "audio/wav");
-        await UploadFile(browserFile, string.Empty);
         StateHasChanged();
+    }
+
+    private async Task SendVoice(IBrowserFile file)
+    {
+        if (SelectedChannel != null) await UploadChannelFile(file, string.Empty);
+        else if (SelectedGroup != null) await UploadGroupFile(file, string.Empty);
+        else await UploadFile(file, string.Empty);
     }
 
     private async Task HandleCancelClick()
@@ -1186,13 +1213,13 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
             return;
         }
 
-        var result = await chatService.SendMessageForGroupAsync(SelectedGroup.Id, newMessage.Content, ParentId);
+        var result = await chatService.SendMessageForGroupAsync(SelectedGroup.Id, newMessage.Content, ParentId, newMessage.Latitude, newMessage.Longitude);
         if (result.Item1)
         {
             await changeUserLastMessage.InvokeAsync();
             newMessage.Id = result.MessageId;
 
-            if (SelectedChannel != null) _drafts.Remove(SelectedGroup.Id);
+            if (SelectedGroup != null) _drafts.Remove(SelectedGroup.Id);
 
             NeedScrollToBottom();
 
@@ -1825,6 +1852,16 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
         Dictionary<string, string> fields,
         string caption)
     {
+        // سقف سرور (Program.cs: MaxUpload). بهتر است همین اول گفته شود تا اینکه
+        // کاربر چند دقیقه آپلود کند و آخرش سرور رد کند.
+        const long MaxUploadBytes = 550L * 1024 * 1024;
+        if (handle.Size > MaxUploadBytes)
+        {
+            ErrorMessage($"حجم فایل ({FormatBytes(handle.Size)}) بیشتر از حد مجاز ۵۵۰ مگابایت است.");
+            await Uploader.ReleaseAsync(handle.Handle);
+            return;
+        }
+
         _activeUploadHandle = handle.Handle;
         IsUploading = true;
         UploadPercent = 0;
@@ -1853,7 +1890,8 @@ public partial class ChatDetail : ComponentBase, IAsyncDisposable
                 {
                     413 => "حجم فایل بیش از حد مجاز است. فایل کوچک‌تری انتخاب کنید.",
                     401 => "نشست شما منقضی شده. دوباره وارد شوید.",
-                    0 => "ارتباط با سرور قطع شد. اتصال اینترنت را بررسی کنید.",
+                    // وقتی سرور (IIS) فایل بزرگ را رد کند هم مرورگر وضعیت ۰ می‌بیند
+                    0 => "ارسال فایل نیمه‌کاره ماند. اتصال اینترنت را بررسی کنید و دوباره بفرستید.",
                     _ => "آپلود فایل با خطا مواجه شد لطفا مجدد تلاش فرمایید!"
                 });
                 return;

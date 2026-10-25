@@ -1,0 +1,120 @@
+﻿@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+@* پنجره‌ی ارسال موقعیت. موقعیت فعلی پیدا می‌شود ولی کاربر قبل از ارسال آن را
+   روی نقشه می‌بیند و می‌تواند جابه‌جا کند — روی کامپیوتر موقعیت از روی IP حدس
+   زده می‌شود و گاهی چند کیلومتر خطا دارد. *@
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">ارسال موقعیت مکانی</MudText>
+    </TitleContent>
+    <DialogContent>
+        <div class="nlp" style="--nm-accent:@MediaKit.Accent(ThemeCascading)">
+            <div class="nlp-map" id="@_mapId"></div>
+            <button type="button" class="nlp-me @(_locating ? "busy" : "")" @onclick="LocateMe"
+                    title="موقعیت فعلی من" aria-label="موقعیت فعلی من">
+                <svg class="nm-svg" viewBox="0 0 24 24"><path d="@NaraIcons.MyLocation" /></svg>
+            </button>
+        </div>
+        <div class="nlp-status">@_status</div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">انصراف</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@(_lat is null)" OnClick="Send"
+                   StartIcon="@Icons.Material.Filled.Place">
+            ارسال این موقعیت
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [CascadingParameter(Name = "Theme")]
+    public ThemeChanging? ThemeCascading { get; set; }
+
+    private readonly string _mapId = "nlp-" + Guid.NewGuid().ToString("N");
+    private DotNetObjectReference<LocationPickerDialog>? _self;
+    private double? _lat, _lng;
+    private bool _locating;
+    private string _status = "در حال باز کردن نقشه…";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        _self = DotNetObjectReference.Create(this);
+
+        // نقشه کمی بعد از باز شدن پنجره ساخته می‌شود تا اندازه‌ی نهایی را داشته باشد
+        await Task.Delay(150);
+        bool ok;
+        try { ok = await JS.InvokeAsync<bool>("naraLocation.picker", _mapId, null, null, 0, _self); }
+        catch (JSException) { ok = false; }
+
+        if (!ok)
+        {
+            _status = "نقشه بارگذاری نشد. اتصال اینترنت را بررسی کنید.";
+            StateHasChanged();
+            return;
+        }
+        await LocateMe();
+    }
+
+    private async Task LocateMe()
+    {
+        if (_locating) return;
+        _locating = true;
+        _status = "در حال پیدا کردن موقعیت شما…";
+        StateHasChanged();
+
+        GeoResult? r = null;
+        try { r = await JS.InvokeAsync<GeoResult>("naraLocation.locate"); }
+        catch (JSException) { }
+        _locating = false;
+
+        if (r is { Lat: double lat, Lng: double lng })
+        {
+            _lat = lat;
+            _lng = lng;
+            try { await JS.InvokeVoidAsync("naraLocation.moveTo", _mapId, lat, lng, r.Accuracy); } catch (JSException) { }
+            _status = r.Accuracy > 0
+                ? $"دقت حدود {MediaKit.Fa(r.Accuracy.ToString(System.Globalization.CultureInfo.InvariantCulture))} متر. اگر دقیق نیست، سنجاق را بکشید یا روی نقشه بزنید."
+                : "اگر دقیق نیست، سنجاق را بکشید یا روی نقشه بزنید.";
+        }
+        else
+        {
+            _status = r?.Error switch
+            {
+                "denied" => "اجازه‌ی دسترسی به موقعیت داده نشده. روی نقشه بزنید تا مکان را انتخاب کنید.",
+                "timeout" => "پیدا کردن موقعیت طول کشید. روی نقشه بزنید یا دوباره دکمه‌ی موقعیت را بزنید.",
+                "unsupported" => "مرورگر موقعیت را پشتیبانی نمی‌کند. روی نقشه بزنید تا مکان را انتخاب کنید.",
+                _ => "موقعیت پیدا نشد. روی نقشه بزنید تا مکان را انتخاب کنید."
+            };
+        }
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public Task OnPicked(double lat, double lng)
+    {
+        _lat = lat;
+        _lng = lng;
+        _status = "این نقطه ارسال می‌شود: " + MediaKit.Fa(MediaKit.Coord(Math.Round(lat, 5))) + "، " + MediaKit.Fa(MediaKit.Coord(Math.Round(lng, 5)));
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private void Send()
+    {
+        if (_lat is null || _lng is null) return;
+        MudDialog.Close(DialogResult.Ok(new LocationPick(_lat.Value, _lng.Value)));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    public async ValueTask DisposeAsync()
+    {
+        try { await JS.InvokeVoidAsync("naraLocation.destroy", _mapId); } catch { }
+        _self?.Dispose();
+    }
+}
